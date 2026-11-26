@@ -37,6 +37,7 @@ object I18n {
         Language("uk", "Українська"),
         Language("pl", "Polski"),
         Language("tr", "Türkçe"),
+        Language("bn", "বাংলা"),
     )
 
     private const val PREFS = "rawr_i18n"

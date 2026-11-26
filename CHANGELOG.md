@@ -13,6 +13,8 @@ first and moves to `xiaomi-17u` once verified.
   plus words that stay the same, kept as they are so nothing falls back to English).
 - Turkish: the community translation by @agabey_42 (Telegram) replaces the machine-made one (711 texts reworded,
   383 more filled, among them chip abbreviations and error messages).
+- Bengali (বাংলা): the community translation by @arcticstellar (Telegram), bundled as sent (1869 texts); the four newest
+  texts stay in English until it is updated.
 - A build test checks that every bundled language has every text Portuguese has, so a new text can't be translated
   in one language and forgotten in the others (a community file may have more).
 
