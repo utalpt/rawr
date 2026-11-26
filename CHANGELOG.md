@@ -11,8 +11,10 @@ first and moves to `xiaomi-17u` once verified.
 - Three more languages bundled: Ukrainian, Polish and Turkish, machine-made from the full list of texts.
 - Spanish, French, German and Italian now have every text the other languages have (the longer help texts,
   plus words that stay the same, kept as they are so nothing falls back to English).
-- A build test checks that every bundled language has the same texts, so a new text can't be translated in one
-  language and forgotten in the others.
+- Turkish: the community translation by @agabey_42 (Telegram) replaces the machine-made one (711 texts reworded,
+  383 more filled, among them chip abbreviations and error messages).
+- A build test checks that every bundled language has every text Portuguese has, so a new text can't be translated
+  in one language and forgotten in the others (a community file may have more).
 
 ## 0.5.1-17u.13
 

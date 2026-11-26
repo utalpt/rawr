@@ -36,7 +36,10 @@ class I18nTest {
         assertEquals("Filme", tr("Film"))
     }
 
-    /** Every bundled language carries every text any bundled language has, so none falls behind the others. */
+    /**
+     * Every bundled language carries every text Portuguese has (the fork keeps Portuguese complete), so none falls
+     * behind. A language can have more: a community file may also fill texts left in English elsewhere.
+     */
     @Test fun bundledLanguagesCoverTheSameTexts() {
         val dir = File("src/main/assets/i18n")
         val files = I18n.bundled.associate { lang ->
@@ -46,9 +49,9 @@ class I18nTest {
             assertEquals(lang.code, json.optString("@code"), "@code of ${file.name}")
             lang.code to I18n.parse(file.readText()).keys
         }
-        val all = files.values.flatten().toSortedSet()
+        val reference = files.getValue("pt")
         files.forEach { (code, keys) ->
-            val missing = all - keys
+            val missing = reference - keys
             assertTrue(missing.isEmpty(), "$code.json lacks ${missing.size} texts, e.g. ${missing.take(5)}")
         }
     }
