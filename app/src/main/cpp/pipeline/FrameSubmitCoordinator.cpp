@@ -130,7 +130,19 @@ void FrameSubmitCoordinator::configure(const FrameSubmitConfiguration& config) {
         const char setting = __system_property_get("debug.rawr.gles_bridge", bridge) > 0 ? bridge[0] : '\0';
         bridgeEnabled_.store(rawrcam::vulkan::glesBridgeAllowed(device, setting));
         if (!bridgeEnabled_.load()) bridgeSelected_.store(false);
+        // The RAW10 half of the bridge decodes packed MIPI bytes in a compute shader; one property can
+        // take it out on data that misbehaves while the RAW16 pack keeps working.
+        char raw10Bridge[PROP_VALUE_MAX]{};
+        const bool raw10Off =
+            __system_property_get("debug.rawr.gles_bridge_raw10", raw10Bridge) > 0 && raw10Bridge[0] == '0';
+        raw10BridgeEnabled_.store(rawrcam::vulkan::glesBridgeAllowed(device, setting) && !raw10Off);
+        if (!raw10BridgeEnabled_.load()) raw10BridgeSelected_.store(false);
+        // A new configuration gets one more chance at the bridge, as the RAW16 path does.
+        if (raw10BridgeEnabled_.load()) raw10BridgeBroken_.store(false, std::memory_order_relaxed);
         raw10ParityEnabled_ = __system_property_get("debug.rawr.raw10_parity", value) > 0 && value[0] == '1';
+        // One bridge report per configuration: a lens switch reopens at another stride and should say so.
+        raw10BridgeLogged_ = false;
+        raw10GpuUnpackLogged_ = false;
     }
     cpuUpload_.configure(config_.rawWidth, config_.rawHeight);
     cpuUpload_.configureRemosaic(config_.cfaBlock, config_.cfa, config_.cfaQuality, config_.cfaBlack);
@@ -506,40 +518,90 @@ rawrcam::vulkan::ImportedRaw& FrameSubmitCoordinator::ingestRaw(const SubmitPara
             }
         }
     }
-    // RAW10: unpack the imported camera buffer on the GPU into the pool's
-    // owned R16 image. Diagnostic modes keep the CPU route they were built on.
-    if (raw10 && !cpuIngressRequired() && !raw10GpuUnpackLatched_.load(std::memory_order_relaxed) &&
-        config_.diagnosticMode == 0u) {
-        try {
-            int32_t rowStride = 0;
-            if (!params.lease->image() || AImage_getPlaneRowStride(params.lease->image(), 0, &rowStride) != AMEDIA_OK ||
-                rowStride <= 0)
-                throw std::runtime_error("RAW10 row stride unavailable");
-            const auto& camera = resources_.importer()->importRaw10Buffer(
-                params.ahb, config_.rawWidth, config_.rawHeight, static_cast<uint32_t>(rowStride));
-            if (raw10ParityEnabled_) {
-                const std::string report = cpuUpload_.takeRaw10ParityReport(slotIndex);
-                if (!report.empty()) {
-                    LOGI("%s", report.c_str());
-                    lifecyclePort_.postDiagnostic(report);
-                }
-                if (cpuUpload_.raw10ParityIdle() && (++raw10ParityFrame_ % 30u) == 0u)
-                    cpuUpload_.armRaw10Parity(slotIndex, params.lease->image(), params.ahb, params.acquireFenceFd);
+    // RAW10: the camera plane is packed MIPI bytes, so the Vulkan unpack reads it as a storage buffer
+    // (importRaw10Buffer -> Raw10Unpacker). A driver that refuses that AHB goes through the GLES bridge,
+    // whose compute shader decodes the packed groups into the slot BLOB the GPU copy takes: the same
+    // downstream R16 image, still no CPU pixel copy. Diagnostic modes keep the CPU route they were built
+    // on, and the latch is separate from the RAW16 one so a RAW16 fallback cannot strand RAW10.
+    if (raw10 && !cpuIngressRequired() && config_.diagnosticMode == 0u) {
+        int32_t rowStride = 0;
+        const bool strideKnown = params.lease->image() &&
+                                 AImage_getPlaneRowStride(params.lease->image(), 0, &rowStride) == AMEDIA_OK &&
+                                 rowStride > 0;
+        auto bridgePack = [&](const char* mode) -> rawrcam::vulkan::ImportedRaw& {
+            std::string parity;
+            // The parity readback copies the whole slot BLOB back, so sample it once per second rather than
+            // on every frame while the debug property is on.
+            const bool wantParity = raw10ParityEnabled_ && (++raw10BridgeParityFrame_ % 30u) == 0u;
+            auto packed = bridge_.packRaw10(vulkanContext_.device(), vulkanContext_.getAhbProperties(), slotIndex,
+                                            params.ahb, params.acquireFenceFd, config_.rawWidth, config_.rawHeight,
+                                            static_cast<uint32_t>(rowStride), wantParity ? &parity : nullptr);
+            if (!parity.empty()) {
+                LOGI("%s", parity.c_str());
+                lifecyclePort_.postDiagnostic(parity);
             }
-            rawrcam::vulkan::ImportedRaw& raw = cpuUpload_.gpuUnpack(slotIndex, camera);
-            if (!raw10GpuUnpackLogged_) {
-                raw10GpuUnpackLogged_ = true;
-                const std::string line =
-                    "RAW_INGRESS_GPU_UNPACK format=RAW10 rowStrideBytes=" + std::to_string(rowStride);
+            raw10BridgeSelected_.store(true, std::memory_order_relaxed);
+            if (!raw10BridgeLogged_) {
+                raw10BridgeLogged_ = true;
+                const std::string line = std::string("RAW_INGRESS_GLES_BRIDGE format=RAW10 rowStrideBytes=") +
+                                         std::to_string(rowStride) + " mode=" + mode;
                 LOGI("%s", line.c_str());
                 lifecyclePort_.postDiagnostic(line);
             }
-            return raw;
-        } catch (const std::exception& e) {
-            raw10GpuUnpackLatched_.store(true, std::memory_order_relaxed);
-            const std::string line = std::string("RAW_INGRESS_FALLBACK from=gpu_unpack to=cpu_upload reason=") + e.what();
-            LOGE("%s", line.c_str());
-            lifecyclePort_.postDiagnostic(line);
+            return cpuUpload_.gpuCopy(slotIndex, packed);
+        };
+        // Sticky: the bridge already carried a frame, and the Vulkan import was given up on.
+        if (raw10BridgeSelected_.load(std::memory_order_relaxed) && strideKnown) {
+            try {
+                return bridgePack("sticky");
+            } catch (const std::exception& e) {
+                raw10BridgeSelected_.store(false, std::memory_order_relaxed);
+                raw10BridgeBroken_.store(true, std::memory_order_relaxed);
+                const std::string line = std::string("RAW_INGRESS_GLES_BRIDGE_FAILED format=RAW10 reason=") + e.what();
+                LOGE("%s", line.c_str());
+                lifecyclePort_.postDiagnostic(line);
+            }
+        }
+        if (!raw10GpuUnpackLatched_.load(std::memory_order_relaxed)) {
+            try {
+                if (!strideKnown) throw std::runtime_error("RAW10 row stride unavailable");
+                const auto& camera = resources_.importer()->importRaw10Buffer(
+                    params.ahb, config_.rawWidth, config_.rawHeight, static_cast<uint32_t>(rowStride));
+                if (raw10ParityEnabled_) {
+                    const std::string report = cpuUpload_.takeRaw10ParityReport(slotIndex);
+                    if (!report.empty()) {
+                        LOGI("%s", report.c_str());
+                        lifecyclePort_.postDiagnostic(report);
+                    }
+                    if (cpuUpload_.raw10ParityIdle() && (++raw10ParityFrame_ % 30u) == 0u)
+                        cpuUpload_.armRaw10Parity(slotIndex, params.lease->image(), params.ahb, params.acquireFenceFd);
+                }
+                rawrcam::vulkan::ImportedRaw& raw = cpuUpload_.gpuUnpack(slotIndex, camera);
+                if (!raw10GpuUnpackLogged_) {
+                    raw10GpuUnpackLogged_ = true;
+                    const std::string line =
+                        "RAW_INGRESS_GPU_UNPACK format=RAW10 rowStrideBytes=" + std::to_string(rowStride);
+                    LOGI("%s", line.c_str());
+                    lifecyclePort_.postDiagnostic(line);
+                }
+                return raw;
+            } catch (const std::exception& e) {
+                raw10GpuUnpackLatched_.store(true, std::memory_order_relaxed);
+                const std::string line = std::string("RAW_INGRESS_GPU_UNPACK_FAILED format=RAW10 reason=") + e.what();
+                LOGE("%s", line.c_str());
+                lifecyclePort_.postDiagnostic(line);
+            }
+        }
+        // The driver's own unpack is out of the picture: decode the packed plane on the GPU through GLES.
+        if (raw10GlesBridgeWanted() && strideKnown) {
+            try {
+                return bridgePack("session");
+            } catch (const std::exception& e) {
+                raw10BridgeBroken_.store(true, std::memory_order_relaxed);
+                const std::string line = std::string("RAW_INGRESS_GLES_BRIDGE_FAILED format=RAW10 reason=") + e.what();
+                LOGE("%s", line.c_str());
+                lifecyclePort_.postDiagnostic(line);
+            }
         }
     }
     cpuIngressActive_.store(true, std::memory_order_relaxed);

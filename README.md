@@ -144,7 +144,9 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   #140.)*
 
 **Xiaomi 15 (by the-marox, PRs #2 to #5)**
-- GLES bridge for RAW16 where the Vulkan driver refuses the camera buffers; 60 fps only where a sensor mode
+- GLES bridge for RAW16 where the Vulkan driver refuses the camera buffers, and for RAW10, whose packed MIPI
+  plane the bridge's compute shader decodes to 16-bit on the GPU (no CPU copy, no downgraded preview); 60 fps
+  only where a sensor mode
   delivers the RAW stream; sensed flicker for AE; ToF focus and light-sensor WB (both also work on the
   17 Ultra); 1080p from the full sensor width. The mirrored-lens preview fix of #3 is *(already in Rawr:
   Ed's #150)*.

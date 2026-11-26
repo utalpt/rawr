@@ -46,7 +46,7 @@ rawrcam_module(imaging
 
 rawrcam_module(vulkan
   DIRECTORY vulkan
-  DEPENDS
+  DEPENDS imaging
   SOURCES
     vulkan/VulkanContext.cpp
     vulkan/VulkanDispatch.cpp

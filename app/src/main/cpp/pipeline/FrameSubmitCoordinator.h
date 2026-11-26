@@ -194,6 +194,13 @@ class FrameSubmitCoordinator final {
                (raw16ImageImportLatched_.load(std::memory_order_relaxed) || config_.cfaBlock > 1u);
     }
     [[nodiscard]] bool cpuIngressActive() const noexcept { return cpuIngressActive_.load(std::memory_order_relaxed); }
+    // True while the GLES bridge (GlesRawBridge.h) may still take a RAW10 frame. The reader setup asks
+    // this too: the bridge imports the packed plane as a storage buffer, so the camera AHB needs GPU
+    // buffer usage even after the RAW16 latch already sent this process to the CPU.
+    [[nodiscard]] bool raw10GlesBridgeWanted() const noexcept {
+        return raw10BridgeEnabled_.load(std::memory_order_relaxed) &&
+               !raw10BridgeBroken_.load(std::memory_order_relaxed);
+    }
     void setForceCpuIngress(bool enabled) noexcept { forceCpuIngress_.store(enabled, std::memory_order_relaxed); }
     // Skips the R16 image import: readers without GPU image usage can only be
     // read through the buffer import (GPU copy) or the CPU upload.
@@ -313,6 +320,12 @@ class FrameSubmitCoordinator final {
     // Set when the RAW10 GPU unpack failed once; RAW10 then stays on the CPU upload.
     std::atomic<bool> raw10GpuUnpackLatched_{false};
     bool raw10GpuUnpackLogged_ = false;
+    // RAW10 through the same GLES bridge, configured in configure() and dead after one GLES refusal.
+    // Its latch is separate from the RAW16 one so a RAW16 fallback cannot strand RAW10 on the CPU.
+    std::atomic<bool> raw10BridgeEnabled_{false};
+    std::atomic<bool> raw10BridgeBroken_{false};
+    std::atomic<bool> raw10BridgeSelected_{false};  // sticky: readers keep GPU buffer usage
+    bool raw10BridgeLogged_ = false;
     // Set when the RAW16 image import failed once; RAW16 then goes through the
     // GPU buffer copy (or, if that fails too, the CPU upload).
     std::atomic<bool> raw16ImageImportLatched_{false};
@@ -322,6 +335,7 @@ class FrameSubmitCoordinator final {
     bool raw16GpuCopyDeferredLogged_ = false;
     bool raw10ParityEnabled_ = false;  // debug.rawr.raw10_parity
     uint32_t raw10ParityFrame_ = 0;
+    uint32_t raw10BridgeParityFrame_ = 0;
     rawrcam::vulkan::ImportedRaw& ingestRaw(const SubmitParams& params, uint32_t slotIndex);
     VideoDropReasons videoDropReasons_{};
     std::string lastVideoSubmitFailure_;
