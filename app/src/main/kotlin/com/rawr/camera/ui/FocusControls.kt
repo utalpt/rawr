@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,6 +40,7 @@ import com.rawr.camera.architecture.MoveSpotAe
 import com.rawr.camera.architecture.OpenFocusSelector
 import com.rawr.camera.architecture.Refocus
 import com.rawr.camera.architecture.SetFocusMode
+import com.rawr.camera.integration.tofDistanceForFocus
 import com.rawr.camera.architecture.SetManualFocus
 import com.rawr.camera.model.*
 import kotlin.math.roundToInt
@@ -283,7 +285,7 @@ private fun pulsingAlpha(status: TargetStatus): Float {
 internal fun FocusBottomControls(state: CaptureUiState, dispatch: CaptureDispatch, modifier: Modifier = Modifier) {
     // The laser ToF distance, where the phone has one (rear cameras): a cell that focuses there.
     val aux = LocalAuxSensors.current?.collectAsStateWithLifecycle()?.value
-    val tof = aux?.tofDistanceMm?.let { mm ->
+    val tof = tofDistanceForFocus(aux, state.focus, state.capabilities.manualFocus)?.let { mm ->
         tofFocusNormalized(mm, state.capabilities.manualFocus)?.let { TofFocus(mm, it) }
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(CaptureDimens.ControlGap)) {
@@ -432,12 +434,16 @@ private fun FocusModeSelector(
                     },
                 contentAlignment = Alignment.Center
             ) {
+                // Turned upright in landscape the label runs along the bar's height: "TOF 1.1m" on one line
+                // ran past the screen edge (17U), two lines of at most four characters fit.
                 Text(
-                    label,
+                    if (orientation == Orientation.Landscape) label.replaceFirst(' ', '\n') else label,
                     color = Color.White.copy(alpha = .72f),
                     fontFamily = CaptureMono,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 10.sp,
+                    lineHeight = 11.sp,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.uprightInLandscape(orientation)
                 )
             }

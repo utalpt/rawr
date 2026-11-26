@@ -1,5 +1,8 @@
 package com.rawr.camera.integration
 
+import com.rawr.camera.model.FocusMode
+import com.rawr.camera.model.FocusUiState
+import com.rawr.camera.model.ManualFocusCapability
 import kotlin.math.abs
 import kotlin.math.log2
 import kotlin.math.roundToLong
@@ -228,4 +231,36 @@ object FlickerBanding {
         val periods = (exposureNs.toDouble() / periodNs).roundToLong().coerceAtLeast(1L)
         return periods * periodNs
     }
+}
+
+/** A ToF reading this much nearer than a confirmed AF focus, in diopters, disagrees with the image ... */
+private const val TOF_AF_GAP_DIOPTERS = 0.5f
+/** ... or this share of the AF diopters, whichever is larger, so close up (where both read in many diopters) it scales. */
+private const val TOF_AF_GAP_SHARE = 0.5f
+
+/**
+ * The ToF distance to show and focus at, or null when there is none or it contradicts the image.
+ *
+ * The Xiaomi 17 Ultra's ST L8 reports a valid-looking 0.4-0.65 m in bright light that is not there: at
+ * open sky (AF at 11-20 m) and on sunlit paving or a car (AF at 1.2-1.9 m, utalpt's tests). Indoors it agrees
+ * with AF (a backpack at 1.2 m reads 1.1-1.2 m). The Xiaomi 15's VI5300 flags the sky by its status.
+ * So when the camera's AF has placed the lens and confirms focus, a ToF distance more than
+ * max(0.5 D, half the AF diopters) nearer than that focus is not offered. A focus confirmed by contrast on the
+ * image outweighs the laser then; the cost is a real near object AF did not pick (a hand in front of the
+ * subject), which manual focus still reaches. Manual focus, a scanning or failed AF, or a lens whose focus
+ * distance is not calibrated leave the reading as it is: that is where the ToF helps. The TOF cell, the
+ * light-meter pill and the capture metadata (rawr:TofDistance) all take the distance from here.
+ */
+internal fun tofDistanceForFocus(
+    reading: AuxSensorReading?,
+    focus: FocusUiState,
+    capability: ManualFocusCapability
+): Float? {
+    val distance = reading?.tofDistanceMm ?: return null
+    val afDiopters = focus.appliedFocusDiopters
+    val afConfirmed = focus.mode != FocusMode.Mf && focus.afFocused && capability.distanceReadoutTrustworthy &&
+        afDiopters != null && afDiopters.isFinite() && afDiopters >= 0f
+    if (!afConfirmed) return distance
+    val gap = 1000f / distance - afDiopters!!
+    return distance.takeUnless { gap > maxOf(TOF_AF_GAP_DIOPTERS, TOF_AF_GAP_SHARE * afDiopters) }
 }

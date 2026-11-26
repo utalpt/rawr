@@ -1,5 +1,9 @@
 package com.rawr.camera.ui
 
+import com.rawr.camera.integration.AuxSensorReading
+import com.rawr.camera.integration.tofDistanceForFocus
+import com.rawr.camera.model.FocusMode
+import com.rawr.camera.model.FocusUiState
 import com.rawr.camera.model.ManualFocusCapability
 import kotlin.test.*
 
@@ -26,6 +30,44 @@ class TofFocusTest {
         assertNull(tofFocusNormalized(1000f, lens.copy(distanceReadoutTrustworthy = false)))
         assertNull(tofFocusNormalized(1000f, lens.copy(supported = false)))
         assertNull(tofFocusNormalized(1000f, lens.copy(minimumFocusDistance = 0f)))
+    }
+
+    private fun afAt(metres: Float, mode: FocusMode = FocusMode.Af) =
+        FocusUiState(mode = mode, appliedFocusDiopters = 1f / metres, afFocused = true)
+    private fun tof(mm: Float) = AuxSensorReading(tofDistanceMm = mm)
+
+    // utalpt's 17U tests: the L8 reads a made-up 0.4-0.65 m in bright light.
+    @Test fun aReadingFarNearerThanAConfirmedAfFocusIsDropped() {
+        assertNull(tofDistanceForFocus(tof(540f), afAt(12.5f), lens))                     // open sky
+        assertNull(tofDistanceForFocus(tof(540f), afAt(12.5f, FocusMode.AfLock), lens))
+        assertNull(tofDistanceForFocus(tof(540f), FocusUiState(mode = FocusMode.Af, appliedFocusDiopters = 0f, afFocused = true), lens))
+        assertNull(tofDistanceForFocus(tof(570f), afAt(3.3f), lens))                      // sky beside a wall
+        assertNull(tofDistanceForFocus(tof(640f), afAt(1.2f), lens))                      // sunlit paving
+        assertNull(tofDistanceForFocus(tof(480f), afAt(1.9f), lens))                      // a car in the sun
+    }
+
+    @Test fun aReadingThatAgreesWithAfStays() {
+        assertEquals(1100f, tofDistanceForFocus(tof(1100f), afAt(1.4f), lens))           // backpack, landscape
+        assertEquals(1200f, tofDistanceForFocus(tof(1200f), afAt(1.1f), lens))           // backpack, portrait
+        assertEquals(4000f, tofDistanceForFocus(tof(4000f), afAt(12.5f), lens))          // farther than AF: kept
+        // Close up both read in many diopters: 10 cm against AF at 11 cm is agreement.
+        assertEquals(100f, tofDistanceForFocus(tof(100f), afAt(0.11f), lens))
+        assertNull(tofDistanceForFocus(tof(60f), afAt(0.11f), lens))
+    }
+
+    @Test fun withoutAConfirmedAfFocusTheReadingStays() {
+        val sky = afAt(12.5f)
+        assertEquals(540f, tofDistanceForFocus(tof(540f), sky.copy(afFocused = false), lens))      // scanning or failed
+        assertEquals(540f, tofDistanceForFocus(tof(540f), sky.copy(mode = FocusMode.Mf), lens))    // the user set focus
+        assertEquals(540f, tofDistanceForFocus(tof(540f), sky.copy(appliedFocusDiopters = null), lens))
+        assertEquals(540f, tofDistanceForFocus(tof(540f), sky, lens.copy(distanceReadoutTrustworthy = false)))
+        assertNull(tofDistanceForFocus(AuxSensorReading(), sky, lens))
+        assertNull(tofDistanceForFocus(null, sky, lens))
+    }
+
+    @Test fun aNearObjectAfDidNotPickIsNotOffered() {
+        // The price of trusting a confirmed AF: a hand at 10 cm in front of a wall AF focused at 1.1 m.
+        assertNull(tofDistanceForFocus(tof(105f), afAt(1.1f), lens))
     }
 
     @Test fun labelIsShort() {

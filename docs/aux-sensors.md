@@ -51,7 +51,7 @@ two standard sensors many phones have, the barometer (`TYPE_PRESSURE`) and the r
 | `xiaomi.sensor.back_lux_strm` | continuous, 10 Hz | [0] lux, [1] lux, [2] gain, [3] integration ms, [4..7] raw channels |
 | `xiaomi.sensor.back_lux` | on change | [0] lux |
 | `xiaomi.sensor.flicker` | ~8 Hz | [0] dominant frequency, a multiple of 7.8125 Hz (1000/128); 7.8125 = no flicker |
-| `xiaomi.sensor.tof` | continuous, 10 Hz | [0] distance mm (about -5 when covered, max 4000), [2]/[3] range bounds mm |
+| `xiaomi.sensor.tof` | continuous, 10 Hz | [0] distance mm (about -5 when covered, max 4000), [1] status (0 target, 255 none), [2]/[3] range bounds mm |
 
 In the dark the CCT reads about 662000 ("no measurement"); Rawr drops CCT outside 1000–25000 K and below 2 lux.
 
@@ -65,7 +65,36 @@ Readings taken with the probe app, back of the phone towards the source:
 | Wall at ~20 cm under the same lamp | 9.8 | 2720 K | 7.81 |
 
 ToF [0]: 218 mm against a wall at about 20 cm, 529 mm and 3384 mm at farther surfaces, -5 with the phone lying
-on its back.
+on its back. Aimed at an overcast sky [0] still gives 1.7–2.8 m, with status 255: only status 0 counts.
+
+The Xiaomi 17 Ultra's `xiaomi.sensor.tof` is an ST "L8 TOF Sensor" with another layout: [0..7] four
+distance/status pairs, one per horizontal band of the frame from the top (portrait), [8..15] unset. A flat wall
+reads 993/1018/1040/1072 mm; a hand over the top half changes bands 0 and 1 only. Rawr picks the layout from the
+sensor's name (`tofLayoutFor`) and focuses at the nearer of the two middle bands. In bright light the L8 reports
+a made-up 0.4–0.65 m with status 0: at open sky every band reads 520–630 mm, and sunlit paving or a car at
+1.2–1.9 m read the same. So `tofDistanceForFocus` drops the distance when the camera's AF confirms focus and the
+ToF is more than max(0.5 D, half the AF diopters) nearer than it; with manual focus or AF not focused the
+reading stays. The TOF cell, the light-meter pill and the capture metadata all take the distance from there.
+
+The L8's status cannot tell either, so on that phone the distance is also filtered over time (`TofWindow`):
+nothing is published until three readings agree, the median of the last five is what gets published, and a
+window whose readings span more than max(50 mm, 10 % of the median) is emptied rather than averaged, because
+a target that moves that far in half a second is not one target. A reading with no target (status invalid,
+out of range) ends the window too. `debug.rawr.tof_stability 0` turns the filter off for one session on any
+phone, which is how the same scene is compared with and without it.
+
+Above a set light level the L8's distance is withheld altogether: `debug.rawr.tof_max_lux` overrides the
+15 000 lux the phone uses by default (0 turns the limit off, 40 000 raises it). It is the low end of the
+15 000-57 000 range where utalpt saw the invented distance, a starting point for the sweep and not a
+calibration: targets at 0.3, 0.5, 1, 2 and 3 m at 0, 100, 1 000, 15 000 and 57 000 lux decide whether a
+single ceiling is right, whether it has to be a ramp, and whether the sensor is simply unusable above it.
+The window and the ceiling are off on every other phone, and the VI5300 keeps its status as the only guard.
+
+The sweep has an instrument of its own: `debug.rawr.tof_log 1`, then `adb logcat -s RawrTof` prints a
+`TOF_SAMPLE` line per reading (distance, the band statuses, lux, CCT, monotonic ms) and a `TOF_SUMMARY`
+line every ten with the median, the median absolute deviation, min/max and how many readings had no
+target, so each cell of the sweep is a number instead of an impression. The property is read again every
+ten readings; nothing is logged while it is off, on any phone.
 
 Flicker is confirmed after three readings in a row within one bin of 100 or 120 Hz and released after
 16 readings in a row that are not, about two seconds (`FlickerClassifier`).
