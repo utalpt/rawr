@@ -136,7 +136,8 @@ internal fun FilmStrip(
                             groups = groups,
                             helpFor = ::filmSheetSettingHelp
                         )
-                    }
+                    },
+                    onAllParams = { mode = FilmStripMode.Config }
                 )
             }
             FilmStripMode.Quick -> {
@@ -181,6 +182,8 @@ internal fun FilmStrip(
                     },
                     onCloseParams = {
                         l4Key = null
+                        // Rawr 17U fork: the LOOK button reopens on the film sheet, not on ALL PARAMS.
+                        mode = FilmStripMode.Profiles
                         closeSheet()
                     },
                     l4Key = l4Key,

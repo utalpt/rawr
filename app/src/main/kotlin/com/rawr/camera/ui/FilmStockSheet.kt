@@ -263,7 +263,9 @@ internal fun FilmSheetPanel(
     onApply: (LookEdit) -> Unit,
     onHold: (HeldLook?) -> Unit,
     /** The PARAMS quick card limited to one group (by its label), or nothing for a tab without one. */
-    groupCard: @Composable (String) -> Unit
+    groupCard: @Composable (String) -> Unit,
+    /** Rawr 17U fork: opens ALL PARAMS (every film parameter); null hides the chip. */
+    onAllParams: (() -> Unit)? = null
 ) {
     val film = quick.discretes["Film"]?.selectedIndex ?: -1
     var tab by remember { mutableStateOf(filmSheetTabOf(film)) }
@@ -285,6 +287,7 @@ internal fun FilmSheetPanel(
             tab = tab,
             onTab = { tab = it },
             onClose = onClose,
+            onAllParams = onAllParams,
             onSelectPreset = onSelectPreset,
             onApply = onApply,
             onHold = { edit ->
@@ -306,7 +309,9 @@ internal fun FilmStockSheet(
     onApply: (LookEdit) -> Unit,
     /** Show a change on the viewfinder only while a card is held; null on release. */
     onHold: (HeldLook?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Rawr 17U fork: opens ALL PARAMS; null hides the chip. */
+    onAllParams: (() -> Unit)? = null
 ) {
     val haptics = LocalCaptureHaptics.current
     val showHelp = rememberControlHelp()
@@ -417,6 +422,37 @@ internal fun FilmStockSheet(
                     Text(
                         tr(t.label),
                         color = if (on) CaptureColors.Accent else Color.White.copy(alpha = .8f),
+                        fontFamily = CaptureMono,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        style = ViewfinderTextStyle
+                    )
+                }
+            }
+            // Rawr 17U fork: the way into ALL PARAMS. Since the LOOK button opens this sheet in place of FILM and
+            // PARAMS, the quick card's "ADV ›" (in its FILTERS group) had no tab to show it.
+            if (onAllParams != null) item(key = "all_params") {
+                Box(
+                    Modifier
+                        .height(26.dp)
+                        .viewfinderChip(active = false)
+                        .captureCombinedClickable(
+                            shape = CaptureTextRippleShape,
+                            onLongClickLabel = "Explain",
+                            onLongClick = { showHelp("All params: every film parameter, by section. Sections whose switch is off show OFF.") }
+                        ) {
+                            haptics.selection()
+                            onAllParams()
+                        }
+                        .padding(horizontal = 8.dp)
+                        .semantics { contentDescription = "All film parameters" }
+                        .testTag("film_sheet_all_params"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        tr("ALL PARAMS") + " ›",
+                        color = Color.White.copy(alpha = .8f),
                         fontFamily = CaptureMono,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 10.sp,
