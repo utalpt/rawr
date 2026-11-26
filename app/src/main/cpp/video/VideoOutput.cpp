@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 #include <ctime>
@@ -18,6 +20,7 @@
 
 #include "video_yuv_pack_nv12.h"
 #include "video_yuv_pack_p010.h"
+#include "video/VideoAcquirePolicy.h"
 #include "vulkan/ImageResources.h"
 #include "vulkan/RawImportEvidence.h"
 #include "vulkan/VulkanContext.h"
@@ -32,6 +35,14 @@ int64_t monotonicNs() {
     timespec now{};
     clock_gettime(CLOCK_MONOTONIC, &now);
     return int64_t(now.tv_sec) * 1'000'000'000 + now.tv_nsec;
+}
+
+uint32_t acquireWaitMs() noexcept {
+    char device[PROP_VALUE_MAX] = {};
+    char setting[PROP_VALUE_MAX] = {};
+    __system_property_get("ro.product.device", device);
+    __system_property_get("debug.rawr.video_acquire_wait_ms", setting);
+    return rawrcam::video::videoAcquireWaitMs(device, setting);
 }
 bool clearException(JNIEnv* env) {
     if (!env->ExceptionCheck()) return false;
@@ -206,23 +217,52 @@ void VideoOutput::stop() noexcept {
     extent_ = {};
     startedAtNs_ = 0;
 }
-bool VideoOutput::acquire(uint32_t frameSlot, uint32_t* imageIndex) {
+VideoOutput::YuvStats VideoOutput::yuvStats() const noexcept {
+    std::lock_guard<std::mutex> lock(yuvMutex_);
+    return {yuvNoBuffer_.load(std::memory_order_relaxed), yuvNoReady_, yuvNoImage_, yuvAcquires_,
+            yuvDequeues_, yuvQueued_, yuvFenceWaits_, yuvDequeues_ ? yuvDequeueMs_ / double(yuvDequeues_) : 0.0,
+            yuvDequeueMaxMs_, yuvFenceWaits_ ? yuvFenceMs_ / double(yuvFenceWaits_) : 0.0, yuvFenceMaxMs_};
+}
+
+bool VideoOutput::acquire(uint32_t frameSlot, uint32_t* imageIndex, uint64_t frameOrdinal,
+                           uint64_t timestampNs) {
     if (!ready() || frameSlot >= available_.size()) return false;
     if (yuv_) {
-        std::lock_guard<std::mutex> lock(yuvMutex_);
-        uint32_t index = kYuvImages;
-        for (uint32_t k = 0; k < kYuvImages; ++k) {
-            const uint32_t candidate = (nextYuvIndex_ + k) % kYuvImages;
-            if (!yuvFrames_[candidate].inUse) {
-                index = candidate;
-                break;
+        std::unique_lock<std::mutex> lock(yuvMutex_);
+        const auto findFree = [this] {
+            for (uint32_t k = 0; k < kYuvImages; ++k) {
+                const uint32_t candidate = (nextYuvIndex_ + k) % kYuvImages;
+                if (!yuvFrames_[candidate].inUse) return candidate;
             }
-        }
+            return kYuvImages;
+        };
+        uint32_t index = findFree();
         ++yuvAcquires_;
+        const uint32_t waitMs = acquireWaitMs();
+        if ((readyImages_.empty() || index == kYuvImages) && waitMs > 0) {
+            yuvCv_.wait_for(lock, std::chrono::milliseconds(waitMs), [&] {
+                index = findFree();
+                return !readyImages_.empty() && index != kYuvImages;
+            });
+        }
         if (readyImages_.empty() || index == kYuvImages) {
-            // No encoder buffer in hand: drop this frame now instead of waiting.
+            // A short wait is opt-in and limited to the validated dada device.
+            // Classify the miss so a recording can distinguish feeder starvation
+            // from all GPU output images still being in flight.
             yuvNoBuffer_.fetch_add(1, std::memory_order_relaxed);
-            if (index == kYuvImages) ++yuvNoImage_; else ++yuvNoReady_;
+            if (index == kYuvImages) {
+                ++yuvNoImage_;
+                YLOG("VIDEO_YUV_ACQUIRE_DROP reason=noImage frameOrdinal=%llu timestampNs=%llu waitMs=%u "
+                     "ready=%zu pending=%zu outstanding=%u",
+                     static_cast<unsigned long long>(frameOrdinal), static_cast<unsigned long long>(timestampNs),
+                     waitMs, readyImages_.size(), pendingImages_.size(), outstandingImages_);
+            } else {
+                ++yuvNoReady_;
+                YLOG("VIDEO_YUV_ACQUIRE_DROP reason=noReady frameOrdinal=%llu timestampNs=%llu waitMs=%u "
+                     "ready=%zu pending=%zu outstanding=%u",
+                     static_cast<unsigned long long>(frameOrdinal), static_cast<unsigned long long>(timestampNs),
+                     waitMs, readyImages_.size(), pendingImages_.size(), outstandingImages_);
+            }
             yuvCv_.notify_one();
             return false;
         }
@@ -232,7 +272,7 @@ bool VideoOutput::acquire(uint32_t frameSlot, uint32_t* imageIndex) {
                  static_cast<unsigned long long>(yuvAcquires_), static_cast<unsigned long long>(yuvNoReady_),
                  static_cast<unsigned long long>(yuvNoImage_), readyImages_.size(), pendingImages_.size(),
                  outstandingImages_, yuvDequeues_ ? yuvDequeueMs_ / double(yuvDequeues_) : 0.0, yuvDequeueMaxMs_,
-                 yuvQueued_ ? yuvFenceMs_ / double(yuvQueued_) : 0.0, yuvFenceMaxMs_,
+                 yuvFenceWaits_ ? yuvFenceMs_ / double(yuvFenceWaits_) : 0.0, yuvFenceMaxMs_,
                  static_cast<unsigned long long>(yuvQueued_));
         const ReadyImage next = readyImages_.front();
         readyImages_.pop_front();
@@ -420,7 +460,11 @@ bool VideoOutput::startYuv(JNIEnv* env, jobject surface, uint32_t width, uint32_
     nextYuvIndex_ = 0;
     yuvNoBuffer_.store(0, std::memory_order_relaxed);
     // Have encoder buffers in hand (and their imports done) before the first frame.
-    for (uint32_t i = 0; i < kYuvReady; ++i) {
+    char productDevice[PROP_VALUE_MAX] = {}, readySetting[PROP_VALUE_MAX] = {};
+    __system_property_get("ro.product.device", productDevice);
+    __system_property_get("debug.rawr.video_yuv_ready", readySetting);
+    yuvReadyTarget_ = videoReadyBufferCount(productDevice, readySetting);
+    for (uint32_t i = 0; i < yuvReadyTarget_; ++i) {
         if (!dequeueEncoderImage(env)) throw std::runtime_error("first encoder buffer");
         ++outstandingImages_;
     }
@@ -522,6 +566,7 @@ bool VideoOutput::dequeueEncoderImage(JNIEnv* env) {
     env->DeleteLocalRef(image);
     std::lock_guard<std::mutex> lock(yuvMutex_);
     readyImages_.push_back({global, buffer});
+    yuvCv_.notify_all();
     return true;
 }
 
@@ -549,7 +594,7 @@ void VideoOutput::feederLoop() {
         // first (~15 ms per frame at 4K60) starved the ready list and dropped
         // frames (VIDEO_YUV_FLOW noReady). Finished frames still go first so an
         // encoder holding buffers for lookahead always gets its next input.
-        const bool topUp = readyImages_.size() < kYuvReady && outstandingImages_ < kYuvWriterImages;
+        const bool topUp = readyImages_.size() < yuvReadyTarget_ && outstandingImages_ < kYuvWriterImages;
         if (!pendingImages_.empty() &&
             (!topUp || vkGetFenceStatus(device, yuvFences_[pendingImages_.front()]) == VK_SUCCESS)) {
             const uint32_t index = pendingImages_.front();
@@ -558,13 +603,12 @@ void VideoOutput::feederLoop() {
             const auto w0 = std::chrono::steady_clock::now();
             const VkResult r = vkWaitForFences(device, 1, &fence, VK_TRUE, 2'000'000);
             const double waited = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - w0).count();
-            yuvFenceMs_ += waited;
-            if (waited > yuvFenceMaxMs_) yuvFenceMaxMs_ = waited;
-            if (r == VK_SUCCESS) {
-                queueEncoderImage(env, index);
-                ++yuvQueued_;
-            }
+            if (r == VK_SUCCESS) queueEncoderImage(env, index);
             lock.lock();
+            yuvFenceMs_ += waited;
+            ++yuvFenceWaits_;
+            if (waited > yuvFenceMaxMs_) yuvFenceMaxMs_ = waited;
+            if (r == VK_SUCCESS) ++yuvQueued_;
             if (r != VK_TIMEOUT) {
                 if (r != VK_SUCCESS) {  // lost frame: return the buffer unqueued
                     YLOG("VIDEO_YUV_FENCE_FAIL result=%d", r);
@@ -577,6 +621,7 @@ void VideoOutput::feederLoop() {
                 pendingImages_.pop_front();
                 yuvFrames_[index] = {};
                 --outstandingImages_;
+                yuvCv_.notify_all();
             }
             continue;
         }
@@ -587,10 +632,10 @@ void VideoOutput::feederLoop() {
             const auto d0 = std::chrono::steady_clock::now();
             const bool ok = dequeueEncoderImage(env);
             const double took = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - d0).count();
+            lock.lock();
             yuvDequeueMs_ += took;
             if (took > yuvDequeueMaxMs_) yuvDequeueMaxMs_ = took;
             ++yuvDequeues_;
-            lock.lock();
             if (!ok) {
                 --outstandingImages_;
                 lock.unlock();
@@ -670,7 +715,7 @@ void VideoOutput::stopYuv() noexcept {
          static_cast<unsigned long long>(yuvNoBuffer_.load(std::memory_order_relaxed)),
          static_cast<unsigned long long>(yuvNoReady_), static_cast<unsigned long long>(yuvNoImage_),
          encoderBuffers_.size());
-    yuvNoReady_ = yuvNoImage_ = yuvAcquires_ = yuvDequeues_ = yuvQueued_ = 0;
+    yuvNoReady_ = yuvNoImage_ = yuvAcquires_ = yuvDequeues_ = yuvQueued_ = yuvFenceWaits_ = 0;
     yuvDequeueMs_ = yuvDequeueMaxMs_ = yuvFenceMs_ = yuvFenceMaxMs_ = 0;
     if (env) {
         // Closing the writer returns every dequeued image to the encoder Surface.

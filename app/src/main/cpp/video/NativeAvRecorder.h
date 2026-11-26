@@ -102,6 +102,8 @@ private:
     int64_t monotonicToBootUs_ = 0;
     AMediaCodec* videoCodec_ = nullptr;
     std::string videoCodecName_;
+    // "reused" when VideoEncoderPrewarm supplied the codec, else "missed"/"off".
+    std::string encoderPrewarm_ = "off";
     AMediaCodec* audioCodec_ = nullptr;
     ANativeWindow* inputWindow_ = nullptr;
     std::shared_ptr<AudioInput> audioInput_;

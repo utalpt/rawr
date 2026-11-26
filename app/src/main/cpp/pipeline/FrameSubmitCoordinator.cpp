@@ -339,7 +339,7 @@ std::optional<FrameSubmitCoordinator::AcquiredSubmit> FrameSubmitCoordinator::ac
     if (videoOutput_ && videoOutput_->ready() && config_.diagnosticMode == 0u && !preRoll) {
         if (videoOutput_->extent().width <= config_.rawWidth && videoOutput_->extent().height <= config_.rawHeight) {
             uint32_t index = 0;
-            if (videoOutput_->acquire(slotIndex, &index))
+            if (videoOutput_->acquire(slotIndex, &index, metadata.frameOrdinal, params.timestampNs))
                 videoIndex = index;
             else {
                 ++videoDrops_;

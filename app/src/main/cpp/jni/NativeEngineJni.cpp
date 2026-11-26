@@ -27,6 +27,7 @@
 #include "jni/DevelopSettingsReader.h"
 #include "jni/SessionEngineApi.h"
 #include "tonemap/ColorRenderProfile.h"
+#include "video/VideoEncoderPrewarm.h"
 #include "vulkan/VulkanDispatch.h"
 
 namespace {
@@ -232,6 +233,27 @@ extern "C" JNIEXPORT void JNICALL Java_com_rawr_camera_integration_NativePreview
                                                                                                               jobject,
                                                                                                               jlong h) {
     rawrcam::session::releaseVideoProcessing(handle(h));
+}
+// The encoder prewarm is process-wide, not per session: it is the same pool the
+// recording start takes from, and the property debug.rawr.video_encoder_prewarm
+// decides whether anything is built at all.
+extern "C" JNIEXPORT void JNICALL Java_com_rawr_camera_integration_NativePreviewEngine_prewarmVideoEncoder(
+    JNIEnv*, jobject, jint width, jint height, jint fps, jint bitrate, jint intraFrames, jint bitrateMode,
+    jint maxBFrames, jint bitDepth) {
+    rawrcam::video::HevcVideoEncoderSpec spec;
+    spec.width = std::max(width, 0);
+    spec.height = std::max(height, 0);
+    spec.fps = std::max(fps, 0);
+    spec.bitrate = std::max(bitrate, 0);
+    spec.intraFrames = std::max(intraFrames, 1);
+    spec.bitrateMode = std::max(bitrateMode, -1);
+    spec.maxBFrames = std::max(maxBFrames, -1);
+    spec.bitDepth = std::max(bitDepth, 0);
+    rawrcam::video::VideoEncoderPrewarm::instance().warm(spec);
+}
+extern "C" JNIEXPORT void JNICALL Java_com_rawr_camera_integration_NativePreviewEngine_releaseVideoEncoderPrewarm(
+    JNIEnv*, jobject) {
+    rawrcam::video::VideoEncoderPrewarm::instance().release();
 }
 extern "C" JNIEXPORT void JNICALL Java_com_rawr_camera_integration_NativePreviewEngine_setVideoPreviewCrop(
     JNIEnv*, jobject, jlong h, jint width, jint height, jint aspectNum, jint aspectDen, jboolean halve) {

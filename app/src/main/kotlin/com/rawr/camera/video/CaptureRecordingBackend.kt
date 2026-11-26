@@ -52,28 +52,25 @@ internal class CaptureRecordingBackend(
                 // Settings → Video Encoder; debug builds let scripted runs override via extras.
                 fun extra(name: String, value: Int) =
                     options.encoderOverrides[name] ?: value
-                // Never ask for more than the encoder advertises.
-                val bitrate = extra("raw_video_bitrate", minOf(encoder.bitrateMbps(selectedMode),
-                    com.rawr.camera.video.VideoEncoderCapabilities.maxBitrateMbps) * 1_000_000)
-                val intraFrames = extra("raw_video_intra_frames", encoder.keyframeInterval.frames(selectedFps))
-                val bitrateMode = extra("raw_video_bitrate_mode", encoder.bitrateMode.wireValue)
-                val maxBFrames = extra("raw_video_max_b_frames", encoder.maxBFrames)
+                val bitDepth = if (log) 10 else extra("raw_video_bit_depth", encoder.bitDepth)
                 val audioChannels = extra("raw_video_audio_channels", encoder.audioChannels)
                 val audioBitrate = extra("raw_video_audio_bitrate", encoder.audioBitrateKbps * 1_000)
-                val bitDepth = if (log) 10 else extra("raw_video_bit_depth", encoder.bitDepth)
+                // Encoder input, shared with the prewarm: one builder for both paths.
+                val setup = encoder.encoderSetup(
+                    selectedMode, frameSize, selectedFps, bitDepth, options.encoderOverrides)
                 if (log) check(VideoEncoderCapabilities.supportsMain10(frameSize.width, frameSize.height, selectedFps)) {
                     "LOG requires hardware HEVC 10-bit at ${frameSize.width}×${frameSize.height} / $selectedFps fps"
                 }
                 recorder.start(NativeVideoRecorder.Settings(
                     gps = gps,
                     saveLocationId = imageSettings.saveLocationId,
-                    fps = selectedFps, bitrate = bitrate, intraFrames = intraFrames,
-                    width = frameSize.width, height = frameSize.height, mode = selectedMode.label,
-                    deviceRotationDegrees = deviceRotationDegrees, bitrateMode = bitrateMode,
-                    maxBFrames = maxBFrames, audioChannels = audioChannels, audioBitrate = audioBitrate,
+                    fps = setup.fps, bitrate = setup.bitrate, intraFrames = setup.intraFrames,
+                    width = setup.width, height = setup.height, mode = selectedMode.label,
+                    deviceRotationDegrees = deviceRotationDegrees, bitrateMode = setup.bitrateMode,
+                    maxBFrames = setup.maxBFrames, audioChannels = audioChannels, audioBitrate = audioBitrate,
                     audio = VideoAudioInput.of(encoder),
                     audioPcmBits = extra("raw_video_audio_pcm_bits", encoder.audioCodec.pcmBits),
-                    bitDepth = bitDepth,
+                    bitDepth = setup.bitDepth,
                     renderProfile = imageSettings.activeProfileLabel(),
                     logProfile = imageSettings.videoLogProfile.takeIf { log },
                     renderProfileId = imageSettings.effectiveRenderProfileId(),

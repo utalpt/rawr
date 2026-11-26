@@ -292,6 +292,8 @@ rawr_test(crop_window_fractions_test
   "${RAWR_ROOT}/tests/native/crop_window_fractions_test.cpp")
 rawr_test(video_crop_mirror_test
   "${RAWR_ROOT}/tests/native/video_crop_mirror_test.cpp")
+rawr_test(video_acquire_policy_test
+  "${RAWR_ROOT}/tests/native/video_acquire_policy_test.cpp")
 rawr_test(camera_workarounds_test
   "${RAWR_ROOT}/tests/native/camera_workarounds_test.cpp"
   "${APP}/camera/CameraRouting.cpp"
@@ -362,3 +364,7 @@ rawr_test(raw_reader_drain_test
   "${RAWR_ROOT}/tests/native/raw_reader_drain_test.cpp"
   "${APP}/imaging/RawFrameIngress.cpp")
 target_include_directories(raw_reader_drain_test BEFORE PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/native/reader_stubs")
+
+# Whether a prepared HEVC encoder may be reused, kept, or dropped: pure policy, no MediaCodec.
+rawr_test(video_encoder_prewarm_policy_test
+  "${RAWR_ROOT}/tests/native/video_encoder_prewarm_policy_test.cpp")

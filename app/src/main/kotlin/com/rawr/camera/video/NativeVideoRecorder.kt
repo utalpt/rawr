@@ -304,6 +304,12 @@ class NativeVideoRecorder(private val context: Context, private val preview: Raw
             append(JSONObject().put("event", "published"))
             saveGyroLog(result.optJSONObject("stats"))
             index?.delete()
+            // A back-to-back recording finds the encoder already configured for the same
+            // window and settings: the pool rebuilds it off the stop path, so the shutter
+            // press only has to start it (gate: debug.rawr.video_encoder_prewarm).
+            preview.prewarmVideoEncoder(VideoEncoderSetup(
+                settings.width, settings.height, settings.fps, settings.bitrate,
+                settings.intraFrames, settings.bitrateMode, settings.maxBFrames, settings.bitDepth))
         } catch (error: Throwable) {
             failure = error
             append(JSONObject().put("event", "error").put("error", error.toString()))

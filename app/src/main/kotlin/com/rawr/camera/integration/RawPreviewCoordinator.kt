@@ -11,6 +11,7 @@ import com.rawr.camera.settings.model.MultiframeTuning
 import com.rawr.camera.settings.preferences.GpuDriverFileStore
 import com.rawr.camera.settings.preferences.DcpFileStore
 import com.rawr.camera.settings.preferences.LensProfileCodec
+import com.rawr.camera.video.VideoEncoderSetup
 import com.rawr.camera.video.VideoImageSettings
 
 /**
@@ -69,8 +70,20 @@ class RawPreviewCoordinator(application: Application) : AutoCloseable {
     fun prewarmVideo(width: Int, height: Int, bitDepth: Int) =
         postNative { native.prewarmVideo(nativeHandle, width, height, bitDepth) }
 
-    /** Frees the prewarmed recording pipeline (leaving Video mode). */
-    fun releaseVideoProcessing() = postNative { native.releaseVideoProcessing(nativeHandle) }
+    /**
+     * Prepares the next recording's HEVC encoder (gate: debug.rawr.video_encoder_prewarm).
+     * Same spec as the recording, so a warm codec is taken instead of built at shutter press.
+     */
+    fun prewarmVideoEncoder(setup: VideoEncoderSetup) = postNative {
+        native.prewarmVideoEncoder(setup.width, setup.height, setup.fps, setup.bitrate,
+            setup.intraFrames, setup.bitrateMode, setup.maxBFrames, setup.bitDepth)
+    }
+
+    /** Frees the prewarmed recording pipeline and the prepared encoder (leaving Video mode). */
+    fun releaseVideoProcessing() = postNative {
+        native.releaseVideoProcessing(nativeHandle)
+        native.releaseVideoEncoderPrewarm()
+    }
 
     fun setVideoImageSettings(settings: VideoImageSettings) {
         currentVideoImageSettings = settings

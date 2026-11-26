@@ -98,8 +98,10 @@ class VideoSession final {
     VkImage monitorImage(uint32_t slot) const noexcept { return resources_.monitorImage(slot); }
     // Waits briefly for an encoder buffer; still none is a video drop. The
     // wait stays short because it holds the frame submit path.
-    bool acquire(uint32_t frameSlot, uint32_t* imageIndex);
+    bool acquire(uint32_t frameSlot, uint32_t* imageIndex, uint64_t frameOrdinal = 0,
+                 uint64_t timestampNs = 0);
     uint32_t encoderImageCount() const noexcept { return output_.encoderImageCount(); }
+    VideoOutput::YuvStats encoderYuvStats() const noexcept { return output_.yuvStats(); }
     void record(VkCommandBuffer command, uint32_t frameSlot, uint32_t imageIndex, uint32_t rawWidth, uint32_t rawHeight,
                 const VideoDemosaic::Frame& rawFrame, const std::array<float, 9>& cameraToAp1,
                 const tonemap::TonemapParams& params, rawrcam::diagnostics::GpuTimingTracker& timing,

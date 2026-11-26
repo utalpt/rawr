@@ -5,9 +5,14 @@ import com.rawr.camera.architecture.SetControlSurfaceStyle
 import com.rawr.camera.architecture.SyncToneControls
 import com.rawr.camera.model.CaptureMode
 import com.rawr.camera.settings.model.*
+import com.rawr.camera.video.VideoEncoderSetup
+import com.rawr.camera.video.VideoFrameSize
 import com.rawr.camera.video.VideoResolutionMode
+import com.rawr.camera.video.encoderSetup
 import com.rawr.camera.video.toVideoImageSettings
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -32,6 +37,7 @@ internal class CaptureSettingsSync(
     private val bindings = mutableListOf<suspend () -> Unit>()
     private var firstApplies = 0
     private var started = false
+    private var encoderPrewarmRetry: Job? = null
 
     fun start() {
         check(!started)
@@ -185,6 +191,9 @@ internal class CaptureSettingsSync(
         resolution: VideoResolutionMode = controller.state.value.videoResolution
     ) {
         if (mode != CaptureMode.Video) {
+            // Leaving Video releases the pool: a pending wait for the snapshot must not refill it afterwards.
+            encoderPrewarmRetry?.cancel()
+            encoderPrewarmRetry = null
             previewCoordinator.releaseVideoProcessing()
             return
         }
@@ -194,6 +203,55 @@ internal class CaptureSettingsSync(
             VideoResolutionMode.OPEN_GATE -> 0 to 0
         }
         previewCoordinator.prewarmVideo(width, height, latestSettings().effectiveVideoBitDepth())
+        prewarmVideoEncoder(resolution)
+    }
+
+    /**
+     * Prepares the next recording's HEVC encoder with the same spec the recording will
+     * build. The record window comes from the camera geometry and changes with lens and
+     * aspect, so it is resolved exactly as the recording does; when the snapshot is not
+     * available yet the prewarm falls back to the nominal size and lets the recorder
+     * report the real error.
+     *
+     * Open Gate records the image area, so without the RAW geometry there is nothing exact
+     * to prepare. A session that boots straight into Video has not published it yet, and
+     * the first take would pay the full setup: the prewarm waits for the snapshot instead,
+     * polling it for a few seconds, and gives up once Video is left.
+     */
+    private fun prewarmVideoEncoder(resolution: VideoResolutionMode) {
+        encoderPrewarmRetry?.cancel()
+        encoderPrewarmRetry = null
+        val setup = encoderSetup(resolution)
+        if (setup != null) {
+            previewCoordinator.prewarmVideoEncoder(setup)
+            return
+        }
+        encoderPrewarmRetry = scope.launch {
+            repeat(ENCODER_PREWARM_RETRY_ATTEMPTS) {
+                delay(ENCODER_PREWARM_RETRY_DELAY_MS)
+                val state = controller.state.value
+                if (state.captureMode != CaptureMode.Video) return@launch
+                val setup = encoderSetup(state.videoResolution) ?: return@repeat
+                previewCoordinator.prewarmVideoEncoder(setup)
+                return@launch
+            }
+        }
+    }
+
+    /** The encoder spec the next take will build, or null when the snapshot lacks the window. */
+    private fun encoderSetup(resolution: VideoResolutionMode): VideoEncoderSetup? {
+        val state = controller.state.value
+        val settings = latestSettings()
+        val frameSize = runCatching {
+            resolution.resolve(org.json.JSONObject(previewCoordinator.cameraControlSnapshot()), state.videoAspect)
+        }.getOrNull() ?: when (resolution) {
+            VideoResolutionMode.HD1080 -> VideoFrameSize(1920, 1080)
+            VideoResolutionMode.UHD4K -> VideoFrameSize(3840, 2160)
+            // Open Gate records the image area: without the RAW geometry there is nothing to prepare.
+            VideoResolutionMode.OPEN_GATE -> return null
+        }
+        return settings.videoEncoder.sanitized().encoderSetup(
+            resolution, frameSize, state.videoFps, settings.effectiveVideoBitDepth())
     }
 
     private fun applyTonemapState(tone: com.rawr.camera.model.ImageToneState) {
@@ -206,4 +264,10 @@ internal class CaptureSettingsSync(
         controller.dispatch(SyncToneControls.fromImageTone(tone))
     }
 
+    private companion object {
+        /** Poll cadence while the RAW geometry is still missing from the snapshot. */
+        const val ENCODER_PREWARM_RETRY_DELAY_MS = 250L
+        /** About 6 s: a cold session publishes the snapshot well within it. */
+        const val ENCODER_PREWARM_RETRY_ATTEMPTS = 24
+    }
 }

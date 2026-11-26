@@ -36,6 +36,10 @@ class NativePreviewEngine {
     external fun setVideoPreviewCrop(handle: Long, width: Int, height: Int, aspectNum: Int, aspectDen: Int, halve: Boolean)
     external fun prewarmVideo(handle: Long, width: Int, height: Int, bitDepth: Int)
     external fun releaseVideoProcessing(handle: Long)
+    /** Process-wide: prepares the HEVC encoder the next recording takes. */
+    external fun prewarmVideoEncoder(width: Int, height: Int, fps: Int, bitrate: Int, intraFrames: Int,
+                                     bitrateMode: Int, maxBFrames: Int, bitDepth: Int)
+    external fun releaseVideoEncoderPrewarm()
     external fun videoStats(handle: Long): String
     external fun setVideoImageSettings(handle: Long, lensShadingEnabled: Boolean,
         highlightEnabled: Boolean, highlightMethod: Int, highlightThreshold: Float,

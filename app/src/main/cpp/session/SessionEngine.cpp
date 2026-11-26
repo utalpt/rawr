@@ -409,6 +409,7 @@ std::string SessionEngine::videoStats() {
     const auto timing = realtime_.timing().snapshot();
     const auto& processing = videoSession_.activeProcessingConfig();
     const auto& reasons = realtime_.coordinator().videoDropReasons();
+    const auto yuv = videoSession_.encoderYuvStats();
     const uint64_t ingressDrops = videoIngressDrops_.load(std::memory_order_relaxed);
     // Every camera frame that never reached the encoder, whatever the stage.
     const uint64_t dropped = ingressDrops + reasons.noSlot + reasons.encoderBusy + reasons.presentFail +
@@ -433,6 +434,16 @@ std::string SessionEngine::videoStats() {
            ",\"rawStage\":\"" + videoSession_.rawStageMethod() + "\"" + ",\"encoderSurfaceOffered\":\"" +
            videoSession_.offeredFormats() + "\"" +
            ",\"encoderImages\":" + std::to_string(videoSession_.encoderImageCount()) +
+           ",\"encoderNoReady\":" + std::to_string(yuv.noReady) +
+           ",\"encoderNoImage\":" + std::to_string(yuv.noImage) +
+           ",\"encoderNoBuffer\":" + std::to_string(yuv.noBuffer) +
+           ",\"encoderAcquires\":" + std::to_string(yuv.acquires) +
+           ",\"encoderDequeues\":" + std::to_string(yuv.dequeues) +
+           ",\"encoderQueued\":" + std::to_string(yuv.queued) +
+           ",\"encoderDequeueMs\":" + std::to_string(yuv.dequeueMs) +
+           ",\"encoderDequeueMaxMs\":" + std::to_string(yuv.dequeueMaxMs) +
+           ",\"encoderFenceMs\":" + std::to_string(yuv.fenceMs) +
+           ",\"encoderFenceMaxMs\":" + std::to_string(yuv.fenceMaxMs) +
            ",\"dropReasons\":{\"ingress\":" + std::to_string(ingressDrops) +
            ",\"noSlot\":" + std::to_string(reasons.noSlot) + ",\"encoderBusy\":" + std::to_string(reasons.encoderBusy) +
            ",\"presentFail\":" + std::to_string(reasons.presentFail) + ",\"pairer\":" + std::to_string(reasons.pairer) +

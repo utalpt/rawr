@@ -39,6 +39,16 @@ jobs:
         with:
           clean: ${{ vars.RUNNER != 'self-hosted' }}
 
+      - name: Host video policy regression tests
+        run: |
+          mkdir -p tmp/host-tests
+          c++ -std=c++20 -Wall -Wextra -Werror -UNDEBUG -Iapp/src/main/cpp \
+            tests/native/video_acquire_policy_test.cpp -o tmp/host-tests/video_acquire_policy_test
+          tmp/host-tests/video_acquire_policy_test
+          c++ -std=c++20 -Wall -Wextra -Werror -UNDEBUG -Iapp/src/main/cpp \
+            tests/native/video_encoder_prewarm_policy_test.cpp -o tmp/host-tests/video_encoder_prewarm_policy_test
+          tmp/host-tests/video_encoder_prewarm_policy_test
+
       # Fixed debug key kept as a repo secret (base64), so every CI APK installs
       # over the previous one. Without the secret the default debug key is used.
       - name: Restore debug keystore
@@ -87,6 +97,40 @@ jobs:
           key: native-arm64
           max-size: 2G
 
+      # Robolectric fetches its android-all runtime (~151 MB, MavenArtifactFetcher) from Maven Central the
+      # first time a test runs, and one failed download fails every Robolectric test in the run. Keep the jar
+      # between builds and fetch it here with retries, so the tests themselves need no network.
+      - uses: actions/cache@v4
+        if: vars.RUNNER != 'self-hosted'
+        with:
+          path: ~/.m2/repository/org/robolectric/android-all-instrumented
+          key: robolectric-android-all-14-robolectric-10818077-i7
+
+      - name: Fetch Robolectric android runtime
+        continue-on-error: true
+        run: |
+          # Keep in sync with @Config(sdk = [34]) and the robolectric version in app/build.gradle.kts
+          # (Robolectric builds the artifact name as <androidVersion>-robolectric-<buildId>-i<preinstrumented>).
+          version=14-robolectric-10818077-i7
+          jar="$HOME/.m2/repository/org/robolectric/android-all-instrumented/$version/android-all-instrumented-$version.jar"
+          if [ -s "$jar" ]; then
+            echo "Robolectric runtime already present: $(du -h "$jar" | cut -f1)"
+            exit 0
+          fi
+          mkdir -p "$(dirname "$jar")"
+          for repo in https://repo1.maven.org/maven2 https://repo.maven.apache.org/maven2; do
+            echo "Fetching $version from $repo"
+            if curl -fSL --retry 6 --retry-delay 5 --retry-all-errors --connect-timeout 30 \
+                 -o "$jar.part" \
+                 "$repo/org/robolectric/android-all-instrumented/$version/android-all-instrumented-$version.jar"; then
+              mv "$jar.part" "$jar"
+              echo "Fetched $(du -h "$jar" | cut -f1)"
+              exit 0
+            fi
+          done
+          echo "::warning::Robolectric runtime not fetched; unit tests may fail with MavenArtifactFetcher errors"
+          exit 1
+
       # One Gradle run for both (shared configuration). Add [skip tests] to the
       # commit message to only assemble.
       - name: Unit tests + assemble debug APK
@@ -113,8 +157,10 @@ jobs:
 
       # (a private repository – the test builds', utalpt/rawr-dev – has a small artifact quota shared by the
       # account: its APK goes to the test-build prerelease instead; release files don't count against it)
+      # Publishes the APK even when the unit tests fail: a test failure leaves the assembled APK usable for
+      # device work, and the job still shows red. Cancellation skips it.
       - uses: actions/upload-artifact@v4
-        if: ${{ !github.event.repository.private }}
+        if: ${{ !cancelled() && !github.event.repository.private }}
         with:
           name: rawr-debug-${{ github.sha }}
           path: app/build/outputs/apk/*/*.apk

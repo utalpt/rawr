@@ -13,14 +13,30 @@
 #include <cstring>
 #include <stdexcept>
 
+#include "video/HevcEncoderSetup.h"
 #include "video/Mp4MetadataPatcher.h"
+#include "video/VideoEncoderPrewarm.h"
+#include "video/VideoEncoderPrewarmPolicy.h"
 
 namespace rawrcam::video {
 namespace {
 constexpr char kTag[] = "RawrNativeVideo";
-constexpr int kSurfaceColorFormat = 2130708361;  // MediaCodecInfo.COLOR_FormatSurface.
-constexpr int kMainProfile = 1;                  // HEVCProfileMain.
-constexpr int kMain10Profile = 2;                // HEVCProfileMain10.
+
+// The recording's encoder input, shared with VideoEncoderPrewarm so a prepared
+// codec is only reused for exactly the same 4K/1080p window and encoder settings.
+HevcVideoEncoderSpec encoderSpec(const NativeAvRecorder::Settings& settings) noexcept {
+    HevcVideoEncoderSpec spec;
+    spec.width = settings.width;
+    spec.height = settings.height;
+    spec.fps = settings.fps;
+    spec.bitrate = settings.bitrate;
+    spec.intraFrames = settings.intraFrames;
+    spec.bitrateMode = settings.bitrateMode;
+    spec.maxBFrames = settings.maxBFrames;
+    spec.bitDepth = settings.bitDepth;
+    return spec;
+}
+
 constexpr int kAacLcProfile = 2;
 constexpr int kSampleRate = AudioInput::kSampleRate;
 constexpr int kMaxAudioChannels = 2;
@@ -61,77 +77,28 @@ NativeAvRecorder::~NativeAvRecorder() { (void)stop(); }
 int64_t NativeAvRecorder::bootNs() noexcept { return clockNs(CLOCK_BOOTTIME); }
 
 void NativeAvRecorder::configureVideo() {
-    videoCodec_ = AMediaCodec_createEncoderByType("video/hevc");
-    if (!videoCodec_) throw std::runtime_error("HEVC encoder unavailable");
-    char* codecName = nullptr;
-    requireMedia(AMediaCodec_getName(videoCodec_, &codecName), "query HEVC encoder");
-    videoCodecName_ = codecName ? codecName : "";
-    if (codecName) AMediaCodec_releaseName(videoCodec_, codecName);
-    if (videoCodecName_.rfind("c2.android.", 0) == 0 || videoCodecName_.rfind("OMX.google.", 0) == 0)
-        throw std::runtime_error("software HEVC encoder selected: " + videoCodecName_);
-    // Realtime hints: operating-rate tells the codec driver the rate to clock for, and priority 0
-    // marks the session realtime. Without them a Qualcomm HEVC encoder can stay in a lower clock
-    // state and fall behind at 4K60 (encoder-side drops, latency piling up past 500 ms). A codec
-    // that refuses either key is configured again without both.
-    const auto configureWith = [&](bool realtime) {
-        AMediaFormat* format = AMediaFormat_new();
-        if (!format) throw std::runtime_error("video format allocation failed");
-        AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, "video/hevc");
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_WIDTH, settings_.width);
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_HEIGHT, settings_.height);
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_COLOR_FORMAT, kSurfaceColorFormat);
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_PROFILE, settings_.bitDepth == 8 ? kMainProfile : kMain10Profile);
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_BIT_RATE, settings_.bitrate);
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_FRAME_RATE, settings_.fps);
-        // i-frame-interval is in seconds and accepts a float; 0 asks for every frame to be a sync frame.
-        AMediaFormat_setFloat(format, AMEDIAFORMAT_KEY_I_FRAME_INTERVAL,
-                              settings_.intraFrames <= 1 ? 0.0f
-                                                         : static_cast<float>(settings_.intraFrames) / settings_.fps);
-        if (settings_.bitrateMode >= 0) AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_BITRATE_MODE, settings_.bitrateMode);
-        // Optional codec key. A codec may reject the request during configure;
-        // omit it when left at the automatic default.
-        const int maxBFrames = settings_.intraFrames <= 1 ? 0 : settings_.maxBFrames;
-        if (maxBFrames >= 0) AMediaFormat_setInt32(format, "max-bframes", maxBFrames);
-        // Preserve the encoder's BT.709 RGB-to-YCbCr conversion. LOG signalling
-        // is rewritten after encoding, without changing the encoded samples.
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_COLOR_STANDARD, 1);
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_COLOR_TRANSFER, 3);
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_COLOR_RANGE, 2);
-        if (realtime) {
-            AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_OPERATING_RATE, settings_.fps);
-            AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_PRIORITY, 0);
-        }
-        const media_status_t status =
-            AMediaCodec_configure(videoCodec_, format, nullptr, nullptr, AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
-        AMediaFormat_delete(format);
-        return status;
-    };
-    media_status_t configured = configureWith(true);
-    if (configured != AMEDIA_OK) {
-        __android_log_print(ANDROID_LOG_WARN, "RawrNativeVideo",
-                            "VIDEO_ENCODER_REALTIME_REFUSED status=%d codec=%s", int(configured),
-                            videoCodecName_.c_str());
-        // A refused configure leaves no promise about the codec's state (the NDK has no reset): the fallback runs on
-        // a fresh instance of the same encoder.
-        (void)AMediaCodec_delete(videoCodec_);
-        videoCodec_ = AMediaCodec_createEncoderByType("video/hevc");
-        if (!videoCodec_) throw std::runtime_error("HEVC encoder unavailable");
-        configured = configureWith(false);
-    } else {
-        __android_log_print(ANDROID_LOG_INFO, "RawrNativeVideo",
-                            "VIDEO_ENCODER_REALTIME operatingRate=%d priority=0 codec=%s %dx%d", settings_.fps,
-                            videoCodecName_.c_str(), settings_.width, settings_.height);
+    // A prepared encoder turns the shutter press into start() only: the pool built it while
+    // the user was still framing the shot (debug.rawr.video_encoder_prewarm=1).
+    const HevcVideoEncoderSpec spec = encoderSpec(settings_);
+    if (AMediaCodec* prepared = VideoEncoderPrewarm::instance().take(spec, &inputWindow_, &videoCodecName_)) {
+        videoCodec_ = prepared;
+        encoderPrewarm_ = "reused";
+        return;
     }
-    if (configured != AMEDIA_OK)
+    encoderPrewarm_ = VideoEncoderPrewarm::instance().enabled() ? "missed" : "off";
+    const HevcEncoderOpening opening = prepareHevcEncoder(spec);
+    videoCodec_ = opening.codec;
+    videoCodecName_ = opening.codecName;
+    if (!videoCodec_) throw std::runtime_error("HEVC encoder unavailable");
+    if (opening.configureStatus != AMEDIA_OK)
         throw std::runtime_error(std::string("configure HEVC ") + (settings_.bitDepth == 8 ? "Main " : "Main10 ") +
                                  std::to_string(settings_.width) + "x" + std::to_string(settings_.height) + " at " +
                                  std::to_string(settings_.fps) + " fps on " + videoCodecName_ +
-                                 " status=" + std::to_string(configured));
+                                 " status=" + std::to_string(opening.configureStatus));
     requireMedia(AMediaCodec_createInputSurface(videoCodec_, &inputWindow_), "create HEVC input surface");
     if (!inputWindow_) throw std::runtime_error("HEVC input surface is null");
     requireMedia(AMediaCodec_start(videoCodec_), "start HEVC");
 }
-
 void NativeAvRecorder::configureAudio() {
     const int requestedChannels = settings_.audioChannels;
     // Reuses the meter's running stream; a stereo stream is downmixed for a mono request.
@@ -219,7 +186,7 @@ void NativeAvRecorder::setFormat(Track track, AMediaFormat* format) {
     if (!format) throw std::runtime_error("encoder output format missing");
     if (track == Track::Video && settings_.log) {
         int32_t profile = 0;
-        if (AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_PROFILE, &profile) && profile != kMain10Profile)
+        if (AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_PROFILE, &profile) && profile != kHevcMain10Profile)
             throw std::runtime_error("LOG encoder did not produce HEVC Main10");
         void* csd = nullptr;
         size_t size = 0;
@@ -587,6 +554,8 @@ bool NativeAvRecorder::stop() noexcept {
 }
 
 void NativeAvRecorder::cleanup() noexcept {
+    // This recorder no longer holds an encoder: the pool may warm one again.
+    VideoEncoderPrewarm::instance().setRecordingActive(false);
     audioRunning_.store(false);
     if (audioInput_) {
         audioInput_->setSink({});
@@ -643,7 +612,7 @@ std::string NativeAvRecorder::statsJson() const {
         return frameTypeCount_[slot] == 0 ? 0.0 : frameTypeBytes_[slot] / 1024.0 / frameTypeCount_[slot];
     };
     const double audioRmsDbfs = rms <= 0.0 ? -120.0 : 20.0 * std::log10(rms / 32768.0);
-    return std::string("{\"videoCodec\":\"") + escaped(videoCodecName_) +
+    return std::string("{\"videoCodec\":\"") + escaped(videoCodecName_) + "\",\"encoderPrewarm\":\"" + encoderPrewarm_ +
            "\",\"width\":" + std::to_string(settings_.width) + ",\"height\":" + std::to_string(settings_.height) +
            ",\"requestedFps\":" + std::to_string(settings_.fps) + ",\"bitrate\":" + std::to_string(settings_.bitrate) +
            ",\"intraFrames\":" + std::to_string(settings_.intraFrames) +
