@@ -1491,5 +1491,6 @@
  "↺ RESET": "↺ СКИНУТИ",
  "✓ Photo": "✓ Фото",
  "✓ Video": "✓ Відео",
- "Capture-screen label, up to 12 characters (e.g. 35, UW, 3x)": "Підпис на екрані зйомки, до 12 символів (напр. 35, UW, 3x)"
+ "Capture-screen label, up to 12 characters (e.g. 35, UW, 3x)": "Підпис на екрані зйомки, до 12 символів (напр. 35, UW, 3x)",
+ "Also a JPEG or DNG taken with Rawr": "Також JPEG або DNG, знятий у Rawr"
 }

@@ -1491,5 +1491,6 @@
  "↺ RESET": "↺ СБРОС",
  "✓ Photo": "✓ Фото",
  "✓ Video": "✓ Видео",
- "Capture-screen label, up to 12 characters (e.g. 35, UW, 3x)": "Подпись на экране съёмки, до 12 символов (напр. 35, UW, 3x)"
+ "Capture-screen label, up to 12 characters (e.g. 35, UW, 3x)": "Подпись на экране съёмки, до 12 символов (напр. 35, UW, 3x)",
+ "Also a JPEG or DNG taken with Rawr": "Также JPEG или DNG, снятый в Rawr"
 }

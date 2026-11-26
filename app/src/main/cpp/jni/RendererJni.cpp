@@ -509,6 +509,8 @@ Java_com_rawr_camera_renderer_RendererNative_render(JNIEnv* e, jobject, jlong id
             c.utcOffsetMinutes = std::int16_t(exportJson.number("utcOffsetMinutes", 0));
             c.displayName = exportJson.text("displayName");
             if (c.displayName.empty()) c.displayName = "Renderer.jpg";
+            // Rawr 17U fork: the edited look travels with the exported JPEG.
+            c.processingRecipe = str(e, recipe);
             if (source.exposureTimeNs) c.exposureTimeNs = *source.exposureTimeNs;
             if (source.sensitivity) c.sensitivity = *source.sensitivity;
             c.aperture = source.fNumber;

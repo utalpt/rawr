@@ -113,6 +113,40 @@ std::vector<IfdEntry> gpsIfd(const tinydng_gps& gps) {
     return ifd;
 }
 
+// Rawr 17U fork: the MakerNote carrying the processing recipe, in the same key the DNG's provenance uses, so one
+// reader (LookFiles.kt) finds it in either file: "RawrRecipe\0" + {"com.rawrcam.processing.recipe.v1":"<json>"}.
+// Empty when there is no recipe or it would push the APP1 segment past its 64 KB limit.
+constexpr std::size_t kMaxRecipeMakerNote = 48u * 1024u;
+std::vector<unsigned char> recipeMakerNote(const std::string& recipe) {
+    if (recipe.empty()) return {};
+    std::string out = "{\"com.rawrcam.processing.recipe.v1\":\"";
+    for (const char ch : recipe) {
+        const auto c = static_cast<unsigned char>(ch);
+        if (c == '"' || c == '\\') {
+            out += '\\';
+            out += ch;
+        } else if (c == '\n') {
+            out += "\\n";
+        } else if (c == '\r') {
+            out += "\\r";
+        } else if (c == '\t') {
+            out += "\\t";
+        } else if (c < 0x20u) {
+            char buf[8];
+            std::snprintf(buf, sizeof(buf), "\\u%04x", c);
+            out += buf;
+        } else {
+            out += ch;
+        }
+    }
+    out += "\"}";
+    static constexpr char kId[] = "RawrRecipe";
+    std::vector<unsigned char> note(kId, kId + sizeof(kId));  // includes the NUL
+    note.insert(note.end(), out.begin(), out.end());
+    if (note.size() > kMaxRecipeMakerNote) return {};
+    return note;
+}
+
 }  // namespace
 
 // Builds a compact EXIF APP1 payload. TIFF offsets are relative to the TIFF header
@@ -214,6 +248,10 @@ std::vector<unsigned char> buildExif(const JpegCaptureContext& c, std::uint32_t 
         put32(value, pressure[0]);
         put32(value, pressure[1]);
         exif.push_back({0x9402, 5, 1, value});  // Pressure, RATIONAL hPa
+    }
+    if (auto note = recipeMakerNote(c.processingRecipe); !note.empty()) {
+        const auto size = static_cast<std::uint32_t>(note.size());
+        exif.push_back({0x927C, 7, size, std::move(note)});  // MakerNote, UNDEFINED (Rawr 17U fork)
     }
     exif.push_back({0xA001, 3, 1, shortData(1)});  // sRGB
     exif.push_back({0xA000, 7, 4, {'0', '1', '0', '0'}});

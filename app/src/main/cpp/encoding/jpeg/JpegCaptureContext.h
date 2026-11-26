@@ -50,6 +50,9 @@ struct JpegCaptureContext {
     ChromaSubsampling subsampling = ChromaSubsampling::Yuv420;
     rawrcam::color::UltraHdrParams ultraHdr;
     std::string rendererDisplayName;
+    // Rawr 17U fork: the processing recipe JSON (CaptureRecipe.kt, or the Renderer's draft), written into the EXIF
+    // MakerNote so the look can be read back from the JPEG (LookFiles.kt). Empty: none. Not journaled.
+    std::string processingRecipe;
     // Processing provenance for EXIF; these values do not control development.
     bool appliedLensShadingCorrection = false;
     uint32_t appliedFccSteps = 1;

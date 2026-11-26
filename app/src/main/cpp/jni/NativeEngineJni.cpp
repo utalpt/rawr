@@ -825,6 +825,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_com_rawr_camera_integration_NativePrevie
     jpeg.output.gps = dng.gps;
     jpeg.output.level = dng.level;
     jpeg.output.ambient = dng.ambient;
+    jpeg.output.processingRecipe = dng.processingRecipe;  // Rawr 17U fork: the recipe in the JPEG too.
     return static_cast<jlong>(rawrcam::session::requestRawStillCapture(handle(h), std::move(dng), std::move(jpeg)));
 }
 extern "C" JNIEXPORT jlong JNICALL Java_com_rawr_camera_integration_NativePreviewEngine_startPreparedMultiframeCapture(
@@ -873,6 +874,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_com_rawr_camera_integration_NativePrevie
     jpeg.output.gps = base.gps;
     jpeg.output.level = base.level;
     jpeg.output.ambient = base.ambient;
+    jpeg.output.processingRecipe = base.processingRecipe;  // Rawr 17U fork: the recipe in the JPEG too.
     auto baseMode = rawrcam::capture::multiframe::MultiframeBaseFrameMode::Sharpest;
     if (baseFrameMode == 0) baseMode = rawrcam::capture::multiframe::MultiframeBaseFrameMode::Middle;
     return static_cast<jlong>(rawrcam::session::startPreparedMultiframeCapture(

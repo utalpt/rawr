@@ -282,7 +282,8 @@ internal fun FilmSimPresetGroup(state: SettingsUiState, dispatch: SettingsDispat
             }
         )
         SettingDivider()
-        SettingsRow(title = "Import look file", onClick = { files.import() })
+        // Rawr 17U fork: a Rawr JPEG or DNG works too (its film look, from the recipe it carries).
+        SettingsRow(title = "Import look file", value = "Also a JPEG or DNG taken with Rawr", onClick = { files.import() })
     }
 
     SettingsGroup(title = "Factory") {

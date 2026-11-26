@@ -23,6 +23,13 @@ import com.rawr.camera.settings.architecture.ImportFilmPreset
 import com.rawr.camera.settings.architecture.SettingsDispatch
 import com.rawr.camera.settings.preferences.ImportedLook
 import com.rawr.camera.settings.preferences.LookFileCodec
+import com.rawr.camera.settings.preferences.PhotoRecipe
+import com.rawr.camera.renderer.RendererRecipe
+import com.rawr.camera.settings.model.SettingsCatalog
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.rawr.camera.storage.PickFile
 import com.rawr.camera.storage.launchPicker
 
@@ -51,13 +58,19 @@ internal fun rememberLookFiles(dispatch: SettingsDispatch): LookFiles {
         pending = null
         if (uri != null && text != null) write(context, uri, text)
     }
+    val scope = rememberCoroutineScope()
     val picker = rememberLauncherForActivityResult(PickFile()) { uri ->
-        if (uri != null) read(context, uri)?.let { look ->
-            when (look) {
-                is ImportedLook.Film -> dispatch.invoke(ImportFilmPreset(look.name, look.look))
-                is ImportedLook.Agx -> dispatch.invoke(ImportAgxLook(look.name, look.base, look.values))
+        // Rawr 17U fork: a Rawr photo can be large (a 200 MP DNG), so the file is read off the main thread.
+        if (uri != null) scope.launch {
+            val look = withContext(Dispatchers.IO) { runCatching { read(context, uri) } }
+            look.onFailure { toast(context, it.message ?: "Unable to import look") }
+            look.getOrNull()?.let { imported ->
+                when (imported) {
+                    is ImportedLook.Film -> dispatch.invoke(ImportFilmPreset(imported.name, imported.look))
+                    is ImportedLook.Agx -> dispatch.invoke(ImportAgxLook(imported.name, imported.base, imported.values))
+                }
+                toast(context, "Imported '${imported.name}'")
             }
-            toast(context, "Imported '${look.name}'")
         }
     }
     return remember(context, creator, picker) {
@@ -74,12 +87,29 @@ private fun write(context: Context, uri: Uri, text: String) {
         .onFailure { toast(context, it.message ?: "Unable to export look") }
 }
 
-private fun read(context: Context, uri: Uri): ImportedLook? = runCatching {
+private fun read(context: Context, uri: Uri): ImportedLook {
+    val head = requireNotNull(context.contentResolver.openInputStream(uri)) { "Unable to open file" }
+        .use { it.readBytes(4) }
+    // Rawr 17U fork: a JPEG or DNG taken with Rawr gives its film look, read from the recipe the photo carries.
+    if (PhotoRecipe.looksLikePhoto(head)) {
+        val recipe = requireNotNull(context.contentResolver.openInputStream(uri)) { "Unable to open file" }
+            .use { PhotoRecipe.find(it.buffered()) }
+        requireNotNull(recipe) { "This photo has no Rawr recipe" }
+        val values = RendererRecipe.decode(recipe, SettingsCatalog.initialState().values)
+        require(values.filmSimEnabled) { "This photo was taken without film" }
+        return ImportedLook.Film(displayName(context, uri), values.filmSimLook)
+    }
     val text = requireNotNull(context.contentResolver.openInputStream(uri)) { "Unable to open file" }
         .use { it.readBytes(MAX_LOOK_FILE_BYTES + 1) }
     require(text.size <= MAX_LOOK_FILE_BYTES) { "Not a Rawr look file" }
-    LookFileCodec.import(String(text))
-}.onFailure { toast(context, it.message ?: "Unable to import look") }.getOrNull()
+    return LookFileCodec.import(String(text))
+}
+
+/** The picked file's name without its extension, for the imported preset. */
+private fun displayName(context: Context, uri: Uri): String = runCatching {
+    context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+        ?.use { if (it.moveToFirst()) it.getString(0) else null }
+}.getOrNull()?.substringBeforeLast('.')?.takeIf { it.isNotBlank() } ?: "Photo look"
 
 private fun java.io.InputStream.readBytes(limit: Int): ByteArray {
     val out = java.io.ByteArrayOutputStream()
