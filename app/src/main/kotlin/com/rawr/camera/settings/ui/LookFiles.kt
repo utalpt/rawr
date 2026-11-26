@@ -86,17 +86,24 @@ internal fun rememberLookFiles(dispatch: SettingsDispatch): LookFiles {
  * for the camera's film sheet. Returns the action that opens the picker.
  */
 @Composable
-internal fun rememberPhotoLookImport(onImported: (String, FilmSimLook) -> Unit): () -> Unit {
+internal fun rememberPhotoLookImport(
+    /** The name of a preset that already has this look (the same photo imported again), or null. */
+    existing: (FilmSimLook) -> String?,
+    onImported: (String, FilmSimLook) -> Unit
+): () -> Unit {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val latest by rememberUpdatedState(onImported)
+    val latestExisting by rememberUpdatedState(existing)
     val picker = rememberLauncherForActivityResult(PickFile()) { uri ->
         if (uri != null) scope.launch {
             val look = withContext(Dispatchers.IO) { runCatching { read(context, uri) } }
             look.onFailure { toast(context, it.message ?: "Unable to import look") }
             (look.getOrNull() as? ImportedLook.Film)?.let { imported ->
+                // The same look again is not saved twice: the preset that has it is put in use (CaptureViewModel).
+                val already = latestExisting(imported.look)
                 latest(imported.name, imported.look)
-                toast(context, "Imported '${imported.name}'")
+                toast(context, if (already != null) "Already saved as '$already'" else "Imported '${imported.name}'")
             }
         }
     }
@@ -123,12 +130,22 @@ private fun read(context: Context, uri: Uri): ImportedLook {
         requireNotNull(recipe) { "This photo has no Rawr recipe" }
         val values = RendererRecipe.decode(recipe, SettingsCatalog.initialState().values)
         require(values.filmSimEnabled) { "This photo was taken without film" }
-        return ImportedLook.Film(displayName(context, uri), values.filmSimLook)
+        return ImportedLook.Film(photoPresetName(displayName(context, uri), values.filmSimLook), values.filmSimLook)
     }
     val text = requireNotNull(context.contentResolver.openInputStream(uri)) { "Unable to open file" }
         .use { it.readBytes(MAX_LOOK_FILE_BYTES + 1) }
     require(text.size <= MAX_LOOK_FILE_BYTES) { "Not a Rawr look file" }
     return LookFileCodec.import(String(text))
+}
+
+/**
+ * Rawr 17U fork: a short name for a photo's look, readable on an 84 dp sheet card: the shot's time and the film
+ * stock ("21:32 Velvia 100") from a Rawr file name (RAWR_yyyyMMdd_HHmmss_…); otherwise the file name.
+ */
+internal fun photoPresetName(fileName: String, look: FilmSimLook): String {
+    val time = Regex("""RAWR_\d{8}_(\d{2})(\d{2})\d{2}""").find(fileName)?.groupValues ?: return fileName
+    val stock = com.rawr.camera.settings.model.FilmStocks.films.getOrNull(look.film)
+    return listOfNotNull("${time[1]}:${time[2]}", stock).joinToString(" ")
 }
 
 /** The picked file's name without its extension, for the imported preset. */

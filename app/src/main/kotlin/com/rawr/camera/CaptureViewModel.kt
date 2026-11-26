@@ -291,11 +291,16 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                 is com.rawr.camera.architecture.CaptureFilmEvent.ApplyLook -> current.copy(filmSimLook = event.edit(current.filmSimLook))
                 is com.rawr.camera.architecture.CaptureFilmEvent.SelectPreset -> current.withFilmPreset(event.id)
                 is com.rawr.camera.architecture.CaptureFilmEvent.ImportPreset -> {
-                    // Rawr 17U fork: the photo's look as a new saved preset, put in use straight away.
-                    val id = com.rawr.camera.settings.architecture.newPresetId(current.filmPresets.map { it.id })
-                    val name = event.name.trim().take(48).ifEmpty { "Photo look" }
-                    current.copy(filmPresets = current.filmPresets +
-                        com.rawr.camera.settings.model.FilmPreset(id, name, event.look)).withFilmPreset(id)
+                    // Rawr 17U fork: the photo's look as a new saved preset, put in use straight away. A look that a
+                    // preset already has (the same photo imported again) is not saved twice: that preset is used.
+                    val same = (com.rawr.camera.settings.model.FilmFactoryPresets.all + current.filmPresets)
+                        .firstOrNull { it.look == event.look }
+                    if (same != null) current.withFilmPreset(same.id) else {
+                        val id = com.rawr.camera.settings.architecture.newPresetId(current.filmPresets.map { it.id })
+                        val name = event.name.trim().take(48).ifEmpty { "Photo look" }
+                        current.copy(filmPresets = current.filmPresets +
+                            com.rawr.camera.settings.model.FilmPreset(id, name, event.look)).withFilmPreset(id)
+                    }
                 }
                 is com.rawr.camera.architecture.CaptureFilmEvent.ScrubNumeric -> current.withFilmNumeric(
                     SetFilmSimNumericValue(event.parameter, event.value), quantize = true, enableGrain = true

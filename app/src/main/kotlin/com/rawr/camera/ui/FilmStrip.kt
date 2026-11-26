@@ -82,7 +82,12 @@ internal fun FilmStrip(
     // Rawr 17U fork: film on opens the film sheet straight away (✕ goes back to FILM and PARAMS).
     var mode by remember { mutableStateOf(FilmStripMode.Profiles) }
     // Before any early return, so the picker is always registered in the same place.
-    val importPhoto = com.rawr.camera.settings.ui.rememberPhotoLookImport { name, look -> onImportPhotoLook?.invoke(name, look) }
+    val importPhoto = com.rawr.camera.settings.ui.rememberPhotoLookImport(
+        existing = { look ->
+            quick.presetLooks.entries.firstOrNull { it.value == look }?.key
+                ?.let { id -> quick.presets.firstOrNull { it.id == id }?.label }
+        }
+    ) { name, look -> onImportPhotoLook?.invoke(name, look) }
     var sectionKey by remember { mutableStateOf(quick.sections.firstOrNull()?.key ?: "film") }
     var subsectionKey by remember { mutableStateOf<String?>(null) }
     // L4 drill into a discrete's option list. Cleared whenever the section

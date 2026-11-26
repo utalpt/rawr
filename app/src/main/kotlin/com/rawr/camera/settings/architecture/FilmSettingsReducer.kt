@@ -22,7 +22,9 @@ internal fun reduceFilmSettings(
         val name = if (action is SaveFilmPreset) action.name else (action as ImportFilmPreset).name
         val look = if (action is ImportFilmPreset) action.look else state.values.filmSimLook
         val trimmed = name.trim().take(48)
-        if (trimmed.isEmpty()) {
+        // Rawr 17U fork: an imported look that a saved preset already has is not saved twice.
+        val duplicate = action is ImportFilmPreset && state.values.filmPresets.any { it.look == action.look }
+        if (trimmed.isEmpty() || duplicate) {
             state
         } else {
             val id = newPresetId(state.values.filmPresets.map { it.id })
