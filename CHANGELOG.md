@@ -4,7 +4,47 @@ Fork of [Rawr](https://github.com/adityawarmanfw/rawr) for the Xiaomi 17 Ultra.
 Releases follow Ed's version: `0.5.1-17u.N`. Test work lands on `yuv-probe`
 first and moves to `xiaomi-17u` once verified.
 
-## Unreleased (`yuv-probe`, test builds)
+## 0.5.1-17u.14
+
+A film look read back from any photo taken with Rawr, ALL PARAMS reachable again and laid out like the film
+sheet, Ukrainian, Polish, Turkish and Bengali, the-marox's video and build PRs, and Ed's #162 to #165, checked
+on the Xiaomi 17 Ultra.
+
+### Synced with Ed's main up to #165
+
+- Ed's #162: Rexture's grain evening works on white-balanced values, so warm light no longer gives purple /
+  yellow grain or tinted grey edges.
+- Ed's #163: the AgX RAWR look keeps hue and half the purity as it brightens (orange no longer turns yellow, blue
+  no longer cyan), mid-grey as RAWR NTRL, contrast 3.1, saturation 1.25.
+- Ed's #164: "Correct per-position response" also works on 2x2 quad photo streams; vivo X200 Ultra Q35/Q85. Off
+  on the 17U (its 200 MP lenses keep the fork's 4x4 fast remosaic; the 50 MP lenses get Bayer from the camera).
+- Ed's #165: full-size bursts (a separate photo session, opened after the press) use their first frame as the
+  base, the one closest to the shutter press.
+- Checked on the 17U: a Rexture 17-frame shot on a white wall under warm and blue light (no tinted grain), AgX
+  RAWR on saturated reds, oranges and blues (hues kept).
+
+### Film
+
+- ALL PARAMS has a way in again: an "ALL PARAMS ›" chip after the film sheet's tabs (since the LOOK button opens
+  the sheet in place of FILM and PARAMS, it could not be reached).
+- ALL PARAMS is laid out like the film sheet, in the same space above the exposure row: "‹" (back to the sheet) and
+  the sections in one sliding row, the section's subsections in a second, and its parameters five across the full
+  width. The floating card with FILM and PARAMS beside it, which covered half the viewfinder, is gone.
+- ALL PARAMS shows "OFF" under the GRAIN, HALATION, DIFFUSION (and its CAMERA / PRINT tabs), SCANNER and FILTERS
+  sections when their switch is off, and dims the values that do nothing until it is on, as the quick card
+  already did. They stay editable. Idea from apos-fandango's Rawr X14U fork; the code is the fork's own.
+- A photo's film look can be imported as a preset: the film sheet's PRESETS tab ends with "+ FROM PHOTO" (pick a
+  JPEG or DNG taken with Rawr; its look is saved as a preset named after the shot's time and film, such as
+  "21:32 Velvia 100", and put in use; a look a preset already has is not saved again, that preset is put in use).
+  Settings → Look → Film Simulation → Save & manage → "Import look file" also takes such a photo.
+- A DNG already carries the full processing recipe (Ed's provenance block); JPEGs now carry it too, in the EXIF
+  MakerNote, and so do JPEGs exported from the Renderer, with the edited look. The DNG is unchanged. The idea of
+  keeping each shot's recipe comes from apos-fandango's Rawr X14U fork (its StopBath recipe in the DNG); the code
+  is the fork's own.
+- The Renderer shows in Android's share and open-with list under the build's name ("Rawr 17U Renderer",
+  "Rawr 17U Benchmark Renderer"), so several installed Rawr builds can be told apart.
+- Checked on the 17U: the OFF marks and dimming per section, the three-row layout (no overlap with the exposure
+  row), importing a JPEG-only shot, a DNG + JPEG shot and the same photo twice.
 
 ### Language
 
@@ -13,10 +53,25 @@ first and moves to `xiaomi-17u` once verified.
   plus words that stay the same, kept as they are so nothing falls back to English).
 - Turkish: the community translation by @agabey_42 (Telegram) replaces the machine-made one (711 texts reworded,
   383 more filled, among them chip abbreviations and error messages).
-- Bengali (বাংলা): the community translation by @arcticstellar (Telegram), bundled as sent (1869 texts); the four newest
-  texts stay in English until it is updated.
+- Bengali (বাংলা): the community translation by @arcticstellar (Telegram), bundled as sent (1869 texts); the
+  newest texts stay in English until it is updated.
 - A build test checks that every bundled language has every text Portuguese has, so a new text can't be translated
   in one language and forgotten in the others (a community file may have more).
+- Checked on the 17U in Turkish and Bengali (settings, top sheet, WB strip, film sheet); no text cut.
+
+### the-marox's PRs
+
+- #7 and #8 (video): split YUV encoder drop counters and logs; the HEVC encoder prepared before the shutter. Both
+  change behaviour only on the Xiaomi 15 (dada); on the 17U `debug.rawr.video_encoder_prewarm=1` turns the
+  prewarm on.
+- #9: the log names the sensor mode behind a lens's fps ceiling (1x DCG at 30); no change in what the 17U asks.
+- #13: the native build also configures on a Windows host.
+- #14: the GLES bridge unpacks RAW10 on the GPU when Vulkan cannot import the buffer; on by default only on the
+  Xiaomi 15, `debug.rawr.gles_bridge=1` elsewhere. The 17U imports its RAW10 directly, so it does not use it.
+- The debug build runs the-marox's host policy tests (#7, #8, #9) in one step, skipped with a warning when the
+  runner has no host C++ compiler.
+- Checked on the 17U: 4K30 (no frame dropped) and 4K60 (a few frames dropped only in the first 0.35 s).
+- Not in this release: #6 (17U ToF), still on test with a fork fix for the 0.6x.
 
 ## 0.5.1-17u.13
 

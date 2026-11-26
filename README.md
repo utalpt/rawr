@@ -35,7 +35,7 @@
 
 Everything the fork adds, kept here also once Ed has taken it into Rawr: those items say *(Already in
 Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each was checked:
-[CHANGELOG.md](CHANGELOG.md). Synced with Ed's main up to #160 (25 Nov 2026).
+[CHANGELOG.md](CHANGELOG.md). Synced with Ed's main up to #165 (26 Nov 2026).
 
 **Photo: 50 and 200 MP**
 - **50 MP RAW** on the main, tele and ultra-wide cameras: the viewfinder streams the binned 4:3 RAW at 30 fps
@@ -88,6 +88,13 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   a photo's pixel size, since the normal viewfinder renders the film too small for grain to show).
 - **RESET** back to the preset in use (or the default look), with UNDO for 5 seconds; switching back to one of
   the last two stocks is instant (the film engines are kept).
+- **ALL PARAMS** (the last tab of the film sheet): every film parameter in three rows in the sheet's space -
+  sections, subsections, and the values five across. A section whose switch is off shows OFF and its values are
+  dimmed (they stay editable); the idea comes from apos-fandango's Rawr X14U fork.
+- **A photo's look as a preset:** every JPEG now carries the processing recipe a DNG already carries (Ed's), and
+  "+ FROM PHOTO" in the PRESETS tab (or Import look file in Settings) turns a JPEG or DNG taken with Rawr into a
+  preset named after the shot's time and film, never saving the same look twice; JPEGs exported from the
+  Renderer carry the edited look. The idea of keeping each shot's recipe comes from apos-fandango's Rawr X14U fork.
 - Themes (Leica, Mono, Steel, Sage, Custom), button shapes, and a layout that stays upright in landscape.
 
 **Viewfinder and settings**
@@ -114,8 +121,9 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   own neutral before, a magenta cast). *(Already in Rawr: Ed's #142.)*
 
 **Language**
-- The interface in **Portuguese, Spanish, French, German, Italian and Russian** (machine-made, following the
-  phone or chosen in Settings > System > Language), with **Export / Import language file** (JSON, English as
+- The interface in **Portuguese, Spanish, French, German, Italian, Russian, Ukrainian and Polish** (machine-made),
+  **Turkish** (by @agabey_42) and **Bengali** (by @arcticstellar), following the phone or chosen in Settings >
+  System > Language, with **Export / Import language file** (JSON, English as
   the key) to correct a translation or add a language without a new build. The list of texts is generated
   from the sources at build time.
 
@@ -143,18 +151,23 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   switches of the same logical camera, and RAW10 buffers are probed up front. *(Already in Rawr: Ed's
   #140.)*
 
-**Xiaomi 15 (by the-marox, PRs #2 to #5)**
+**Xiaomi 15 (by the-marox, PRs #2 to #5, #7 to #9, #13 and #14)**
 - GLES bridge for RAW16 where the Vulkan driver refuses the camera buffers, and for RAW10, whose packed MIPI
   plane the bridge's compute shader decodes to 16-bit on the GPU (no CPU copy, no downgraded preview); 60 fps
   only where a sensor mode
   delivers the RAW stream; sensed flicker for AE; ToF focus and light-sensor WB (both also work on the
   17 Ultra); 1080p from the full sensor width. The mirrored-lens preview fix of #3 is *(already in Rawr:
   Ed's #150)*.
+- The HEVC encoder prepared before the shutter and split YUV drop counters (#7, #8), the sensor mode behind a
+  lens's fps ceiling named in the log (#9), the native build on a Windows host (#13). On the 17 Ultra they change
+  nothing by default (`debug.rawr.video_encoder_prewarm=1` and `debug.rawr.gles_bridge=1` turn the prewarm and
+  the bridge on).
 
 **Renderer**
 - Sensor CFA (RAW tab): Auto finds a Quad Bayer block mosaic tagged as Bayer (for example 50 MP Xiaomi 15
   Ultra DNGs from other apps) and remosaics it; large uncompressed DNGs open; optional Renderer icon in the
-  app drawer and Settings > System > Renderer.
+  app drawer and Settings > System > Renderer. In Android's share and open-with list it carries the build's
+  name ("Rawr 17U Renderer"), so several installed Rawr builds can be told apart.
 
 ### How 50 and 200 MP are reached
 
