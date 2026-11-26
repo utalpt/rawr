@@ -2,12 +2,14 @@
 
 ## Toolchain
 
-macOS and Linux: JDK 17, Gradle wrapper 8.11.1, AGP 8.10.1, Kotlin/Compose
+macOS, Linux and Windows: JDK 17, Gradle wrapper 8.11.1, AGP 8.10.1, Kotlin/Compose
 compiler 2.2.21, SDK 36, NDK 29.0.14206865, SDK CMake 3.31.6.
 Install `uv` for Python build helpers and tools.
 Use `ANDROID_HOME` or an untracked `local.properties` containing `sdk.dir`.
 First builds require network access for Maven dependencies and pinned
-libadrenotools sources. Termux and native Windows builds are not supported.
+libadrenotools sources. Termux builds are not supported. On Windows the shaders
+compile with the NDK's own `shader-tools/windows-x86_64/glslc.exe`, so no extra
+toolchain entry is needed beyond `JAVA_HOME` and `ANDROID_HOME`.
 
 The app and standalone runners use the pinned SDK tools. Host Vulkan tests
 additionally need Vulkan headers and a loader; GPU tests need a working Vulkan
