@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rawr.camera.model.FilmSimQuickDiscrete
+import com.rawr.camera.model.FilmSectionGates
 import com.rawr.camera.model.FilmSimQuickState
 import com.rawr.camera.model.FilmStripItem
 import com.rawr.camera.model.formatFilmStripValue
@@ -398,7 +399,15 @@ internal fun FilmCardTitle(title: String) {
 
 /** Grid tile used by the ADV card (sections and subsections). */
 @Composable
-internal fun FilmGridTile(label: String, selected: Boolean, width: androidx.compose.ui.unit.Dp, tag: String, onClick: () -> Unit) {
+internal fun FilmGridTile(
+    label: String,
+    selected: Boolean,
+    width: androidx.compose.ui.unit.Dp,
+    tag: String,
+    /** Rawr 17U fork: the section's effect is switched off; shows "OFF" under the label. */
+    off: Boolean = false,
+    onClick: () -> Unit
+) {
     val haptics = LocalCaptureHaptics.current
     Box(
         Modifier
@@ -410,22 +419,33 @@ internal fun FilmGridTile(label: String, selected: Boolean, width: androidx.comp
                 haptics.selection()
                 onClick()
             }.semantics {
-                contentDescription = label + if (selected) ", active" else ""
+                contentDescription = label + (if (off) ", off" else "") + if (selected) ", active" else ""
                 role = Role.Tab
                 this.selected = selected
             }.padding(horizontal = 6.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            label,
-            color = if (selected) CaptureColors.Accent else Color.White.copy(alpha = .85f),
-            fontFamily = CaptureMono,
-            fontWeight = FontWeight.Bold,
-            fontSize = 10.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = ViewfinderTextStyle
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                label,
+                color = if (selected) CaptureColors.Accent else Color.White.copy(alpha = if (off) .5f else .85f),
+                fontFamily = CaptureMono,
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = ViewfinderTextStyle
+            )
+            if (off) Text(
+                "OFF",
+                color = Color.White.copy(alpha = .45f),
+                fontFamily = CaptureMono,
+                fontWeight = FontWeight.Bold,
+                fontSize = 7.sp,
+                maxLines = 1,
+                style = ViewfinderTextStyle
+            )
+        }
     }
 }
 
@@ -521,13 +541,21 @@ private fun FilmAdvBlock(
                         }
                         subsection?.items?.forEachIndexed { index, item ->
                             val cellWidth = itemWidths[(index + if (hasDirToggle) 1 else 0) % itemWidths.size]
+                            // Rawr 17U fork: values that do nothing while their section is switched off are dimmed,
+                            // as on the quick card (idea: apos-fandango's Rawr X14U). They stay editable.
+                            val itemKey = when (item) {
+                                is FilmStripItem.Numeric -> item.key
+                                is FilmStripItem.Discrete -> item.key
+                                is FilmStripItem.Flag -> item.key
+                            }
+                            val dim = if (FilmSectionGates.isLive(quick, section?.key, subsection?.key, itemKey)) 1f else .35f
                             when (item) {
                                 is FilmStripItem.Numeric -> {
                                     val param = quick.params[item.key] ?: return@forEachIndexed
                                     item(key = item.key) {
                                         StripNumericItem(
                                             key = item.key,
-                                            modifier = Modifier.width(cellWidth),
+                                            modifier = Modifier.width(cellWidth).alpha(dim),
                                             shortLabel = param.shortLabel,
                                             value = param.value,
                                             display = param.displayValue,
@@ -551,7 +579,7 @@ private fun FilmAdvBlock(
                                     item(key = item.key) {
                                         FilmDiscreteItem(
                                             key = item.key,
-                                            modifier = Modifier.width(cellWidth),
+                                            modifier = Modifier.width(cellWidth).alpha(dim),
                                             shortLabel = entry.shortLabel,
                                             display = entry.displayValue,
                                             drilled = drill?.first == item.key,
@@ -564,7 +592,7 @@ private fun FilmAdvBlock(
                                     item(key = item.key) {
                                         FilmFlagItem(
                                             key = item.key,
-                                            modifier = Modifier.width(cellWidth),
+                                            modifier = Modifier.width(cellWidth).alpha(dim),
                                             shortLabel = entry.shortLabel,
                                             enabled = entry.enabled,
                                             onToggle = { onToggleFlag(item.key, it) }
@@ -1051,7 +1079,8 @@ internal fun FilmAdvCard(
         quick.sections.chunked(3).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                 row.forEach { sec ->
-                    FilmGridTile(sec.label, sec.key == section?.key, tile, sectionTag(sec.key)) { onSection(sec.key) }
+                    FilmGridTile(sec.label, sec.key == section?.key, tile, sectionTag(sec.key),
+                        off = FilmSectionGates.isOff(quick, sec.key)) { onSection(sec.key) }
                 }
             }
         }
@@ -1060,7 +1089,8 @@ internal fun FilmAdvCard(
             section.subsections.chunked(3).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                     row.forEach { sub ->
-                        FilmGridTile(sub.label, sub.key == subsection?.key, tile, subsectionTag(section.key, sub.key)) {
+                        FilmGridTile(sub.label, sub.key == subsection?.key, tile, subsectionTag(section.key, sub.key),
+                            off = section.key == "diffusion" && FilmSectionGates.isOff(quick, section.key, sub.key)) {
                             onSubsection(sub.key)
                         }
                     }
