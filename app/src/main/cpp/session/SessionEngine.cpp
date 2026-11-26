@@ -793,6 +793,7 @@ uint32_t SessionEngine::prepareFullSizeBurst(uint32_t maxFrames) {
         if (journalWrites[slot].valid()) journalWrites[slot].get();
     };
     std::unique_ptr<capture::BlockRemosaicGpu> gpuRemosaic;  // created at the first block-CFA frame
+    std::optional<imaging::QuadGainField> gainField;  // quad per-position response, fitted on the first frame
     bool gpuRemosaicTried = false;
     allocationTiming.finish();
     struct Frame {
@@ -1015,9 +1016,10 @@ uint32_t SessionEngine::prepareFullSizeBurst(uint32_t maxFrames) {
                                          " error=" + e.what());
                     }
                 }
-                [[maybe_unused]] const bool onGpu = capture::remosaicBlockCfaBuffer(packed, width, height, *context,
-                                                                   frames.back().metadata.blackLevelPhysicalRggb,
-                                                                   gpuRemosaic.get());
+                // Ed's #164: white level and the quad per-position gain field (fitted on the first frame).
+                [[maybe_unused]] const bool onGpu = capture::remosaicBlockCfaBuffer(
+                    packed, width, height, *context, frames.back().metadata.blackLevelPhysicalRggb, gpuRemosaic.get(),
+                    frames.back().metadata.effectiveWhiteLevel, &gainField);
                 CAPTURE_DEBUG_LOG("FULLRES_REMOSAIC tag=%llu frame=%u block=%u quality=%s gpu=%d",
                                   static_cast<unsigned long long>(tag), index + 1, context->cfaBlock,
                                   capture::remosaicQualityName(capture::photoRemosaicQuality(*context)), onGpu ? 1 : 0);
@@ -1079,7 +1081,10 @@ uint32_t SessionEngine::prepareFullSizeBurst(uint32_t maxFrames) {
         pending->colors.push_back(f.color);
     }
     pending->acquiredJournal = std::move(journal);
-    pending->referenceIndex = static_cast<std::uint32_t>(pending->frames.size() / 2u);
+    // The first frame is the closest to the press (FrozenBurst::firstFrameBase); the frames are on the CPU, so
+    // there is no GPU sharpness scoring to pick among them.
+    pending->referenceIndex = 0;
+    pending->firstFrameBase = true;
     pending->referenceMetadata = pending->metadata[pending->referenceIndex];
     pending->referenceColor = pending->colors[pending->referenceIndex];
     const auto prepared = static_cast<uint32_t>(pending->frames.size());
