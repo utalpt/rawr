@@ -39,15 +39,17 @@ internal fun VideoRecordButton(
     orientation: Orientation,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    countingDown: Boolean = false
+    countingDown: Boolean = false,
+    canStart: Boolean = true
 ) {
     val haptics = LocalCaptureHaptics.current
-    val ring = if (state.busy) CaptureColors.Muted else CaptureColors.Danger
+    val enabled = !state.busy && (canStart || state.recording || countingDown)
+    val ring = if (!enabled) CaptureColors.Muted else CaptureColors.Danger
     Box(
         modifier
             .size(CaptureDimens.ShutterOuter)
             .testTag(CaptureTestTags.VIDEO_RECORD)
-            .captureClickable(shape = CircleShape, enabled = !state.busy, onClick = {
+            .captureClickable(shape = CircleShape, enabled = enabled, onClick = {
                 haptics.capture()
                 onClick()
             })
@@ -56,6 +58,7 @@ internal fun VideoRecordButton(
                 contentDescription = when {
                     countingDown -> "Cancel self timer"
                     state.recording -> "Stop video recording"
+                    !canStart -> "Video recording unavailable for this mode"
                     else -> "Start video recording"
                 }
             },

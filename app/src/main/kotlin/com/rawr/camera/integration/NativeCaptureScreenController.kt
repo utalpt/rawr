@@ -102,14 +102,19 @@ class NativeCaptureScreenController(
         when (action) {
             is PresentationCaptureAction -> {
                 val before = state.value
-                update { CaptureReducer.reduce(it, action) }
+                update {
+                    val next = CaptureReducer.reduce(it, action)
+                    if (next.captureMode == CaptureMode.Video)
+                        next.videoModeAvailability?.reconcile(next) ?: next
+                    else next
+                }
                 if (action is ToggleOverlayArmed || action is ToggleFalseColor ||
                     action is RestoreCapturePreferences
                 ) {
                     syncOverlayArming()
                 }
                 selfTimer.reconcile()
-                if (action is SetCaptureMode || action is CycleVideoFps || action is RestoreCapturePreferences) {
+                if (action is SetCaptureMode || action is RestoreCapturePreferences || before.videoFps != state.value.videoFps) {
                     val current = state.value
                     coordinator.setVideoMode(current.captureMode == CaptureMode.Video, current.videoFps)
                 }
@@ -374,6 +379,7 @@ class NativeCaptureScreenController(
                 current, NativeCapabilityProjection.pending(current.capabilities.lenses)
             )
             CaptureTransitions.selectLens(pending, lensId).copy(
+                videoModeAvailability = null,
                 exposureApplied = ExposureAppliedState.pending(),
                 sensitivityBoost = null,
                 rawFps = null,
@@ -503,6 +509,20 @@ class NativeCaptureScreenController(
                 fullSizeBurstsToSingle = maxOf(current.fullSizeBurstsToSingle, snapshot.fullSizeBurstsToSingle)
             )
         }
+        val before = state.value
+        update { current ->
+            if (current.selectedLensId.isNotEmpty() && current.selectedLensId != snapshot.lensId) current
+            else {
+                val next = current.copy(videoModeAvailability = snapshot.videoModeAvailability)
+                if (next.captureMode == CaptureMode.Video && !videoLocked())
+                    next.videoModeAvailability?.reconcile(next) ?: next
+                else next
+            }
+        }
+        val after = state.value
+        if (after.videoFps != before.videoFps) coordinator.setVideoMode(true, after.videoFps)
+        if (after.videoFps != before.videoFps || after.videoResolution != before.videoResolution)
+            onCapturePreferencesChanged(before, after)
         val prepared = snapshotPresentation.prepare(state.value, snapshot) ?: return
         update { current ->
             prepared.project(current, focusRequestIds.get(), whiteBalanceRequestIds.get())

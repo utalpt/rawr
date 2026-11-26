@@ -76,6 +76,7 @@ struct FrameSubmitConfiguration {
     bool experimentalZeroCopy = false;
     bool lensShadingCorrectionEnabled = false;
     float cfaBlack = 0.0f;  // raw black level in sample units (Detail remosaic regulariser)
+    std::string lensId;
 };
 
 // Owns the runtime state machine after Camera2 RAW/metadata enter the app and
@@ -309,6 +310,7 @@ class FrameSubmitCoordinator final {
     rawrcam::vulkan::GlesRawBridge bridge_;
     // Set in configure(), read and cleared on the ingest thread.
     std::atomic<bool> bridgeEnabled_{false};
+    bool raw16CpuCompatibility_ = false;
     bool bridgeNativeChecked_ = false;
     bool bridgeNativeRefused_ = false;  // the driver imports no RAW16 AHB as a buffer
     bool bridgeLogged_ = false;

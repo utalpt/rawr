@@ -159,6 +159,17 @@ CameraControlState readInitialCameraControlState(const ACameraMetadata* characte
         }
     }
 
+    // These dada routes advertise 60 fps but deliver invalid RAW image areas
+    // at that rate: the 14 mm ultrawide shows bands, and the 23 mm and 59 mm
+    // 50 MP variants show invalid rows. Limit video cadence at any output size.
+    char product[PROP_VALUE_MAX]{};
+    __system_property_get("ro.product.device", product);
+    if (std::string_view(product) == "dada" &&
+        (route.lensId == "14mm" || route.lensId == "23mm 50MP" || route.lensId == "59mm 50MP")) {
+        const int ceiling = caps.sensorModeFpsCeiling;
+        caps.sensorModeFpsCeiling = ceiling > 0 ? std::min(ceiling, 30) : 30;
+    }
+
     // Pick the broadest advertised normal-AE FPS range for Camera2 priority
     // modes. TEMPLATE_PREVIEW commonly defaults to 30/30; that silently caps
     // shutter-priority exposure near 1/30 even though the new priority mode

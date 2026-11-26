@@ -70,8 +70,9 @@ internal fun CaptureTopBar(
                     icon = state.videoResolution.topBarIcon(),
                     label = state.videoResolution.topBarLabel(),
                     testTag = CaptureTestTags.TOPBAR_VIDEO_RESOLUTION,
-                    description = "Video resolution ${state.videoResolution.label}. Tap to change.",
-                    enabled = !videoLocked,
+                    description = "Video resolution ${state.videoResolution.label}.",
+                    enabled = !videoLocked && (state.videoModeAvailability
+                        ?.resolutions(state.videoFps, state.videoAspect)?.size ?: 0) > 1,
                     orientation = state.orientation,
                     rotateLabel = false,
                     onClick = {
@@ -88,8 +89,9 @@ internal fun CaptureTopBar(
                     icon = Icons.Outlined.SlowMotionVideo,
                     label = "${state.videoFps}",
                     testTag = CaptureTestTags.TOPBAR_VIDEO_FPS,
-                    description = "Video frame rate ${state.videoFps} fps. Tap to change.",
-                    enabled = !videoLocked,
+                    description = "Video frame rate ${state.videoFps} fps.",
+                    enabled = !videoLocked && (state.videoModeAvailability
+                        ?.rates(state.videoResolution, state.videoAspect)?.size ?: 0) > 1,
                     orientation = state.orientation,
                     onClick = {
                         haptics.selection()

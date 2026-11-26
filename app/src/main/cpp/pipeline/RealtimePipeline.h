@@ -63,7 +63,7 @@ class RealtimePipeline final : public RealtimeResources {
    private:
     bool configureGeometry(uint64_t generation, uint32_t width, uint32_t height, uint32_t cfa, uint32_t cfaBlock,
                            uint32_t cfaQuality,
-                           const std::array<float, 4>& black, float white, int sensorOrientationDegrees);
+                           const std::array<float, 4>& black, float white, int sensorOrientationDegrees, const std::string& lensId);
     void createFrameProcessor();
     void destroyCameraResources(bool preserveHqStill = false, bool teardownFilm = true) noexcept;
     void emit(const std::string& line) const;

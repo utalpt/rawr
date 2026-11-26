@@ -140,7 +140,8 @@ data class CaptureUiState(
     val captureMode: CaptureMode = CaptureMode.Photo,
     val videoResolution: com.rawr.camera.video.VideoResolutionMode =
         com.rawr.camera.video.VideoResolutionMode.HD1080,
-    /** Recording frame rate; only 24 and 30 are supported by the native recorder. */
+    val videoModeAvailability: com.rawr.camera.video.VideoModeAvailability? = null,
+    /** Requested recording cadence for the active video mode. */
     val videoFps: Int = 30,
     val videoLogEnabled: Boolean = false,
     /** Cinema/panoramic crop of the recording, kept horizontal in the world. */

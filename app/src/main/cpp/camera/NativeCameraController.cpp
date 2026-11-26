@@ -30,6 +30,7 @@
 #include "camera/FlickerPeriod.h"
 #include "camera/CameraProfileJson.h"
 #include "camera/CameraRequestPipeline.h"
+#include "camera/CameraRequestCadence.h"
 #include "camera/CameraResultProcessor.h"
 #include "camera/CameraStartLadder.h"
 #include "camera/CameraWhiteBalanceControls.h"
@@ -2087,9 +2088,7 @@ struct NativeCameraController::Impl final : CameraEventSink {
             if (deviceSession.session()) (void)submitRepeatingLocked();
             return true;
         }
-        if (fps < 1 || control.capabilities.exposureTimeMinNs > 1'000'000'000LL / fps ||
-            !std::any_of(control.capabilities.aeTargetFpsRanges.begin(), control.capabilities.aeTargetFpsRanges.end(),
-                         [fps](const auto& range) { return range[0] == fps && range[1] == fps; })) {
+        if (!cameraSupportsRecordingFps(control.capabilities, fps)) {
             diag("CAMERA_RECORDING_FPS_UNSUPPORTED fps=" + std::to_string(fps));
             return false;
         }

@@ -1,6 +1,7 @@
 #include "camera/CameraControlSerialization.h"
 
 #include "camera/CameraProfileJson.h"
+#include "camera/CameraRequestCadence.h"
 
 #include <iomanip>
 #include <sstream>
@@ -57,6 +58,14 @@ std::string serializeCameraControlState(const CameraControlState& st) {
         s << (i ? "," : "") << "{\"id\":" << quoted(c.profileLenses[i].first)
           << ",\"label\":" << quoted(c.profileLenses[i].second) << ",\"group\":"
           << quoted(i < c.profileLensGroups.size() ? c.profileLensGroups[i] : std::string()) << '}';
+    s << "],\"recordingFpsChoices\":[";
+    bool firstRate = true;
+    for (const auto& range : c.aeTargetFpsRanges) {
+        if (range[0] != range[1] || !cameraSupportsRecordingFps(c, range[0])) continue;
+        if (!firstRate) s << ',';
+        s << range[0];
+        firstRate = false;
+    }
     s << ']'
       << ",\"sensitivityMin\":" << c.sensitivityMin << ",\"sensitivityMax\":" << c.sensitivityMax
       << ",\"exposureTimeMinNs\":" << c.exposureTimeMinNs << ",\"exposureTimeMaxNs\":" << c.exposureTimeMaxNs

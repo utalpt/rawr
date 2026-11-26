@@ -17,6 +17,15 @@ inline int64_t cameraBracketFrameDuration(const CameraControlState& state, int64
                ? std::min(duration, state.capabilities.maxFrameDurationNs) : duration;
 }
 
+inline bool cameraSupportsRecordingFps(const CameraControlCapabilities& caps, int fps) {
+    return fps > 0 && (caps.frameRate <= 0 || caps.frameRate == fps) &&
+           (caps.sensorModeFpsCeiling <= 0 || fps <= caps.sensorModeFpsCeiling) &&
+           caps.exposureTimeMinNs <= 1'000'000'000LL / fps &&
+           std::any_of(caps.aeTargetFpsRanges.begin(), caps.aeTargetFpsRanges.end(), [fps](const auto& range) {
+               return range[0] == fps && range[1] == fps;
+           });
+}
+
 // The idle video cadence the camera is asked for: the chosen rate, held under the RAW stream's
 // sensor-mode ceiling (SensorModeFpsPolicy.h). The chosen rate itself stays in the state.
 inline int32_t cameraVideoPreviewFps(const CameraControlState& state) {

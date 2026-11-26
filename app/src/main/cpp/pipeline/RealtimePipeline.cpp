@@ -139,7 +139,7 @@ bool RealtimePipeline::configureCamera(uint64_t generation, const metadata::Came
     return configureGeometry(generation, metadata.geometry.rawBufferWidth, metadata.geometry.rawBufferHeight,
                              metadata.rawPreviewCfa, metadata.cfaBlock, metadata.cfaLiveQuality,
                              metadata.baselineBlackLevelPhysicalRggb,
-                             metadata.baselineWhiteLevel, metadata.geometry.sensorOrientationDegrees);
+                             metadata.baselineWhiteLevel, metadata.geometry.sensorOrientationDegrees, metadata.lensId);
 }
 void RealtimePipeline::emit(const std::string& line) const {
     if (diagnostic_) diagnostic_(line);
@@ -183,7 +183,7 @@ void RealtimePipeline::setScopeDeviceRotationDegrees(int rotation) {
     realtime_.setScopeDeviceRotationDegrees(scopeDeviceRotationDegrees_);
 }
 bool RealtimePipeline::configureGeometry(uint64_t generation, uint32_t width, uint32_t height, uint32_t cfa,
-                                         uint32_t cfaBlock, uint32_t cfaQuality, const std::array<float, 4>& black, float white, int sensorOrientationDegrees) {
+                                         uint32_t cfaBlock, uint32_t cfaQuality, const std::array<float, 4>& black, float white, int sensorOrientationDegrees, const std::string& lensId) {
     bool oldResourcesDestroyed = false;
     bool preserveHqStillAcrossReconfigure = false;
     try {
@@ -391,7 +391,7 @@ bool RealtimePipeline::configureGeometry(uint64_t generation, uint32_t width, ui
         realtime_.configure(pipeline::FrameSubmitConfiguration{
             generation_, rawWidth_, rawHeight_, previewWidth_, previewHeight_, cfa_, cfaBlock_, cfaQuality_,
             sensorOrientationDegrees_, realtime_.diagnosticMode(), realtime_.experimentalZeroCopy(),
-            realtime_.lensShadingCorrectionEnabled(), 0.25f * (black_[0] + black_[1] + black_[2] + black_[3])});
+            realtime_.lensShadingCorrectionEnabled(), 0.25f * (black_[0] + black_[1] + black_[2] + black_[3]), lensId});
         realtime_.setDisplayRotationDegrees(displayRotationDegrees_);
         realtime_.setScopeDeviceRotationDegrees(scopeDeviceRotationDegrees_);
 

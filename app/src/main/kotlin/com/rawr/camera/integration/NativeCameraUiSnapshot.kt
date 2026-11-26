@@ -60,6 +60,7 @@ internal data class NativeCameraUiSnapshot(
     val focusRequestId: Long = 0L,
     val videoMode: Boolean = false,
     val videoPreviewFps: Int = 30,
+    val videoModeAvailability: com.rawr.camera.video.VideoModeAvailability? = null,
     /** Capture shutter when longer than the viewfinder runs (one-shot on press); 0 = none. */
     val deferredCaptureExposureNs: Long = 0L,
     /** Its ISO on the reported scale (as appliedSensitivity). */
@@ -175,6 +176,12 @@ internal data class NativeCameraUiSnapshot(
                 focusRequestId = j.optLong("focusRequestId", 0L),
                 videoMode = j.optBoolean("videoMode", false),
                 videoPreviewFps = j.optInt("videoPreviewFps", 30),
+                videoModeAvailability = j.optJSONArray("recordingFpsChoices")?.let { rates ->
+                    com.rawr.camera.video.VideoModeAvailability(
+                        com.rawr.camera.video.VideoGeometry.from(j),
+                        (0 until rates.length()).map { rates.optInt(it) }.toSet()
+                    )
+                },
                 deferredCaptureExposureNs = j.optLong("deferredCaptureExposureNs", 0L),
                 deferredCaptureReportedSensitivity = j.optInt("deferredCaptureReportedSensitivity", 0),
                 longExposureNs = j.optLong("longExposureNs", 0L),

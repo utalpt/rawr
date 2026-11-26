@@ -102,7 +102,9 @@ object CaptureReducer {
         }
 
         CycleVideoResolution -> {
-            state.copy(videoResolution = state.videoResolution.next())
+            val choices = state.videoModeAvailability?.resolutions(state.videoFps, state.videoAspect).orEmpty()
+            val next = choices.getOrNull(choices.indexOf(state.videoResolution) + 1) ?: choices.firstOrNull()
+            if (next == null) state else state.copy(videoResolution = next)
         }
 
         is SetPhotoAspect -> state.copy(photoAspect = action.value)
@@ -110,8 +112,9 @@ object CaptureReducer {
         ToggleVideoLog -> if (state.captureMode == CaptureMode.Video) state.copy(videoLogEnabled = !state.videoLogEnabled) else state
 
         CycleVideoFps -> {
-            val next = VIDEO_FPS_CHOICES.getOrNull(VIDEO_FPS_CHOICES.indexOf(state.videoFps) + 1)
-            state.copy(videoFps = next ?: VIDEO_FPS_CHOICES.first())
+            val choices = state.videoModeAvailability?.rates(state.videoResolution, state.videoAspect).orEmpty()
+            val next = choices.getOrNull(choices.indexOf(state.videoFps) + 1) ?: choices.firstOrNull()
+            if (next == null) state else state.copy(videoFps = next)
         }
 
         CycleSelfTimer -> {

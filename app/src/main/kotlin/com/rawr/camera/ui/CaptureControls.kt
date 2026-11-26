@@ -151,6 +151,8 @@ internal fun CaptureControls(
                         state = videoControls,
                         orientation = state.orientation,
                         onClick = onToggleVideoRecording,
+                        canStart = state.videoModeAvailability?.supports(
+                            state.videoResolution, state.videoFps, state.videoAspect) == true,
                         countingDown = state.selfTimerRemainingMs != null
                     )
                 } else {

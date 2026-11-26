@@ -127,6 +127,11 @@ void FrameSubmitCoordinator::configure(const FrameSubmitConfiguration& config) {
         char device[PROP_VALUE_MAX]{};
         char bridge[PROP_VALUE_MAX]{};
         __system_property_get("ro.product.device", device);
+        // On dada the 4080x3072 RAW16 ultrawide stream renders black through
+        // the GPU ingress despite successful import/pack. CPU samples are valid.
+        // Keep this compatibility path local to RAW16 at this geometry.
+        raw16CpuCompatibility_ = std::string_view(device) == "dada" &&
+                                 config_.lensId == "14mm 50mp" && config_.rawWidth == 4080 && config_.rawHeight == 3072;
         const char setting = __system_property_get("debug.rawr.gles_bridge", bridge) > 0 ? bridge[0] : '\0';
         bridgeEnabled_.store(rawrcam::vulkan::glesBridgeAllowed(device, setting));
         if (!bridgeEnabled_.load()) bridgeSelected_.store(false);
@@ -147,6 +152,7 @@ void FrameSubmitCoordinator::configure(const FrameSubmitConfiguration& config) {
     cpuUpload_.configure(config_.rawWidth, config_.rawHeight);
     cpuUpload_.configureRemosaic(config_.cfaBlock, config_.cfa, config_.cfaQuality, config_.cfaBlack);
     cpuIngressActive_.store(false, std::memory_order_relaxed);
+    cpuIngressLogged_ = false;
     raw16GpuCopyDeferredLogged_ = false;
     pipelineAuditMetadataCount_ = 0;
     capturePort_.configureMultiframe(config_.rawWidth, config_.rawHeight, config_.cfa);
@@ -408,9 +414,10 @@ std::optional<FrameSubmitCoordinator::AcquiredSubmit> FrameSubmitCoordinator::ac
 rawrcam::vulkan::ImportedRaw& FrameSubmitCoordinator::ingestRaw(const SubmitParams& params, uint32_t slotIndex) {
     const auto format = rawrcam::imaging::rawPixelFormatOf(params.lease->image());
     const bool raw10 = format == rawrcam::geometry::RawPixelFormat::Raw10;
+    const bool raw16Compat = raw16CpuCompatibility_ && !raw10 && config_.diagnosticMode == 0u;
     // A block-CFA lens skips the zero-copy image import: consumers must read
     // the remosaiced copy, never the camera's block mosaic.
-    if (!raw10 && !cpuIngressRequired() && !raw16ImageImportLatched_.load(std::memory_order_relaxed) &&
+    if (!raw10 && !raw16Compat && !cpuIngressRequired() && !raw16ImageImportLatched_.load(std::memory_order_relaxed) &&
         config_.cfaBlock <= 1u) {
         try {
             rawrcam::vulkan::ImportedRaw& raw =
@@ -439,7 +446,7 @@ rawrcam::vulkan::ImportedRaw& FrameSubmitCoordinator::ingestRaw(const SubmitPara
     }
     // RAW16 whose image import was rejected: copy the imported camera buffer
     // into the pool's owned R16 image on the GPU.
-    if (!raw10 && !cpuIngressRequired() && config_.diagnosticMode == 0u) {
+    if (!raw10 && !raw16Compat && !cpuIngressRequired() && config_.diagnosticMode == 0u) {
         auto pack = [&]() -> rawrcam::vulkan::ImportedRaw& {
             auto twin = bridge_.pack(vulkanContext_.device(), vulkanContext_.getAhbProperties(), slotIndex,
                                      params.ahb, params.acquireFenceFd, config_.rawWidth, config_.rawHeight);
@@ -609,7 +616,8 @@ rawrcam::vulkan::ImportedRaw& FrameSubmitCoordinator::ingestRaw(const SubmitPara
         cpuIngressLogged_ = true;
         const std::string line = std::string("RAW_INGRESS_CPU_UPLOAD active=true format=") +
                                  (raw10 ? "RAW10" : "RAW16") +
-                                 " forced=" + (forceCpuIngress_.load(std::memory_order_relaxed) ? "true" : "false");
+                                 " forced=" + (forceCpuIngress_.load(std::memory_order_relaxed) ? "true" : "false") +
+                                 (raw16Compat ? " reason=dada_raw16_4080_compat" : "");
         LOGI("%s", line.c_str());
         lifecyclePort_.postDiagnostic(line);
     }
