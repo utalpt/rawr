@@ -172,19 +172,10 @@ internal fun FilmStrip(
                         subsectionKey = it
                         l4Key = null
                     },
-                    onBackToQuick = {
-                        l4Key = null
-                        mode = FilmStripMode.Quick
-                    },
-                    onFilm = {
+                    // Rawr 17U fork: "‹" goes back to the film sheet ALL PARAMS opens from.
+                    onBack = {
                         l4Key = null
                         mode = FilmStripMode.Profiles
-                    },
-                    onCloseParams = {
-                        l4Key = null
-                        // Rawr 17U fork: the LOOK button reopens on the film sheet, not on ALL PARAMS.
-                        mode = FilmStripMode.Profiles
-                        closeSheet()
                     },
                     l4Key = l4Key,
                     onOpenDiscrete = { l4Key = it },
@@ -453,8 +444,10 @@ internal fun FilmGridTile(
 }
 
 /**
- * ADV: every film parameter. A card with the sections and the active section's subsections as grids, the
- * subsection's parameters on the row beside PARAMS (first four columns), FILM above PARAMS as always.
+ * ADV: every film parameter. Rawr 17U fork: laid out like the film sheet it opens from, in the sheet's space above
+ * the exposure row: a row of "‹" and the sections (OFF under a section whose switch is off), a row of the section's
+ * subsections, and the subsection's parameters five across the full width. Replaces the floating card with FILM
+ * and PARAMS beside it, which covered half the viewfinder.
  */
 @Composable
 private fun FilmAdvBlock(
@@ -463,9 +456,7 @@ private fun FilmAdvBlock(
     subsectionKey: String?,
     onSection: (String) -> Unit,
     onSubsection: (String) -> Unit,
-    onBackToQuick: () -> Unit,
-    onFilm: () -> Unit,
-    onCloseParams: () -> Unit,
+    onBack: () -> Unit,
     l4Key: String?,
     onOpenDiscrete: (String) -> Unit,
     onCloseL4: () -> Unit,
@@ -474,11 +465,17 @@ private fun FilmAdvBlock(
     onScrubDiscrete: (String, Int) -> Unit,
     onToggleFlag: (String, Boolean) -> Unit
 ) {
-    val haptics = LocalCaptureHaptics.current
     val section = quick.sections.firstOrNull { it.key == sectionKey } ?: quick.sections.firstOrNull()
     val subsection = section?.subsections?.firstOrNull { it.key == subsectionKey } ?: section?.subsections?.firstOrNull()
     val drill = l4Key?.let { key -> quick.discretes[key]?.let { key to it } }
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+    val gap = CaptureDimens.ControlGap
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = CaptureDimens.CompactParamRowEdgeInset)
+            .padding(bottom = gap),
+        verticalArrangement = Arrangement.spacedBy(gap)
+    ) {
         if (drill != null) {
             FilmDiscreteOptionsRow(
                 dropdownKey = drill.first,
@@ -487,127 +484,181 @@ private fun FilmAdvBlock(
                 onSelect = { onScrubDiscrete(drill.first, it) }
             )
         }
-        BoxWithConstraints(
+        Column(
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = CaptureDimens.CompactParamRowEdgeInset)
-                .padding(bottom = CaptureDimens.ControlGap)
+                .background(Color.Black.copy(alpha = .62f), androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                .padding(vertical = 6.dp)
+                .testTag("film_adv_panel"),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            val cells = paramsCellWidths(maxWidth)
-            val gap = CaptureDimens.ControlGap
-            val cardWidth = cells[1] + cells[2] + cells[3] + cells[4] + gap * 3
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(gap)) {
-                FilmAdvCard(quick, section?.key, subsection?.key, cardWidth, onSection, onSubsection, onBackToQuick,
-                    sectionTag = CaptureTestTags::filmSection, subsectionTag = CaptureTestTags::filmSubsection,
-                    backTag = "film_adv_back")
-                // FILM above PARAMS, as in every film state.
-                Box(
-                    Modifier
-                        .width(cells[4])
-                        .height(StripDimens.ParamRowHeight)
-                        .testTag(CaptureTestTags.FILM_STRIP_PROFILE)
-                        .captureClickable(shape = CaptureTextRippleShape) {
-                            haptics.selection()
-                            onFilm()
-                        }
-                        .viewfinderChip(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    StripTwoLineItem(
-                        valueText = if (quick.modified) "${quick.activePresetName} •" else quick.activePresetName,
-                        valueColor = if (quick.modified) CaptureColors.AccentSoft else Color.White.copy(alpha = .95f),
-                        labelText = "FILM"
-                    )
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                item(key = "back") {
+                    FilmAdvChip("‹", selected = false, off = false, tag = "film_adv_back",
+                        description = "Back to the film sheet", onClick = onBack)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(gap), verticalAlignment = Alignment.CenterVertically) {
-                    val itemWidths = cells.subList(0, 4)
-                    val hasDirToggle = section?.key == "dir" && subsection?.key == "couplers"
-                    LazyRow(
-                        Modifier
-                            .width(cells[0] + cells[1] + cells[2] + cells[3] + gap * 3)
-                            .height(StripDimens.ParamRowHeight)
-                            .testTag(CaptureTestTags.FILM_STRIP_PARAMS),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(gap)
-                    ) {
-                        if (hasDirToggle) {
-                            val dirAmount = quick.params["DirCouplersAmount"]?.value ?: 0f
-                            item(key = "dir-enable") {
-                                FilmFlagItem(
-                                    key = "DirEnabled",
-                                    modifier = Modifier.width(itemWidths[0]),
-                                    shortLabel = "DIR",
-                                    enabled = dirAmount > 0f,
-                                    onToggle = { onScrubParam("DirCouplersAmount", if (it) 1f else 0f) }
-                                )
-                            }
+                items(quick.sections.size, key = { quick.sections[it].key }) { i ->
+                    val sec = quick.sections[i]
+                    FilmAdvChip(sec.label, selected = sec.key == section?.key, off = FilmSectionGates.isOff(quick, sec.key),
+                        tag = CaptureTestTags.filmSection(sec.key)) { onSection(sec.key) }
+                }
+            }
+            if (section != null && section.subsections.size > 1) {
+                LazyRow(
+                    Modifier.testTag(CaptureTestTags.filmSubsectionRow(section.key)),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    items(section.subsections.size, key = { section.subsections[it].key }) { i ->
+                        val sub = section.subsections[i]
+                        FilmAdvChip(sub.label, selected = sub.key == subsection?.key,
+                            off = section.key == "diffusion" && FilmSectionGates.isOff(quick, section.key, sub.key),
+                            tag = CaptureTestTags.filmSubsection(section.key, sub.key)) { onSubsection(sub.key) }
+                    }
+                }
+            }
+            BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                val cellWidth = (maxWidth - gap * 4) / 5
+                val hasDirToggle = section?.key == "dir" && subsection?.key == "couplers"
+                LazyRow(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(StripDimens.ParamRowHeight)
+                        .testTag(CaptureTestTags.FILM_STRIP_PARAMS),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(gap)
+                ) {
+                    if (hasDirToggle) {
+                        val dirAmount = quick.params["DirCouplersAmount"]?.value ?: 0f
+                        item(key = "dir-enable") {
+                            FilmFlagItem(
+                                key = "DirEnabled",
+                                modifier = Modifier.width(cellWidth),
+                                shortLabel = "DIR",
+                                enabled = dirAmount > 0f,
+                                onToggle = { onScrubParam("DirCouplersAmount", if (it) 1f else 0f) }
+                            )
                         }
-                        subsection?.items?.forEachIndexed { index, item ->
-                            val cellWidth = itemWidths[(index + if (hasDirToggle) 1 else 0) % itemWidths.size]
-                            // Rawr 17U fork: values that do nothing while their section is switched off are dimmed,
-                            // as on the quick card (idea: apos-fandango's Rawr X14U). They stay editable.
-                            val itemKey = when (item) {
-                                is FilmStripItem.Numeric -> item.key
-                                is FilmStripItem.Discrete -> item.key
-                                is FilmStripItem.Flag -> item.key
+                    }
+                    subsection?.items?.forEach { item ->
+                        // Values that do nothing while their section is switched off are dimmed, as on the quick
+                        // card (idea: apos-fandango's Rawr X14U). They stay editable.
+                        val itemKey = when (item) {
+                            is FilmStripItem.Numeric -> item.key
+                            is FilmStripItem.Discrete -> item.key
+                            is FilmStripItem.Flag -> item.key
+                        }
+                        val dim = if (FilmSectionGates.isLive(quick, section?.key, subsection?.key, itemKey)) 1f else .35f
+                        when (item) {
+                            is FilmStripItem.Numeric -> {
+                                val param = quick.params[item.key] ?: return@forEach
+                                item(key = item.key) {
+                                    StripNumericItem(
+                                        key = item.key,
+                                        modifier = Modifier.width(cellWidth).alpha(dim),
+                                        shortLabel = param.shortLabel,
+                                        value = param.value,
+                                        display = param.displayValue,
+                                        isDefault = param.isDefault,
+                                        defaultValue = param.defaultValue,
+                                        min = param.minimum,
+                                        max = param.maximum,
+                                        step = param.step,
+                                        decimals = param.decimals,
+                                        onScrub = { onScrubParam(item.key, it) },
+                                        onReset = { onResetParam(item.key) },
+                                        format = {
+                                            formatFilmStripValue(it * param.displayScale,
+                                                param.minimum * param.displayScale, param.displayDecimals) + param.unit
+                                        }
+                                    )
+                                }
                             }
-                            val dim = if (FilmSectionGates.isLive(quick, section?.key, subsection?.key, itemKey)) 1f else .35f
-                            when (item) {
-                                is FilmStripItem.Numeric -> {
-                                    val param = quick.params[item.key] ?: return@forEachIndexed
-                                    item(key = item.key) {
-                                        StripNumericItem(
-                                            key = item.key,
-                                            modifier = Modifier.width(cellWidth).alpha(dim),
-                                            shortLabel = param.shortLabel,
-                                            value = param.value,
-                                            display = param.displayValue,
-                                            isDefault = param.isDefault,
-                                            defaultValue = param.defaultValue,
-                                            min = param.minimum,
-                                            max = param.maximum,
-                                            step = param.step,
-                                            decimals = param.decimals,
-                                            onScrub = { onScrubParam(item.key, it) },
-                                            onReset = { onResetParam(item.key) },
-                                            format = {
-                                                formatFilmStripValue(it * param.displayScale,
-                                                    param.minimum * param.displayScale, param.displayDecimals) + param.unit
-                                            }
-                                        )
-                                    }
+                            is FilmStripItem.Discrete -> {
+                                val entry = quick.discretes[item.key] ?: return@forEach
+                                item(key = item.key) {
+                                    FilmDiscreteItem(
+                                        key = item.key,
+                                        modifier = Modifier.width(cellWidth).alpha(dim),
+                                        shortLabel = entry.shortLabel,
+                                        display = entry.displayValue,
+                                        drilled = drill?.first == item.key,
+                                        onOpen = { onOpenDiscrete(item.key) }
+                                    )
                                 }
-                                is FilmStripItem.Discrete -> {
-                                    val entry = quick.discretes[item.key] ?: return@forEachIndexed
-                                    item(key = item.key) {
-                                        FilmDiscreteItem(
-                                            key = item.key,
-                                            modifier = Modifier.width(cellWidth).alpha(dim),
-                                            shortLabel = entry.shortLabel,
-                                            display = entry.displayValue,
-                                            drilled = drill?.first == item.key,
-                                            onOpen = { onOpenDiscrete(item.key) }
-                                        )
-                                    }
-                                }
-                                is FilmStripItem.Flag -> {
-                                    val entry = quick.flags[item.key] ?: return@forEachIndexed
-                                    item(key = item.key) {
-                                        FilmFlagItem(
-                                            key = item.key,
-                                            modifier = Modifier.width(cellWidth).alpha(dim),
-                                            shortLabel = entry.shortLabel,
-                                            enabled = entry.enabled,
-                                            onToggle = { onToggleFlag(item.key, it) }
-                                        )
-                                    }
+                            }
+                            is FilmStripItem.Flag -> {
+                                val entry = quick.flags[item.key] ?: return@forEach
+                                item(key = item.key) {
+                                    FilmFlagItem(
+                                        key = item.key,
+                                        modifier = Modifier.width(cellWidth).alpha(dim),
+                                        shortLabel = entry.shortLabel,
+                                        enabled = entry.enabled,
+                                        onToggle = { onToggleFlag(item.key, it) }
+                                    )
                                 }
                             }
                         }
                     }
-                    StripParamsEntry(onCloseParams, Modifier.width(cells[4]).height(StripDimens.ParamRowHeight), active = true)
                 }
             }
+        }
+    }
+}
+
+/** Rawr 17U fork: a chip of the ALL PARAMS rows, in the film sheet's tab style; [off] adds "OFF" under the label. */
+@Composable
+private fun FilmAdvChip(
+    label: String,
+    selected: Boolean,
+    off: Boolean,
+    tag: String,
+    description: String = label,
+    onClick: () -> Unit
+) {
+    val haptics = LocalCaptureHaptics.current
+    Box(
+        Modifier
+            .height(30.dp)
+            .viewfinderChip(active = selected)
+            .captureClickable(shape = CaptureTextRippleShape) {
+                haptics.selection()
+                onClick()
+            }
+            .padding(horizontal = 8.dp)
+            .semantics {
+                contentDescription = description + (if (off) ", off" else "") + if (selected) ", active" else ""
+                role = Role.Tab
+                this.selected = selected
+            }
+            .testTag(tag),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                tr(label),
+                color = if (selected) CaptureColors.Accent else Color.White.copy(alpha = if (off) .5f else .8f),
+                fontFamily = CaptureMono,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 10.sp,
+                maxLines = 1,
+                style = ViewfinderTextStyle
+            )
+            if (off) Text(
+                tr("OFF"),
+                color = Color.White.copy(alpha = .45f),
+                fontFamily = CaptureMono,
+                fontWeight = FontWeight.Bold,
+                fontSize = 7.sp,
+                maxLines = 1,
+                style = ViewfinderTextStyle
+            )
         }
     }
 }
