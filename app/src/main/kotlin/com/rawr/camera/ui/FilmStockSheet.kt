@@ -265,7 +265,9 @@ internal fun FilmSheetPanel(
     /** The PARAMS quick card limited to one group (by its label), or nothing for a tab without one. */
     groupCard: @Composable (String) -> Unit,
     /** Rawr 17U fork: opens ALL PARAMS (every film parameter); null hides the chip. */
-    onAllParams: (() -> Unit)? = null
+    onAllParams: (() -> Unit)? = null,
+    /** Rawr 17U fork: picks a Rawr photo whose film look becomes a preset; null hides "+ FROM PHOTO". */
+    onImportPhoto: (() -> Unit)? = null
 ) {
     val film = quick.discretes["Film"]?.selectedIndex ?: -1
     var tab by remember { mutableStateOf(filmSheetTabOf(film)) }
@@ -288,6 +290,7 @@ internal fun FilmSheetPanel(
             onTab = { tab = it },
             onClose = onClose,
             onAllParams = onAllParams,
+            onImportPhoto = onImportPhoto,
             onSelectPreset = onSelectPreset,
             onApply = onApply,
             onHold = { edit ->
@@ -311,7 +314,9 @@ internal fun FilmStockSheet(
     onHold: (HeldLook?) -> Unit,
     modifier: Modifier = Modifier,
     /** Rawr 17U fork: opens ALL PARAMS; null hides the chip. */
-    onAllParams: (() -> Unit)? = null
+    onAllParams: (() -> Unit)? = null,
+    /** Rawr 17U fork: the PRESETS tab ends with "+ FROM PHOTO", which calls this; null hides it. */
+    onImportPhoto: (() -> Unit)? = null
 ) {
     val haptics = LocalCaptureHaptics.current
     val showHelp = rememberControlHelp()
@@ -504,6 +509,35 @@ internal fun FilmStockSheet(
                         onHold(if (down) HeldLook(card.edit, mode) else null)
                     }
                 )
+            }
+            // Rawr 17U fork: a JPEG or DNG taken with Rawr gives its film look as a new preset, put in use.
+            if (tab == FilmSheetTab.Presets && onImportPhoto != null) item(key = "import_photo") {
+                val shape = RoundedCornerShape(8.dp)
+                Column(
+                    Modifier
+                        .width(84.dp)
+                        .height(46.dp)
+                        .clip(shape)
+                        .background(Color(0xFF1C1C1C))
+                        .border(1.dp, CaptureColors.Outline, shape)
+                        .captureCombinedClickable(
+                            shape = CaptureTextRippleShape,
+                            onLongClickLabel = "Explain",
+                            onLongClick = { showHelp("From photo: pick a JPEG or DNG taken with Rawr. Its film look is saved as a new preset and put in use.") }
+                        ) {
+                            haptics.selection()
+                            onImportPhoto()
+                        }
+                        .semantics { contentDescription = "Import a film look from a photo" }
+                        .testTag("film_sheet_import_photo")
+                        .padding(horizontal = 7.dp, vertical = 5.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("+", color = CaptureColors.AccentSoft, fontFamily = CaptureMono, fontSize = 10.sp, maxLines = 1,
+                        style = ViewfinderTextStyle)
+                    Text(tr("FROM PHOTO"), color = Color.White.copy(alpha = .85f), fontFamily = CaptureMono, fontSize = 11.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis, style = ViewfinderTextStyle)
+                }
             }
         }
     }

@@ -163,7 +163,8 @@ private fun CompactStripStack(
                 onApplyLook = { edit -> onFilmEvent(CaptureFilmEvent.ApplyLook(edit)) },
                 onHoldLook = { held -> onFilmEvent(CaptureFilmEvent.HoldLook(held?.edit, held?.mode ?: 0)) },
                 open = LookSheetState.open && quick.showLook,
-                onCloseSheet = { LookSheetState.open = false }
+                onCloseSheet = { LookSheetState.open = false },
+                onImportPhotoLook = { name, look -> onFilmEvent(CaptureFilmEvent.ImportPreset(name, look)) }
             )
         } else if ((!state.filmSimEnabled || forceTonemapStrip) && LookSheetState.open && quick.showLook) {
             LookSheetPanel(

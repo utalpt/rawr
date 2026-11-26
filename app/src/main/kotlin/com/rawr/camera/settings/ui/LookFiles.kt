@@ -27,6 +27,8 @@ import com.rawr.camera.settings.preferences.PhotoRecipe
 import com.rawr.camera.renderer.RendererRecipe
 import com.rawr.camera.settings.model.SettingsCatalog
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import com.rawr.camera.settings.model.FilmSimLook
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -76,6 +78,30 @@ internal fun rememberLookFiles(dispatch: SettingsDispatch): LookFiles {
     return remember(context, creator, picker) {
         LookFiles(context, creator::launch, { picker.launchPicker(context, arrayOf(LookFileCodec.MIME, "text/plain", "*/*")) },
             { pending = it })
+    }
+}
+
+/**
+ * Rawr 17U fork: picks a JPEG or DNG taken with Rawr and hands back its film look (read from the recipe it carries),
+ * for the camera's film sheet. Returns the action that opens the picker.
+ */
+@Composable
+internal fun rememberPhotoLookImport(onImported: (String, FilmSimLook) -> Unit): () -> Unit {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val latest by rememberUpdatedState(onImported)
+    val picker = rememberLauncherForActivityResult(PickFile()) { uri ->
+        if (uri != null) scope.launch {
+            val look = withContext(Dispatchers.IO) { runCatching { read(context, uri) } }
+            look.onFailure { toast(context, it.message ?: "Unable to import look") }
+            (look.getOrNull() as? ImportedLook.Film)?.let { imported ->
+                latest(imported.name, imported.look)
+                toast(context, "Imported '${imported.name}'")
+            }
+        }
+    }
+    return remember(context, picker) {
+        { picker.launchPicker(context, arrayOf("image/jpeg", "image/x-adobe-dng", "image/dng", "image/*")) }
     }
 }
 

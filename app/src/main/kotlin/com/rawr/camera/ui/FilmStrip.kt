@@ -75,10 +75,14 @@ internal fun FilmStrip(
      * strip shows the film sheet only while [open], and ✕ calls [onCloseSheet] instead of showing FILM and PARAMS.
      */
     open: Boolean = true,
-    onCloseSheet: (() -> Unit)? = null
+    onCloseSheet: (() -> Unit)? = null,
+    /** Rawr 17U fork: a Rawr photo's film look picked from the PRESETS tab; null hides "+ FROM PHOTO". */
+    onImportPhotoLook: ((String, com.rawr.camera.settings.model.FilmSimLook) -> Unit)? = null
 ) {
     // Rawr 17U fork: film on opens the film sheet straight away (✕ goes back to FILM and PARAMS).
     var mode by remember { mutableStateOf(FilmStripMode.Profiles) }
+    // Before any early return, so the picker is always registered in the same place.
+    val importPhoto = com.rawr.camera.settings.ui.rememberPhotoLookImport { name, look -> onImportPhotoLook?.invoke(name, look) }
     var sectionKey by remember { mutableStateOf(quick.sections.firstOrNull()?.key ?: "film") }
     var subsectionKey by remember { mutableStateOf<String?>(null) }
     // L4 drill into a discrete's option list. Cleared whenever the section
@@ -137,7 +141,8 @@ internal fun FilmStrip(
                             helpFor = ::filmSheetSettingHelp
                         )
                     },
-                    onAllParams = { mode = FilmStripMode.Config }
+                    onAllParams = { mode = FilmStripMode.Config },
+                    onImportPhoto = if (onImportPhotoLook != null) importPhoto else null
                 )
             }
             FilmStripMode.Quick -> {

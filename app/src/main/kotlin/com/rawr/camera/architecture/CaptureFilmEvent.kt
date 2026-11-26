@@ -20,4 +20,6 @@ sealed interface CaptureFilmEvent {
      * 0 the right half of the viewfinder, 1 the whole viewfinder, 2 grain loupe (ui.FilmCompareMode).
      */
     data class HoldLook(val edit: ((FilmSimLook) -> FilmSimLook)?, val mode: Int = 0) : CaptureFilmEvent
+    /** Rawr 17U fork: a photo's film look (read from its recipe) saved as a preset and put in use. */
+    data class ImportPreset(val name: String, val look: FilmSimLook) : CaptureFilmEvent
 }
