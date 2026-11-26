@@ -4,6 +4,16 @@ Fork of [Rawr](https://github.com/adityawarmanfw/rawr) for the Xiaomi 17 Ultra.
 Releases follow Ed's version: `0.5.1-17u.N`. Test work lands on `yuv-probe`
 first and moves to `xiaomi-17u` once verified.
 
+## Unreleased (on the `debug` build, not in a release yet)
+
+### Camera
+
+- Shutter Sound (Settings → Photo, off by default): the system's camera sounds, through Android's MediaActionSound -
+  the shutter click on a photo, and the start and stop tones of a video recording. The start tone plays before the
+  microphone opens, so it is not recorded into the video. Where the law asks for the shutter sound
+  (MediaActionSound.mustPlayShutterSound, for example Japan and Korea) it plays even when off. Asked for by
+  @iG0Lka_ru in the Telegram group.
+
 ## 0.5.1-17u.14
 
 A film look read back from any photo taken with Rawr, ALL PARAMS reachable again and laid out like the film

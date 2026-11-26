@@ -122,6 +122,8 @@ data class SetSaveBaseDng(val enabled: Boolean) : SettingsApplicationAction
 data class SetExperimentalMultiframeEnabled(val enabled: Boolean) : SettingsApplicationAction
 
 data class SetUltraHdrEnabled(val enabled: Boolean) : SettingsApplicationAction
+/** Rawr 17U fork: the camera sounds on or off. */
+data class SetShutterSound(val enabled: Boolean) : SettingsApplicationAction
 
 data class SetAePriorityDisabled(val disabled: Boolean) : SettingsApplicationAction
 

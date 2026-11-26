@@ -151,6 +151,7 @@ class StillCaptureCoordinator(
 
     fun capture(format: CaptureOutputFormat): Long {
         val input = checkNotNull(queuedInputs.poll()) { "Capture requires foreground admission" }
+        CameraSounds.shutter(input.settings.shutterSound)  // Rawr 17U fork: Settings > Photo > Shutter Sound
         var accepted = false
         try {
             val id = captureInternal(format.jpeg, input)

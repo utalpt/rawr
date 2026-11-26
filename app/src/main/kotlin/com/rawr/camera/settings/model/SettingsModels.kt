@@ -784,6 +784,9 @@ data class SettingsValues(
     // UltraHDR (JPEG_R) still output: GPU gain map + MPF/XMP/ISO mux.
     // On by default; legacy SDR JPEG when off.
     val ultraHdrEnabled: Boolean = true,
+    // Rawr 17U fork: the system's camera sounds (shutter, video start / stop). Off by default; where the law asks
+    // for the shutter sound (MediaActionSound.mustPlayShutterSound) it plays regardless.
+    val shutterSound: Boolean = false,
     // Ignore Camera2 shutter/ISO priority modes: locking SS or ISO always enters
     // full Manual. Off by default.
     val aePriorityDisabled: Boolean = false,

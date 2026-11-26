@@ -1493,5 +1493,6 @@
  "Viewfinder controls: which control groups show (EXPO, INFO), the lens bar layout and its button size. Also in Settings > Display.": "Controles del visor: qué grupos de controles se muestran (EXPO, INFO), la disposición de la barra de lentes y el tamaño de sus botones. También en Ajustes > Pantalla.",
  "Without a tap, requests keep the camera's own focus and exposure regions instead of an empty one, which crashes this camera's focus code": "Sin toque, las peticiones mantienen las regiones de enfoque y exposición de la propia cámara en lugar de una vacía, que bloquea el código de enfoque de esta cámara",
  "Also a JPEG or DNG taken with Rawr": "También un JPEG o DNG hecho con Rawr",
- "FROM PHOTO": "DE FOTO"
+ "FROM PHOTO": "DE FOTO",
+ "Shutter Sound": "Sonido del obturador"
 }

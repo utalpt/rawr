@@ -72,6 +72,13 @@ internal fun CaptureSettings(state: SettingsUiState, dispatch: SettingsDispatch)
                 enabled = state.capabilities.oisSupported
             ) { dispatch.invoke(SetOisPreference(it)) }
             SettingDivider()
+            // Rawr 17U fork: the system's camera sounds (asked for by @iG0Lka_ru in the Telegram group).
+            SettingsSwitchRow(
+                title = "Shutter Sound",
+                checked = state.values.shutterSound,
+                testTag = SettingsTestTags.row("Capture", "shutter_sound")
+            ) { dispatch.invoke(SetShutterSound(it)) }
+            SettingDivider()
             SettingsSwitchRow(
                 title = "Location Tagging",
                 checked = state.values.locationTagging && locationGranted,

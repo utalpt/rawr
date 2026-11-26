@@ -205,6 +205,23 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         refreshLatestGalleryImage()
+        // Rawr 17U fork: the camera sounds (CameraSounds.kt): loaded once the setting is on, the video start tone when
+        // a recording starts and the stop tone when it ends.
+        viewModelScope.launch {
+            settingsEditor.values.map { it.shutterSound }.distinctUntilChanged().collect {
+                com.rawr.camera.integration.CameraSounds.prepare(it)
+            }
+        }
+        viewModelScope.launch {
+            var last = recording.state.value.phase
+            recording.state.map { it.phase }.distinctUntilChanged().collect { phase ->
+                val on = latestSettings.shutterSound
+                if (phase == com.rawr.camera.video.RecordingPhase.Starting) com.rawr.camera.integration.CameraSounds.videoStart(on)
+                if (last == com.rawr.camera.video.RecordingPhase.Recording && phase != com.rawr.camera.video.RecordingPhase.Recording)
+                    com.rawr.camera.integration.CameraSounds.videoStop(on)
+                last = phase
+            }
+        }
         viewModelScope.launch { recordingBackend.recoverInterrupted() }
         // The light meter and capture metadata read the front light sensor while a front camera is in use.
         viewModelScope.launch {

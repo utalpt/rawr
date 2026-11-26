@@ -28,6 +28,8 @@ internal fun reduceAppSettings(
         state.withValues(state.values.copy(ultraHdrEnabled = action.enabled))
     }
 
+    is SetShutterSound -> state.withValues(state.values.copy(shutterSound = action.enabled))
+
     is SetAePriorityDisabled -> {
         state.withValues(state.values.copy(aePriorityDisabled = action.disabled))
     }

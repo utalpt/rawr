@@ -509,6 +509,7 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
                 p[Keys.dngCompressionId]?.takeIf { it == "dng.uncompressed" || it == "dng.lossless" }
                     ?: d.dngCompressionId,
             saveBaseDng = p[Keys.saveBaseDng] ?: true,
+            shutterSound = p[Keys.shutterSound] ?: d.shutterSound,
             gridMode = enumOrDefault(p[Keys.gridMode], d.gridMode),
             lensBarGrouping = enumOrDefault(p[Keys.lensBarGrouping], d.lensBarGrouping),
             lensBarSize = enumOrDefault(p[Keys.lensBarSize], d.lensBarSize),
@@ -727,6 +728,7 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         p[Keys.dngEnabled] = v.dngEnabled || !v.jpegEnabled
         p[Keys.dngCompressionId] = v.dngCompressionId
         p[Keys.saveBaseDng] = v.saveBaseDng
+        p[Keys.shutterSound] = v.shutterSound
         p[Keys.gridMode] = v.gridMode.name
         p[Keys.lensBarGrouping] = v.lensBarGrouping.name
         p[Keys.lensBarSize] = v.lensBarSize.name
@@ -1101,6 +1103,7 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         val dngEnabled = booleanPreferencesKey("capture_dng_enabled")
         val dngCompressionId = stringPreferencesKey("capture_dng_compression_id")
         val saveBaseDng = booleanPreferencesKey("capture_save_base_dng")
+        val shutterSound = booleanPreferencesKey("capture_shutter_sound")
         val gridMode = stringPreferencesKey("capture_grid_mode")
         val lensBarGrouping = stringPreferencesKey("lens_bar_grouping")
         val lensBarSize = stringPreferencesKey("lens_bar_size")
