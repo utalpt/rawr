@@ -1072,7 +1072,7 @@ internal fun FilmAdvCard(
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            FilmGridTile("‹ QUICK", false, tile, backTag, onBackToQuick)
+            FilmGridTile("‹ QUICK", false, tile, backTag, onClick = onBackToQuick)
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { FilmCardTitle("ALL PARAMS") }
         }
         FilmCardTitle("SECTION")
