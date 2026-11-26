@@ -34,6 +34,9 @@ object I18n {
         Language("de", "Deutsch"),
         Language("it", "Italiano"),
         Language("ru", "Русский"),
+        Language("uk", "Українська"),
+        Language("pl", "Polski"),
+        Language("tr", "Türkçe"),
     )
 
     private const val PREFS = "rawr_i18n"

@@ -4,6 +4,16 @@ Fork of [Rawr](https://github.com/adityawarmanfw/rawr) for the Xiaomi 17 Ultra.
 Releases follow Ed's version: `0.5.1-17u.N`. Test work lands on `yuv-probe`
 first and moves to `xiaomi-17u` once verified.
 
+## Unreleased (`yuv-probe`, test builds)
+
+### Language
+
+- Three more languages bundled: Ukrainian, Polish and Turkish, machine-made from the full list of texts.
+- Spanish, French, German and Italian now have every text the other languages have (the longer help texts,
+  plus words that stay the same, kept as they are so nothing falls back to English).
+- A build test checks that every bundled language has the same texts, so a new text can't be translated in one
+  language and forgotten in the others.
+
 ## 0.5.1-17u.13
 
 The interface in six languages (with a language file to export, fix and import), the quick and eye panels as
