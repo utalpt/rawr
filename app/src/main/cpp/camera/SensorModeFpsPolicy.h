@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -44,29 +45,97 @@ struct SensorModeEntry {
     return modes;
 }
 
-// Highest fixed rate above 30 fps a RAW stream may request; 0 = no limit, because the table lists
-// no mode of exactly the stream's size and so cannot speak for it. Rates up to 30 fps are never
-// limited here (full-size vendor modes have their own profile frame rate).
+// Why the ceiling came out where it did, so the capabilities log can name the cause instead of
+// leaving a bare "30 fps" to be guessed from the vendor table.
+enum class SensorModeFpsReason : uint8_t {
+    kNoExactSize,  // the table lists no mode of the stream's own size: 0, no limit
+    kForcedMode,   // a request key holds the sensor in `modeIndex`
+    kCropSearch,   // the fastest same-width mode covering the kept rows is `modeIndex`
+    kFloor,        // modes of the size exist but none covers the kept rows: the 30 fps floor stands
+};
+
+struct SensorModeFpsDecision {
+    int32_t ceiling = 0;
+    int32_t modeIndex = -1;  // table entry that set the ceiling; -1 when none did
+    SensorModeFpsReason reason = SensorModeFpsReason::kNoExactSize;
+};
+
+[[nodiscard]] inline const char* sensorModeFpsReasonName(SensorModeFpsReason reason) noexcept {
+    switch (reason) {
+        case SensorModeFpsReason::kForcedMode:
+            return "forcedMode";
+        case SensorModeFpsReason::kCropSearch:
+            return "cropSearch";
+        case SensorModeFpsReason::kFloor:
+            return "floor";
+        case SensorModeFpsReason::kNoExactSize:
+            break;
+    }
+    return "noExactSize";
+}
+
+// The ceiling and the table entry behind it. Highest fixed rate above 30 fps a RAW stream may
+// request; 0 = no limit, because the table lists no mode of exactly the stream's size and so
+// cannot speak for it. Rates up to 30 fps are never limited here (full-size vendor modes have
+// their own profile frame rate).
 // - forcedMode: the table index a request key holds the sensor in; its own rate is the ceiling.
 // - keptRowsEnd: the row past the last one the pipeline keeps above 30 fps (stream height minus
 //   the high-fps bottom crop). A mode serves the stream when it has the stream's width, so its rows
 //   land on the stream's stride, and covers every kept row.
-[[nodiscard]] inline int32_t sensorModeFpsCeiling(const std::vector<SensorModeEntry>& modes, int32_t rawWidth,
-                                                  int32_t rawHeight, int32_t keptRowsEnd,
-                                                  std::optional<int32_t> forcedMode = std::nullopt) {
+[[nodiscard]] inline SensorModeFpsDecision sensorModeFpsDecision(const std::vector<SensorModeEntry>& modes,
+                                                                 int32_t rawWidth, int32_t rawHeight,
+                                                                 int32_t keptRowsEnd,
+                                                                 std::optional<int32_t> forcedMode = std::nullopt) {
+    SensorModeFpsDecision out;
     const auto exact = std::find_if(modes.begin(), modes.end(), [&](const SensorModeEntry& mode) {
         return mode.width == rawWidth && mode.height == rawHeight && mode.fps > 0;
     });
-    if (exact == modes.end()) return 0;
-    if (forcedMode && *forcedMode >= 0 && size_t(*forcedMode) < modes.size()) {
-        return std::max(modes[size_t(*forcedMode)].fps, int32_t{30});
+    if (exact == modes.end()) return out;
+    if (forcedMode && *forcedMode >= 0 && static_cast<size_t>(*forcedMode) < modes.size()) {
+        out.modeIndex = *forcedMode;
+        out.ceiling = std::max(modes[static_cast<size_t>(*forcedMode)].fps, int32_t{30});
+        out.reason = SensorModeFpsReason::kForcedMode;
+        return out;
     }
     int32_t fastest = 0;
-    for (const auto& mode : modes) {
-        if (mode.width == rawWidth && mode.height <= rawHeight && mode.height >= keptRowsEnd)
-            fastest = std::max(fastest, mode.fps);
+    for (size_t i = 0; i < modes.size(); ++i) {
+        const SensorModeEntry& mode = modes[i];
+        if (mode.width == rawWidth && mode.height <= rawHeight && mode.height >= keptRowsEnd && mode.fps > fastest) {
+            fastest = mode.fps;
+            out.modeIndex = static_cast<int32_t>(i);
+        }
     }
-    return std::max(fastest, int32_t{30});
+    out.ceiling = std::max(fastest, int32_t{30});
+    out.reason = out.modeIndex >= 0 ? SensorModeFpsReason::kCropSearch : SensorModeFpsReason::kFloor;
+    return out;
+}
+
+[[nodiscard]] inline int32_t sensorModeFpsCeiling(const std::vector<SensorModeEntry>& modes, int32_t rawWidth,
+                                                  int32_t rawHeight, int32_t keptRowsEnd,
+                                                  std::optional<int32_t> forcedMode = std::nullopt) {
+    return sensorModeFpsDecision(modes, rawWidth, rawHeight, keptRowsEnd, forcedMode).ceiling;
+}
+
+// The parsed table as the capabilities log prints it: `index:widthxheight@fps`, comma separated, so
+// a lens's `current_mode` can be read back against the entries it indexes. Bounded, so a vendor
+// table with hundreds of modes cannot flood the log line.
+inline constexpr size_t kSensorModeTableLogEntries = 64;
+
+[[nodiscard]] inline std::string describeSensorModeTable(const std::vector<SensorModeEntry>& modes) {
+    std::string out;
+    const size_t limit = std::min(modes.size(), kSensorModeTableLogEntries);
+    for (size_t i = 0; i < limit; ++i) {
+        if (i) out += ',';
+        out += std::to_string(i);
+        out += ':';
+        out += std::to_string(modes[i].width);
+        out += 'x';
+        out += std::to_string(modes[i].height);
+        out += '@';
+        out += std::to_string(modes[i].fps);
+    }
+    if (modes.size() > limit) out += ",...+" + std::to_string(modes.size() - limit);
+    return out;
 }
 
 // Where the ceiling applies. It is on only on the devices it was validated on, matched by

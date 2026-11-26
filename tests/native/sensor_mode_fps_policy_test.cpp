@@ -1,16 +1,24 @@
 // Fixed rates above 30 fps need a sensor mode at the RAW stream's own size (camera/SensorModeFpsPolicy.h).
-// The tables are the Xiaomi 15's (dada), as its HAL reports them.
+// The tables are the Xiaomi 15's (dada), as its HAL reports them, plus a synthetic Xiaomi 17 Ultra one
+// shaped after its profile (the 17U's own table is not on file; the device log prints it, see
+// CAMERA_CONTROL_CAPS).
 #include <cassert>
 #include <cstdint>
 #include <iostream>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "camera/SensorModeFpsPolicy.h"
 
+using rawrcam::camera::describeSensorModeTable;
 using rawrcam::camera::parseQuicSensorModeTable;
 using rawrcam::camera::sensorModeFpsCeiling;
 using rawrcam::camera::sensorModeFpsCeilingAllowed;
+using rawrcam::camera::sensorModeFpsDecision;
+using rawrcam::camera::SensorModeEntry;
+using rawrcam::camera::SensorModeFpsDecision;
+using rawrcam::camera::SensorModeFpsReason;
 
 namespace {
 
@@ -18,6 +26,12 @@ int32_t ceilingFor(const std::vector<int32_t>& table, int32_t width, int32_t hei
                    std::optional<int32_t> forcedMode = std::nullopt) {
     return sensorModeFpsCeiling(parseQuicSensorModeTable(table.data(), static_cast<uint32_t>(table.size())), width,
                                 height, keptRowsEnd, forcedMode);
+}
+
+SensorModeFpsDecision decisionFor(const std::vector<int32_t>& table, int32_t width, int32_t height,
+                                  int32_t keptRowsEnd, std::optional<int32_t> forcedMode = std::nullopt) {
+    return sensorModeFpsDecision(parseQuicSensorModeTable(table.data(), static_cast<uint32_t>(table.size())), width,
+                                 height, keptRowsEnd, forcedMode);
 }
 
 // 14 mm (camera 3): the only 60 fps mode is 3456x2160.
@@ -43,6 +57,11 @@ const std::vector<int32_t> kTele = {20,   3,    8192, 6144, 15,  4096, 3072, 30,
 const std::vector<int32_t> kFront = {8,    3,    6528, 4896, 15,   3264, 2448, 30,  3264, 2448, 30,  3264,
                                      1836, 30,   3264, 1836, 30,   3264, 1836, 60,  1632, 918,  120, 1632,
                                      1224, 10};
+
+// Xiaomi 17 Ultra's 23 mm (camera 2), synthetic, shaped after the profile's `1x DCG`: the entry pins
+// `current_mode=4`, the full size has no 60 fps mode, a 4096x2560 crop does.
+const std::vector<int32_t> kWide17uDcg = {6,   3,    4096, 3072, 30,  4096, 3072, 30, 8192, 6144,
+                                          30,  4096, 2560, 30,  4096, 2560, 30, 4096, 2560, 60};
 
 }  // namespace
 
@@ -70,6 +89,37 @@ int main() {
     // An index past the table is ignored.
     assert(ceilingFor(kWide, 4096, 3072, 2560, 99) == 60);
     assert(ceilingFor(kWide, 4096, 3072, 2560, -1) == 60);
+
+    // Xiaomi 17 Ultra `1x DCG`: the profile's request key holds the sensor in mode 4, a 4096x2560
+    // readout at 30 fps, so the ceiling is 30 even though mode 5 reaches 60 on the same width. This is
+    // the case the 17U's 1x DCG lens reports, and the one the capabilities log has to explain.
+    const auto dcg = decisionFor(kWide17uDcg, 4096, 3072, 2560, 4);
+    assert(dcg.ceiling == 30);
+    assert(dcg.modeIndex == 4);
+    assert(dcg.reason == SensorModeFpsReason::kForcedMode);
+    assert(ceilingFor(kWide17uDcg, 4096, 3072, 2560, 4) == 30);
+    // Without the key the same crop opens 60 fps: it is the entry, not the size, that caps the stream.
+    const auto cropped17u = decisionFor(kWide17uDcg, 4096, 3072, 2560);
+    assert(cropped17u.ceiling == 60);
+    assert(cropped17u.modeIndex == 5);
+    assert(cropped17u.reason == SensorModeFpsReason::kCropSearch);
+    // Full size: the 30 fps comes from the first 4096x3072 entry.
+    const auto full17u = decisionFor(kWide17uDcg, 4096, 3072, 3072);
+    assert(full17u.ceiling == 30);
+    assert(full17u.modeIndex == 0);
+    assert(full17u.reason == SensorModeFpsReason::kCropSearch);
+    // An index the table does not list is ignored, and so is a size it does not have.
+    const auto past17u = decisionFor(kWide17uDcg, 4096, 3072, 2560, 99);
+    assert(past17u.ceiling == 60 && past17u.modeIndex == 5);
+    const auto otherSize = decisionFor(kWide17uDcg, 3840, 2160, 2160);
+    assert(otherSize.ceiling == 0);
+    assert(otherSize.modeIndex == -1);
+    assert(otherSize.reason == SensorModeFpsReason::kNoExactSize);
+    // Kept rows past every same-width mode leave the floor in place, naming no entry.
+    const auto floorOnly = decisionFor(kWide17uDcg, 4096, 3072, 3073);
+    assert(floorOnly.ceiling == 30);
+    assert(floorOnly.modeIndex == -1);
+    assert(floorOnly.reason == SensorModeFpsReason::kFloor);
     // Slower full-size modes never pull the ceiling under 30 fps.
     assert(ceilingFor(kUltraWide, 8160, 6144, 6144) == 30);
     assert(ceilingFor(kWide, 8192, 6144, 6144, 32) == 30);
@@ -95,6 +145,18 @@ int main() {
     assert(wide.size() == 2 && wide[1].width == 3456 && wide[1].height == 2160 && wide[1].fps == 60);
     assert(parseQuicSensorModeTable(kUltraWide.data(), static_cast<uint32_t>(kUltraWide.size())).size() == 10);
     assert(parseQuicSensorModeTable(kWide.data(), static_cast<uint32_t>(kWide.size())).size() == 32);
+
+    // The log prints the parsed table with its indices, so a lens's `current_mode` reads back against it.
+    const std::string described = describeSensorModeTable(
+        parseQuicSensorModeTable(kWide17uDcg.data(), static_cast<uint32_t>(kWide17uDcg.size())));
+    assert(described == "0:4096x3072@30,1:4096x3072@30,2:8192x6144@30,3:4096x2560@30,4:4096x2560@30,5:4096x2560@60");
+    assert(describeSensorModeTable({}).empty());
+    // A long table is cut, with the count of what was left out, so one log line stays readable.
+    const std::vector<SensorModeEntry> many(70, SensorModeEntry{4080, 3072, 30});
+    const std::string cut = describeSensorModeTable(many);
+    assert(cut.find("63:4080x3072@30") != std::string::npos);
+    assert(cut.find("64:") == std::string::npos);
+    assert(cut.compare(cut.size() - 6, 6, ",...+" + std::to_string(6)) == 0);
 
     // Xiaomi 15: validated, on by default, and the property can still turn it off.
     assert(sensorModeFpsCeilingAllowed("dada", '\0'));

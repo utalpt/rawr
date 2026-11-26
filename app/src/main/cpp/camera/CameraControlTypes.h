@@ -113,6 +113,10 @@ struct CameraControlCapabilities {
     // Highest rate above 30 fps the RAW stream's size has a sensor mode for (SensorModeFpsPolicy.h);
     // aeTargetFpsRanges then holds no range past it. 0 = no limit.
     int32_t sensorModeFpsCeiling = 0;
+    // Why the ceiling is that number, for CAMERA_CONTROL_CAPS: the table entry behind it, the mode
+    // a request key holds the sensor in, the stream and kept rows, the parsed table. Empty when the
+    // policy never ran (other device, opted out, no vendor table).
+    std::string sensorModeFpsDetail;
 
     int32_t evMinSteps = 0;
     int32_t evMaxSteps = 0;

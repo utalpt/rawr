@@ -39,15 +39,20 @@ jobs:
         with:
           clean: ${{ vars.RUNNER != 'self-hosted' }}
 
-      - name: Host video policy regression tests
+      # the-marox's host tests (#7, #8, #9): pure policy code, run before anything is built.
+      # Rawr 17U fork: skipped with a note when the runner has no host C++ compiler (the mini PC's WSL2 may not).
+      - name: Host policy regression tests
         run: |
+          if ! command -v c++ >/dev/null; then
+            echo "::warning::No host c++ on this runner: host policy tests skipped"
+            exit 0
+          fi
           mkdir -p tmp/host-tests
-          c++ -std=c++20 -Wall -Wextra -Werror -UNDEBUG -Iapp/src/main/cpp \
-            tests/native/video_acquire_policy_test.cpp -o tmp/host-tests/video_acquire_policy_test
-          tmp/host-tests/video_acquire_policy_test
-          c++ -std=c++20 -Wall -Wextra -Werror -UNDEBUG -Iapp/src/main/cpp \
-            tests/native/video_encoder_prewarm_policy_test.cpp -o tmp/host-tests/video_encoder_prewarm_policy_test
-          tmp/host-tests/video_encoder_prewarm_policy_test
+          for t in video_acquire_policy_test video_encoder_prewarm_policy_test sensor_mode_fps_policy_test; do
+            c++ -std=c++20 -Wall -Wextra -Werror -UNDEBUG -Iapp/src/main/cpp \
+              tests/native/$t.cpp -o tmp/host-tests/$t
+            tmp/host-tests/$t
+          done
 
       # Fixed debug key kept as a repo secret (base64), so every CI APK installs
       # over the previous one. Without the secret the default debug key is used.

@@ -152,6 +152,17 @@ added on top of `cropEdges` for video framing only (the Xiaomi 17 Ultra's 60 fps
 front camera); stills are not affected. The app records at 24 and 30 fps for now, so `cropEdgesHighFps` has no
 effect until a higher rate is offered.
 
+The highest rate above 30 fps a RAW stream may ask its sensor mode for is read from the vendor
+sensor-mode table, and `CAMERA_CONTROL_CAPS` names the cause next to the number: `sensorModeFpsCeiling=`
+is followed by a `sensorModeFps=` field that starts with `applied=yes|no` (the ceiling is enforced only on
+the devices it was validated on, and the diagnosis is printed anyway), then the table entry behind it
+(`mode=4(forced) spec=4096x2560@30`), why (`reason=forcedMode` when a request key such as the 17U's
+`1x DCG` `current_mode` holds the sensor in that entry, `cropSearch` when the fastest entry of the
+stream's width that covers the kept rows does, `floor` when no entry covers them, `noExactSize` when the
+table lists no mode of the stream's size and nothing would be capped), the stream and kept rows, the
+profile's `forcedMode`, and the parsed table with its indices, so a `current_mode` value can be read back
+against the entries it indexes.
+
 `photoOutput` (`full`, default, `reduced` or `reduced25`) applies to a Bayer or 4×4 photo stream (`photoBlock` 1
 or 4) and reduces each photo frame before it is stored or merged, so singles and merges run at the smaller size
 and JPEG stays available. `reduced` gives a quarter-size Bayer frame (200 MP to 50 MP): a 4×4 stream takes exact

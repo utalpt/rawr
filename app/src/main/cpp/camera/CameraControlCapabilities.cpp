@@ -123,24 +123,39 @@ CameraControlState readInitialCameraControlState(const ACameraMetadata* characte
         char setting[PROP_VALUE_MAX]{};
         __system_property_get("ro.product.device", device);
         __system_property_get("debug.rawr.sensor_mode_fps", setting);
-        if (sensorModeFpsCeilingAllowed(device, setting[0])) {
-            const auto tag =
-                resolveMetadataTagByNameCompat(characteristics, route.cameraId.c_str(), kQuicSensorModeTableKey, nullptr);
-            const auto table = tag ? entry(characteristics, *tag) : std::nullopt;
-            if (table && table->type == ACAMERA_TYPE_INT32 && table->data.i32) {
-                // A profile key that holds the sensor in one mode on the session or every request.
-                std::optional<int32_t> forcedMode;
-                for (const auto& key : route.vendorKeys) {
-                    if (key.enabled && key.tag == kQuicCurrentModeKey && !key.values.empty() &&
-                        key.scope != CameraKeySetting::Scope::Still && key.scope != CameraKeySetting::Scope::Decision)
-                        forcedMode = static_cast<int32_t>(key.values.front());
-                }
-                const auto keptRowsEnd = static_cast<int32_t>(
-                    route.stream.height - std::min(route.stream.height, std::max(route.cropBottom, route.highFpsCropBottom)));
-                caps.sensorModeFpsCeiling =
-                    sensorModeFpsCeiling(parseQuicSensorModeTable(table->data.i32, table->count), caps.rawWidth,
-                                         caps.rawHeight, keptRowsEnd, forcedMode);
+        const bool applied = sensorModeFpsCeilingAllowed(device, setting[0]);
+        // The diagnosis is collected wherever the vendor table is exposed, applied or not: a lens held in
+        // a 30 fps mode has to name that entry even on a device the ceiling has not been validated on.
+        const auto tag =
+            resolveMetadataTagByNameCompat(characteristics, route.cameraId.c_str(), kQuicSensorModeTableKey, nullptr);
+        const auto table = tag ? entry(characteristics, *tag) : std::nullopt;
+        if (table && table->type == ACAMERA_TYPE_INT32 && table->data.i32) {
+            // A profile key that holds the sensor in one mode on the session or every request.
+            std::optional<int32_t> forcedMode;
+            for (const auto& key : route.vendorKeys) {
+                if (key.enabled && key.tag == kQuicCurrentModeKey && !key.values.empty() &&
+                    key.scope != CameraKeySetting::Scope::Still && key.scope != CameraKeySetting::Scope::Decision)
+                    forcedMode = static_cast<int32_t>(key.values.front());
             }
+            const auto keptRowsEnd = static_cast<int32_t>(
+                route.stream.height - std::min(route.stream.height, std::max(route.cropBottom, route.highFpsCropBottom)));
+            const auto modes = parseQuicSensorModeTable(table->data.i32, table->count);
+            const auto decision = sensorModeFpsDecision(modes, caps.rawWidth, caps.rawHeight, keptRowsEnd, forcedMode);
+            if (applied) caps.sensorModeFpsCeiling = decision.ceiling;
+            // Name the cause next to the number: which table entry the ceiling comes from, which mode the
+            // lens holds the sensor in, and the whole table so the index can be read back.
+            std::ostringstream detail;
+            detail << "applied=" << (applied ? "yes" : "no") << " ceiling=" << decision.ceiling << " mode="
+                   << decision.modeIndex << (decision.reason == SensorModeFpsReason::kForcedMode ? "(forced)" : "");
+            if (decision.modeIndex >= 0 && static_cast<size_t>(decision.modeIndex) < modes.size()) {
+                const auto& served = modes[static_cast<size_t>(decision.modeIndex)];
+                detail << " spec=" << served.width << 'x' << served.height << '@' << served.fps;
+            }
+            detail << " reason=" << sensorModeFpsReasonName(decision.reason) << " stream=" << route.stream.width << 'x'
+                   << route.stream.height << " keptRowsEnd=" << keptRowsEnd << " forcedMode="
+                   << (forcedMode ? std::to_string(*forcedMode) : std::string("-"))
+                   << " table=" << (modes.empty() ? std::string("unparsed") : describeSensorModeTable(modes));
+            caps.sensorModeFpsDetail = detail.str();
         }
     }
 
@@ -316,7 +331,10 @@ std::string describeCameraControlCapabilities(const CameraControlState& state) {
     out << "CAMERA_CONTROL_CAPS cameraId=" << c.cameraId << " generation=" << c.generation
         << " isoRange=" << c.sensitivityMin << ".." << c.sensitivityMax << " exposureNsRange=" << c.exposureTimeMinNs
         << ".." << c.exposureTimeMaxNs << " priorityAeFps=" << c.priorityAeTargetFpsMin << ".."
-        << c.priorityAeTargetFpsMax << " sensorModeFpsCeiling=" << c.sensorModeFpsCeiling << " evSteps=" << c.evMinSteps << ".." << c.evMaxSteps
+        << c.priorityAeTargetFpsMax << " raw=" << c.rawWidth << 'x' << c.rawHeight
+        << " sensorModeFpsCeiling=" << c.sensorModeFpsCeiling;
+    if (!c.sensorModeFpsDetail.empty()) out << " sensorModeFps=" << c.sensorModeFpsDetail;
+    out << " evSteps=" << c.evMinSteps << ".." << c.evMaxSteps
         << " evStep=" << c.evStepNumerator << '/' << c.evStepDenominator
          << " manualExposure=" << c.manualExposureSupported << " shutterPriority=" << c.shutterPrioritySupported
          << " isoPriority=" << c.isoPrioritySupported << " tapAf=" << c.tapAfSupported
