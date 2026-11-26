@@ -134,7 +134,9 @@ class NativeVideoRecorder(private val context: Context, private val preview: Raw
                         val saveLocationId: String = "storage.dcim_camera",
                         val gps: com.rawr.camera.location.CaptureGps? = null,
                         /** Write a Gyroflow .gcsv gyro log beside the video. */
-                        val gyroflowLog: Boolean = false) {
+                        val gyroflowLog: Boolean = false,
+                        /** Rawr 17U fork: play the video start tone before the microphone opens (Shutter Sound). */
+                        val startTone: Boolean = false) {
         /** Rec.709 and AgX (video) write BT.709; other display profiles write sRGB. */
         val rec709: Boolean get() = renderProfileId == com.rawr.camera.settings.model.ColorRenderProfile.Rec709.nativeId ||
             renderProfileId == com.rawr.camera.settings.model.ColorRenderProfile.AGX_REC709_NATIVE_ID
@@ -179,6 +181,9 @@ class NativeVideoRecorder(private val context: Context, private val preview: Raw
         settings = request
         val rotation = preview.videoRotationDegrees(request.deviceRotationDegrees)
         check(rotation >= 0) { "Camera orientation is not ready for recording" }
+        // Rawr 17U fork: the start tone after the orientation check (a press that fails there stays silent) and
+        // before the recorder opens the microphone, so the tone is not in the video.
+        com.rawr.camera.integration.CameraSounds.videoStartBeforeRecording(request.startTone)
         val captureTime = CaptureTime.snapshot()
         val displayName = CaptureFileNames.baseName(captureTime) + if (request.audioPcmBits > 0) ".mov" else ".mp4"
         this.displayName = displayName

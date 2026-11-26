@@ -29,6 +29,17 @@ object CameraSounds {
     }
 
     fun shutter(enabled: Boolean) = play(MediaActionSound.SHUTTER_CLICK, enabled)
-    fun videoStart(enabled: Boolean) = play(MediaActionSound.START_VIDEO_RECORDING, enabled)
+    /**
+     * The video start tone, played before the microphone opens and waited out, so it is not recorded into the
+     * video. Blocks for [START_TONE_MS]: call it off the main thread, once the recording's own checks have passed.
+     */
+    fun videoStartBeforeRecording(enabled: Boolean) {
+        if (!enabled && !required()) return
+        runCatching { sound.play(MediaActionSound.START_VIDEO_RECORDING) }
+        Thread.sleep(START_TONE_MS)
+    }
+
+    /** The start tone lasts about 0.35 s on the 17 Ultra; the rest covers the time it takes to begin playing. */
+    private const val START_TONE_MS = 500L
     fun videoStop(enabled: Boolean) = play(MediaActionSound.STOP_VIDEO_RECORDING, enabled)
 }

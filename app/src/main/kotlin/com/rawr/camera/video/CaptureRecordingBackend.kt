@@ -74,7 +74,8 @@ internal class CaptureRecordingBackend(
                     renderProfile = imageSettings.activeProfileLabel(),
                     logProfile = imageSettings.videoLogProfile.takeIf { log },
                     renderProfileId = imageSettings.effectiveRenderProfileId(),
-                    gyroflowLog = encoder.gyroflowLog))
+                    gyroflowLog = encoder.gyroflowLog,
+                    startTone = imageSettings.shutterSound))  // Rawr 17U fork: Shutter Sound
                 recorder
             } catch (e: Exception) {
                 runCatching { recorder.close() }
