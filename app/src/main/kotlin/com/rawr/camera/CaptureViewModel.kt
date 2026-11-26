@@ -206,7 +206,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     init {
         refreshLatestGalleryImage()
         // Rawr 17U fork: the camera sounds (CameraSounds.kt): loaded once the setting is on, the video start tone when
-        // a recording starts and the stop tone when it ends.
+        // a recording has started and the stop tone when it ends.
         viewModelScope.launch {
             settingsEditor.values.map { it.shutterSound }.distinctUntilChanged().collect {
                 com.rawr.camera.integration.CameraSounds.prepare(it)
@@ -216,7 +216,9 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             var last = recording.state.value.phase
             recording.state.map { it.phase }.distinctUntilChanged().collect { phase ->
                 val on = latestSettings.shutterSound
-                if (phase == com.rawr.camera.video.RecordingPhase.Starting) com.rawr.camera.integration.CameraSounds.videoStart(on)
+                // The start tone once the recorder is running: a press that fails to start (camera not ready) stays
+                // silent.
+                if (phase == com.rawr.camera.video.RecordingPhase.Recording) com.rawr.camera.integration.CameraSounds.videoStart(on)
                 if (last == com.rawr.camera.video.RecordingPhase.Recording && phase != com.rawr.camera.video.RecordingPhase.Recording)
                     com.rawr.camera.integration.CameraSounds.videoStop(on)
                 last = phase
