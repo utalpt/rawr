@@ -26,6 +26,9 @@ with Ed's main in this release (still up to #165).
   **Wheel**, **Dial** or **Rocker**, vertical on the viewfinder's right edge. The bars are reused from the
   Telezoom module ([utalpt/x17u-telezoom](https://github.com/utalpt/x17u-telezoom), its Wheel, Arc and Rocker),
   redrawn for Rawr.
+- **Settings > Capture > Tele Zoom Always On** (off by default) keeps the control on screen while the tele is
+  selected: the Wheel / Dial / Rocker on the edge, or the Bar above the exposure row (it steps aside while
+  another slider, the lens modes popup or the WB strip is up).
 - EXIF and DNG name the focal length the optics were at (the HAL reports the 75 mm end at every position).
 - While recording, a finger on the revealed controls keeps them up (they hid 3 s after the swipe, even under a
   TELE drag).

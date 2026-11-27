@@ -70,7 +70,8 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   button, named by the zoom the optics are at, 3.2x to 4.3x), from a **TELE** cell in the exposure row. Settings
   > Capture > Tele Zoom Control picks the control: **Bar** (presets and a FOCAL tape above the exposure row) or
   **Wheel**, **Dial** or **Rocker** on the viewfinder's edge, reused from the
-  [Telezoom](https://github.com/utalpt/x17u-telezoom) module. EXIF and DNG name the real focal length. The
+  [Telezoom](https://github.com/utalpt/x17u-telezoom) module; **Tele Zoom Always On** keeps it on screen while
+  the tele is selected. EXIF and DNG name the real focal length. The
   vendor tags were found by Anton Tretiakov (@designation_zero).
 - Lens bar grouping (Auto / Grouped / All) and button size (Compact / Normal / Large), from the eye panel.
 - **Exposure memory** (Settings > Viewfinder & controls > Control Style): **Per camera**, each lens keeps its own exposure mode,
