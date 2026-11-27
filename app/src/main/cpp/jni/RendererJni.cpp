@@ -377,25 +377,6 @@ Java_com_rawr_camera_renderer_RendererNative_render(JNIEnv* e, jobject, jlong id
         s->source.wb = {wb[0], (wb[1] + wb[2]) * .5f, wb[3]};
         array("cameraToLinearSrgbRowMajor", s->source.cameraToSrgb.data(), 9);
         s->source.dcpWeight1 = std::clamp(float(frame.number("calibrationWeight1", s->source.dcpWeight1)), 0.0f, 1.0f);
-        // Rawr 17U fork: a float DNG (LOFIC) from another app carries no capture
-        // gain (the import stores aePostGain 1); it is meant to be seen at its
-        // BaselineExposure (the LOFIC data keeps 1.0 = the Short's clip, several
-        // stops above the scene's exposure), so that becomes its gain, as DNG
-        // readers apply it.
-        {
-            const auto& raw = s->source.info().raw;
-            if (!s->source.rawr && s->source.info().sample_format == TINYDNG_SAMPLEFORMAT_IEEEFP &&
-                raw.has_baseline_exposure && std::isfinite(raw.baseline_exposure) &&
-                std::abs(recipeJson.number("aePostGain", 1) - 1.0) < 1e-6) {
-                auto& tone = o.context.tonemapParams;
-                tone.aePostGain = std::exp2(float(std::clamp(raw.baseline_exposure, -8.0, 16.0)));
-                if (o.context.ultraHdrEnabled)
-                    o.context.gainmapParams.hdrExposure =
-                        o.context.filmEnabled
-                            ? std::exp2(rawrcam::color::filmExposureEv(o.context.filmLook, tone.aePostGain, float(tone.exposureEV)))
-                            : tone.aePostGain * std::exp2(float(tone.exposureEV));
-            }
-        }
         resolveAdaptiveTone(*s, o);
         const auto proxyPath = path + ".proxy";
         if (o.bayerBin2x) path += "-natural2x-f32-v1";

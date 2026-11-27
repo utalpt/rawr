@@ -190,8 +190,15 @@ internal class RendererStore private constructor(private val context: Context) {
             .ifBlank { RendererRecipe.encode(RendererRecipe.neutral(library)) }
         val resolved = ext?.optString("com.rawrcam.processing.resolved.v1")?.takeIf { it.isNotBlank() }?.let(::JSONObject)
         val frame = ext?.optString("com.rawrcam.processing.frame.v1")?.takeIf { it.isNotBlank() }?.let(::JSONObject)
+        // Rawr 17U fork: a float DNG from another app (LOFIC) has no capture gain
+        // or shadow lift; it is seen at its BaselineExposure (LOFIC keeps 1.0 at
+        // the Short's clip, stops above the scene) with the Strong lift, as the
+        // phone's LOFIC exposure leaves the Long dark for its own tone mapping.
+        val floatDng = if (!rawr && resolved == null) FloatDngInfo.read(repository.source(job))?.takeIf { it.floatSamples } else null
         val frozen = JSONObject(original).apply {
-            put("aePostGain", resolved?.optDouble("aePostGain", 1.0) ?: 1.0)
+            put("aePostGain", resolved?.optDouble("aePostGain", 1.0)
+                ?: floatDng?.baselineExposure?.let { Math.pow(2.0, it.coerceIn(-8.0, 16.0)) } ?: 1.0)
+            if (floatDng != null) put("adaptiveToneMode", FLOAT_DNG_LIFT)
             resolved?.optJSONObject("tonemap")?.optJSONObject("adaptiveTone")?.let { put("adaptiveTone", it) }
             resolved?.optJSONObject("tonemap")?.optJSONObject("localTone")?.let { put("localTone", it) }
             put("timestampNs", frame?.optLong("timestampNs", 1_000_000_000) ?: 1_000_000_000)
@@ -201,7 +208,9 @@ internal class RendererStore private constructor(private val context: Context) {
         }.toString().let(assets::resolve)
         RendererRecipe.decode(frozen, library) // Validate before the editor is composed.
         val draft = assets.resolve(RendererRecipe.startingDraft(frozen, library,
-            captured = RendererRecipe.replaysRecipe(job.capture, embedded)))
+            captured = RendererRecipe.replaysRecipe(job.capture, embedded)).let { d ->
+                if (floatDng == null) d else JSONObject(d).put("adaptiveToneMode", FLOAT_DNG_LIFT).toString()
+            })
         return job.copy(original = frozen, draft = draft, width = w, height = h, rawr = rawr,
             orientation = data[2].toInt(), megapixels = RenderResolution.defaultMegapixels(w, h, rawr))
     }
@@ -257,6 +266,8 @@ internal class RendererStore private constructor(private val context: Context) {
     }
     companion object {
         private const val IMPORT_CHECK_BYTES = 64L * 1024 * 1024
+        // Shadow lift for float DNGs from other apps (LOFIC): up to 3 EV.
+        private val FLOAT_DNG_LIFT = com.rawr.camera.settings.model.AutoKeyExposure.Strong.name
         // get() constructs this process-lifetime store exclusively with applicationContext.
         @android.annotation.SuppressLint("StaticFieldLeak")
         @Volatile private var instance: RendererStore? = null
