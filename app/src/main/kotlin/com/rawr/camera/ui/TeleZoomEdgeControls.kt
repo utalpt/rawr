@@ -62,7 +62,7 @@ import kotlinx.coroutines.launch
 private val MIN = TeleOpticalZoom.MIN_MM.toFloat()
 private val MAX = TeleOpticalZoom.MAX_MM.toFloat()
 private val Panel = Color.Black.copy(alpha = .55f)
-private val Dim = Color(0xFFD8F0FA).copy(alpha = .6f)
+private val Dim = Color.White.copy(alpha = .6f)
 
 /** The chosen edge control, when the style is not the bar. */
 @Composable
@@ -242,8 +242,8 @@ private fun TeleDial(mm: Int, onSelect: (Int) -> Unit, modifier: Modifier) {
             }
             close()
         }
-        drawPath(disc, Color(0xE60A0E20))
-        drawPath(disc, Color.White.copy(alpha = .2f), style = Stroke(width = 1.dp.toPx()))
+        drawPath(disc, Panel)  // the other controls' see-through black, not Telezoom's near-opaque navy
+        drawPath(disc, Color.White.copy(alpha = .12f), style = Stroke(width = 1.dp.toPx()))
         val pos = scale.pos.value
         for (v in TeleOpticalZoom.MIN_MM..TeleOpticalZoom.MAX_MM) {
             val phi = PI + (v - pos) * stepRad
