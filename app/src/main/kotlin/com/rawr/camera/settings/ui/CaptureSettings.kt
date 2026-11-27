@@ -126,6 +126,19 @@ internal fun CaptureSettings(state: SettingsUiState, dispatch: SettingsDispatch)
                 onClick = { dispatch.invoke(SetTeleZoomStyle(teleStyle.next().id)) }
             )
             SettingDivider()
+            // Rawr 17U fork: the LOFIC camera (both LOFIC exposures of the main camera as RAW, merged into a float
+            // DNG), from Anton Tretiakov's X17U LOFIC RAW specification; needs his root module. Xiaomi 17 Ultra only.
+            if (android.os.Build.DEVICE == "nezha") {
+                SettingsRow(
+                    title = "LOFIC Camera",
+                    value = "Needs the X17U LOFIC RAW module",
+                    testTag = SettingsTestTags.row("Capture", "lofic_camera"),
+                    onClick = {
+                        context.startActivity(android.content.Intent(context, com.rawr.camera.lofic.LoficActivity::class.java))
+                    }
+                )
+                SettingDivider()
+            }
             SettingsSwitchRow(
                 title = "Tele Zoom Always On",
                 checked = state.values.teleZoomAlwaysOn,

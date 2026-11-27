@@ -86,6 +86,14 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
         <activity android:name=".settings.SettingsActivity" android:exported="false" android:label="@string/settings_title" />
+        <!-- Rawr 17U fork: LOFIC camera of the Xiaomi 17 Ultra main camera (Anton Tretiakov's X17U LOFIC RAW). -->
+        <activity
+            android:name=".lofic.LoficActivity"
+            android:exported="false"
+            android:label="Rawr LOFIC"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            tools:ignore="LockedOrientationActivity,DiscouragedApi" />
         <activity
             android:name=".MainActivity"
             android:screenOrientation="portrait"
