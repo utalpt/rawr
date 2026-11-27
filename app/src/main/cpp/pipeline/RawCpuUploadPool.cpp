@@ -1,5 +1,6 @@
 #include "pipeline/RawCpuUploadPool.h"
 
+#include <android/log.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -164,6 +165,15 @@ rawrcam::vulkan::ImportedRaw& RawCpuUploadPool::upload(uint32_t slotIndex, AImag
         throw std::runtime_error("RAW CPU upload: AHB lock failed status=" + std::to_string(lockResult));
     const rawrcam::imaging::RawPixelSource source{static_cast<const uint8_t*>(address), *format, width_, height_,
                                                   static_cast<size_t>(rowStride)};
+    if (packed14_ && (loficLogCounter_++ % 90u) == 0u) {
+        const uint32_t filled = rawrcam::imaging::filledRows(static_cast<const uint8_t*>(address),
+                                                             static_cast<size_t>(rowStride), height_);
+        const uint32_t filledAtPlaneStride =
+            rawrcam::imaging::filledRows(static_cast<const uint8_t*>(address), size_t(width_) * 2u, height_);
+        __android_log_print(ANDROID_LOG_INFO, "RawrCamNative",
+                            "LOFIC_LONG_ROWS filled=%u of %u rowBytes=%d planeStrideRowsFilled=%u bufferStride=%u",
+                            filled, height_, rowStride, filledAtPlaneStride, desc.stride);
+    }
     const bool copied = rawrcam::imaging::copyRawToPackedRaw16(source, static_cast<uint16_t*>(slot.mapped));
     int releaseFence = -1;
     AHardwareBuffer_unlock(ahb, &releaseFence);

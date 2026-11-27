@@ -2,9 +2,11 @@
 #include "camera/VendorCameraGate.h"
 
 #include <android/hardware_buffer.h>
+#include <android/log.h>
 #include <camera/NdkCameraMetadataTags.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -16,6 +18,7 @@
 #include <utility>
 
 #include "camera/CameraControlCapabilities.h"
+#include "imaging/RawPixelSource.h"
 #include "camera/CameraDiscovery.h"
 #include "camera/CameraKeyInjection.h"
 #include "camera/CompanionStreamSize.h"
@@ -158,6 +161,29 @@ ANativeWindow* CameraDeviceSession::addDrainedReader(uint32_t width, uint32_t he
             image = nullptr;
         }
     };
+    // The Short (RAW10 rows 5120 bytes apart): how many rows it fills, every 90th frame.
+    if (std::string(label) == "short_raw") {
+        listener.onImageAvailable = [](void*, AImageReader* r) {
+            static std::atomic<uint32_t> counter{0};
+            AImage* image = nullptr;
+            while (AImageReader_acquireNextImage(r, &image) == AMEDIA_OK && image) {
+                if ((counter++ % 90u) == 0u) {
+                    uint8_t* data = nullptr;
+                    int length = 0;
+                    int32_t height = 0;
+                    AImage_getHeight(image, &height);
+                    if (AImage_getPlaneData(image, 0, &data, &length) == AMEDIA_OK && data && height > 0)
+                        __android_log_print(ANDROID_LOG_INFO, "RawrCamNative",
+                                            "LOFIC_SHORT_ROWS filled=%u of %d length=%d",
+                                            imaging::filledRows(data, 5120, uint32_t(std::min<int64_t>(
+                                                                                   height, length / 5120))),
+                                            height, length);
+                }
+                AImage_delete(image);
+                image = nullptr;
+            }
+        };
+    }
     if (const auto ls = AImageReader_setImageListener(reader, &listener); ls != AMEDIA_OK) return fail("listener", ls);
     ANativeWindow* window = nullptr;
     if (const auto ws = AImageReader_getWindow(reader, &window); ws != AMEDIA_OK || !window) return fail("window", ws);

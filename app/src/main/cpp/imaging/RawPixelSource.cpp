@@ -45,6 +45,16 @@ void unpackRaw10Row(const uint8_t* packed, uint32_t width, uint16_t* destination
     }
 }
 
+uint32_t filledRows(const uint8_t* base, size_t rowBytes, uint32_t maxRows) noexcept {
+    if (!base || !rowBytes) return 0;
+    for (uint32_t row = maxRows; row > 0; --row) {
+        const uint8_t* p = base + static_cast<size_t>(row - 1u) * rowBytes;
+        for (size_t i = 0; i < rowBytes; i += 16)
+            if (p[i]) return row;
+    }
+    return 0;
+}
+
 // Xiaomi 17 Ultra LOFIC Long frame (layout from Anton Tretiakov's X17U LOFIC RAW v1.0 spec, measured on the 17U):
 // 4 MSB bytes then 3 bytes holding four 6-bit LSBs, little-endian; value = msb << 6 | lsb.
 void unpackRaw14Row(const uint8_t* packed, uint32_t width, uint16_t* destination) noexcept {

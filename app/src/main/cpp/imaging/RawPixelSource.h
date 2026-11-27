@@ -30,6 +30,8 @@ struct RawPixelSource {
 
 // Unpacks one RAW10 row (width must be a multiple of 4) into uint16 values.
 void unpackRaw10Row(const uint8_t* packed, uint32_t width, uint16_t* destination) noexcept;
+// Rows of a packed frame that hold data: one past the last row with a non-zero byte (sampled every 16 bytes).
+uint32_t filledRows(const uint8_t* base, size_t rowBytes, uint32_t maxRows) noexcept;
 void unpackRaw14Row(const uint8_t* packed, uint32_t width, uint16_t* destination) noexcept;
 
 // Copies the source into tightly packed RAW16 rows (stride = width). Returns

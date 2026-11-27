@@ -101,6 +101,7 @@ class RawCpuUploadPool final {
     uint32_t height_ = 0;
     std::array<Slot, rawrcam::imaging::kRealtimeFramesInFlight> slots_{};
     bool packed14_ = false;
+    uint32_t loficLogCounter_ = 0;
 };
 
 // Barriers for the frame's RAW image. Camera AHB imports are foreign-owned and
