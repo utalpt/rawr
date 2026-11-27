@@ -48,14 +48,24 @@ object TeleOpticalZoom {
         }
     }
 
+    /** Ids the 17 Ultra profile's tele lenses had before "Tele DCG": the fixed "3.2x DCG" and the movable "4.3x DCG". */
+    private val legacyPrefixes = listOf("3.2x ", "4.3x ")
+
+    /** "3.2x DCG" / "4.3x DCG" -> "Tele DCG"; any other id unchanged. */
+    fun teleId(id: String): String =
+        legacyPrefixes.firstOrNull { id.startsWith(it) }?.let { "Tele " + id.removePrefix(it) } ?: id
+
     /**
-     * The movable lens for a saved id of a fixed 75 mm tele lens that is no longer in the profile ("3.2x DCG" ->
-     * "4.3x DCG"). Null when the id is not one of those or the twin is missing.
+     * The movable lens for a saved id of a tele lens that is no longer in the profile ("3.2x DCG" or "4.3x DCG" ->
+     * "Tele DCG"; a user's own lens list may still have "4.3x DCG"). Null when the id is not one of those or no
+     * movable lens of that mode is there.
      */
     fun legacyFixedLens(id: String, lenses: List<LensCapability>): String? {
-        if (!id.startsWith("3.2x ")) return null
-        val twin = "4.3x " + id.removePrefix("3.2x ")
-        return lenses.firstOrNull { it.id == twin && supports(it) }?.id
+        val prefix = legacyPrefixes.firstOrNull { id.startsWith(it) } ?: return null
+        val mode = id.removePrefix(prefix)
+        return listOf("Tele $mode", "4.3x $mode").firstNotNullOfOrNull { candidate ->
+            lenses.firstOrNull { it.id == candidate && it.id != id && supports(it) }?.id
+        }
     }
 
     /** The lens bar's lenses: the fixed tele lenses that have a movable twin are left out. */

@@ -2872,7 +2872,7 @@ mirror=0
 dcp=
 key.request=org.codeaurora.qcamera3.sensor_meta_data.current_mode type:1 enabled:1 values:2,
 
-lens=4.3x Normal
+lens=Tele Normal
 camera=4
 physical=
 stream=0:0x0 highResLive:0 useCase:0
@@ -2905,7 +2905,7 @@ dcp=
 key.request=xiaomi.zoomRatio.debug.setZoomRatioCode type:3 enabled:1 values:4.2999999999999998,
 key.request=xiaomi.zoomRatio.debug.zoomRatioDebugEnable type:1 enabled:1 values:1,
 
-lens=4.3x DCG
+lens=Tele DCG
 camera=4
 physical=
 stream=0:0x0 highResLive:0 useCase:0
@@ -2939,7 +2939,7 @@ key.request=org.codeaurora.qcamera3.sensor_meta_data.current_mode type:1 enabled
 key.request=xiaomi.zoomRatio.debug.setZoomRatioCode type:3 enabled:1 values:4.2999999999999998,
 key.request=xiaomi.zoomRatio.debug.zoomRatioDebugEnable type:1 enabled:1 values:1,
 
-lens=4.3x 50MP
+lens=Tele 50MP
 camera=4
 physical=
 stream=0:4080x3072 highResLive:0 useCase:0
@@ -2973,7 +2973,7 @@ key.request=xiaomi.zoomRatio.debug.setZoomRatioCode type:3 enabled:1 values:4.29
 key.request=xiaomi.zoomRatio.debug.zoomRatioDebugEnable type:1 enabled:1 values:1,
 key.still=org.codeaurora.qcamera3.sensor_meta_data.current_mode type:1 enabled:1 values:1,
 
-lens=4.3x 200>50
+lens=Tele 200>50
 camera=4
 physical=
 stream=1:4080x3072 highResLive:0 useCase:0
@@ -3011,7 +3011,7 @@ key.request=xiaomi.zoomRatio.debug.setZoomRatioCode type:3 enabled:1 values:4.29
 key.request=xiaomi.zoomRatio.debug.zoomRatioDebugEnable type:1 enabled:1 values:1,
 key.still=xiaomi.remosaic.enabled type:0 enabled:1 values:1,
 
-lens=4.3x 200>25
+lens=Tele 200>25
 camera=4
 physical=
 stream=1:4080x3072 highResLive:0 useCase:0
@@ -3049,7 +3049,7 @@ key.request=xiaomi.zoomRatio.debug.setZoomRatioCode type:3 enabled:1 values:4.29
 key.request=xiaomi.zoomRatio.debug.zoomRatioDebugEnable type:1 enabled:1 values:1,
 key.still=xiaomi.remosaic.enabled type:0 enabled:1 values:1,
 
-lens=4.3x 200 SF
+lens=Tele 200 SF
 camera=4
 physical=
 stream=1:4080x3072 highResLive:0 useCase:0
@@ -3086,7 +3086,7 @@ key.request=xiaomi.zoomRatio.debug.setZoomRatioCode type:3 enabled:1 values:4.29
 key.request=xiaomi.zoomRatio.debug.zoomRatioDebugEnable type:1 enabled:1 values:1,
 key.still=xiaomi.remosaic.enabled type:0 enabled:1 values:1,
 
-lens=4.3x ISZ
+lens=Tele ISZ
 camera=4
 physical=
 stream=0:0x0 highResLive:0 useCase:0

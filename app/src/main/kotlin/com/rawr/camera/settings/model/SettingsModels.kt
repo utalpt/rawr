@@ -1171,3 +1171,24 @@ fun SettingsValues.withOwnLookForActiveLens(own: Boolean): SettingsValues {
         if (lens !in lookByLens) this else copy(lookByLens = lookByLens - lens).withLook(sharedLook ?: current)
     }
 }
+
+/**
+ * Rawr 17U fork: the 17 Ultra profile's tele lenses are "Tele DCG"... (were "3.2x DCG" fixed at 75 mm and "4.3x DCG"
+ * moving the optics). The last lens and the per-lens multiframe tuning and look follow the new ids; "4.3x" entries win
+ * over "3.2x" ones. Only with the built-in lens list: a list the user edited keeps its own ids. Idempotent.
+ */
+fun SettingsValues.withTeleLensIds(): SettingsValues {
+    if (lensProfiles != null) return this
+    fun <T> rename(map: Map<String, T>): Map<String, T> {
+        if (map.keys.none { com.rawr.camera.model.TeleOpticalZoom.teleId(it) != it }) return map
+        val out = LinkedHashMap<String, T>()
+        map.filterKeys { it.startsWith("3.2x ") }.forEach { (k, v) -> out[com.rawr.camera.model.TeleOpticalZoom.teleId(k)] = v }
+        map.filterKeys { !it.startsWith("3.2x ") }.forEach { (k, v) -> out[com.rawr.camera.model.TeleOpticalZoom.teleId(k)] = v }
+        return out
+    }
+    val last = lastLensId?.let { com.rawr.camera.model.TeleOpticalZoom.teleId(it) }
+    val tuning = rename(multiframeTuningByLens)
+    val looks = rename(lookByLens)
+    if (last == lastLensId && tuning === multiframeTuningByLens && looks === lookByLens) return this
+    return copy(lastLensId = last, multiframeTuningByLens = tuning, lookByLens = looks)
+}

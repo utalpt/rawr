@@ -40,6 +40,7 @@ import com.rawr.camera.settings.model.VideoAudioSource
 import com.rawr.camera.settings.model.VideoBitrateMode
 import com.rawr.camera.settings.model.VideoEncoderConfig
 import com.rawr.camera.settings.model.toLegacy
+import com.rawr.camera.settings.model.withTeleLensIds
 import java.io.IOException
 import kotlin.math.abs
 import kotlinx.coroutines.CoroutineScope
@@ -115,7 +116,7 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
             decoded,
             hasPersistedSaturation = p[Keys.saturation] != null,
             hasPersistedVibrance = p[Keys.vibrance] != null
-        )
+        ).withTeleLensIds()
     }
 
     /**

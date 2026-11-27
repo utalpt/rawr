@@ -337,7 +337,7 @@
       }
     },
     {
-      "id": "4.3x Normal",
+      "id": "Tele Normal",
       "camera": {
         "id": "4",
         "physical": ""
@@ -386,7 +386,7 @@
       }
     },
     {
-      "id": "4.3x DCG",
+      "id": "Tele DCG",
       "camera": {
         "id": "4",
         "physical": ""
@@ -446,7 +446,7 @@
       }
     },
     {
-      "id": "4.3x 50MP",
+      "id": "Tele 50MP",
       "camera": {
         "id": "4",
         "physical": ""
@@ -516,7 +516,7 @@
       }
     },
     {
-      "id": "4.3x 200>50",
+      "id": "Tele 200>50",
       "camera": {
         "id": "4",
         "physical": ""
@@ -615,7 +615,7 @@
       }
     },
     {
-      "id": "4.3x 200>25",
+      "id": "Tele 200>25",
       "camera": {
         "id": "4",
         "physical": ""
@@ -714,7 +714,7 @@
       }
     },
     {
-      "id": "4.3x 200 SF",
+      "id": "Tele 200 SF",
       "camera": {
         "id": "4",
         "physical": ""
@@ -813,7 +813,7 @@
       }
     },
     {
-      "id": "4.3x ISZ",
+      "id": "Tele ISZ",
       "camera": {
         "id": "4",
         "physical": ""

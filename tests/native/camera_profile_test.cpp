@@ -150,14 +150,14 @@ void testProfileMatching() {
     m = matchBuiltInProfile(props({{"ro.product.model", "25010PN30G"}}));
     assert(m.profileId == "xiaomi_15_ultra" && m.rule == "model" && !m.verified);
     const auto x17 = builtInCameraProfile("xiaomi_17_ultra");
-    for (const char* id : {"1x 50MP", "0.6x 50MP", "4.3x 50MP", "4.3x 200>50", "4.3x 200>25"}) {
+    for (const char* id : {"1x 50MP", "0.6x 50MP", "Tele 50MP", "Tele 200>50", "Tele 200>25"}) {
         const auto lens = routeForLens(x17, id);
         assert(lens && lens->photoStream);
     }
-    const auto x17Tele200 = routeForLens(x17, "4.3x 200>50");
+    const auto x17Tele200 = routeForLens(x17, "Tele 200>50");
     assert(x17Tele200->photoStream->width == 16320 && x17Tele200->photoStream->height == 12288 && x17Tele200->photoReduced);
     // The 60 fps video modes pad blank rows at the bottom of the frame (image.cropEdgesHighFps); stills keep every row.
-    for (const char* id : {"0.6 Normal", "1x Normal", "4.3x Normal"}) {
+    for (const char* id : {"0.6 Normal", "1x Normal", "Tele Normal"}) {
         const auto lens = routeForLens(x17, id);
         assert(lens && lens->highFpsCropBottom == 512 && lens->highFpsCropTop == 0 && lens->highFpsCropLeft == 0 &&
                lens->highFpsCropRight == 0 && lens->cropBottom == 0);

@@ -686,6 +686,17 @@ class SettingsModelTest {
         assertTrue(v.lookByLens.isEmpty())
     }
 
+    @Test fun teleLensIdsFollowTheProfile() {
+        val base = PersistentSettingsController(onValuesChanged = {}).state.value.values
+        val own = base.copy(lastLensId = "1x 50MP").withLensSelected("4.3x DCG").withOwnLookForActiveLens(true)
+        val v = own.copy(lastLensId = "3.2x 200>50").withTeleLensIds()
+        assertEquals("Tele 200>50", v.lastLensId)
+        assertEquals(setOf("Tele DCG"), v.lookByLens.keys)
+        assertEquals(v, v.withTeleLensIds())
+        val edited = own.copy(lensProfiles = listOf(LensProfile("4.3x DCG", "4")))
+        assertEquals(edited, edited.withTeleLensIds())
+    }
+
     @Test fun multiframeTuningCanBeSetPerLens() {
         val base = PersistentSettingsController(onValuesChanged = {}).state.value
         var state = base.withValues(base.values.copy(lastLensId = "3.2x 200MP"))

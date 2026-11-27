@@ -42,7 +42,8 @@ object CaptureTransitions {
                 appliedFocusDiopters = null
             )
 
-        // Rawr 17U fork: a saved "3.2x ..." lens (no longer in the profile) is the "4.3x ..." one at 75 mm.
+        // Rawr 17U fork: a saved "3.2x ..." or "4.3x ..." lens (no longer in the profile) is "Tele ..."; the fixed
+        // 3.2x one at 75 mm.
         val legacyTele = TeleOpticalZoom.legacyFixedLens(state.selectedLensId, capabilities.lenses)
         val selectedLensId =
             state.selectedLensId
@@ -90,7 +91,12 @@ object CaptureTransitions {
             rawFps = null,
             viewfinderFps = null,
             selectedLensId = selectedLensId,
-            teleZoomMm = if (legacyTele != null && selectedLensId == legacyTele) TeleOpticalZoom.MIN_MM else state.teleZoomMm,
+            teleZoomMm =
+                if (legacyTele != null && selectedLensId == legacyTele && state.selectedLensId.startsWith("3.2x ")) {
+                    TeleOpticalZoom.MIN_MM
+                } else {
+                    state.teleZoomMm
+                },
             whiteBalanceMode = reconciledWhiteBalanceMode,
             whiteBalanceTemperatureK =
                 state.whiteBalanceTemperatureK.coerceIn(
@@ -380,9 +386,13 @@ object CaptureTransitions {
 
     fun selectLens(state: CaptureUiState, lensId: String): CaptureUiState {
         if (state.capabilities.lenses.any { it.id == lensId }) return state.copy(selectedLensId = lensId)
-        // Rawr 17U fork: a saved "3.2x ..." lens (no longer in the profile) opens the "4.3x ..." one at 75 mm.
+        // Rawr 17U fork: a saved "3.2x ..." or "4.3x ..." lens (no longer in the profile) opens "Tele ..."; the fixed
+        // 3.2x one at 75 mm.
         val twin = TeleOpticalZoom.legacyFixedLens(lensId, state.capabilities.lenses) ?: return state
-        return state.copy(selectedLensId = twin, teleZoomMm = TeleOpticalZoom.MIN_MM)
+        return state.copy(
+            selectedLensId = twin,
+            teleZoomMm = if (lensId.startsWith("3.2x ")) TeleOpticalZoom.MIN_MM else state.teleZoomMm
+        )
     }
 
     fun setManualFocus(state: CaptureUiState, normalized: Float): CaptureUiState {

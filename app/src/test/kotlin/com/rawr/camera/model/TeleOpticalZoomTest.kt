@@ -50,11 +50,23 @@ class TeleOpticalZoomTwinTest {
 
     @Test
     fun savedFixedTeleLensesOpenTheMovableOne() {
-        val profile = lenses.filterNot { it.id.startsWith("3.2x ") }
-        assertEquals("4.3x DCG", TeleOpticalZoom.legacyFixedLens("3.2x DCG", profile))
-        assertEquals("4.3x Normal", TeleOpticalZoom.legacyFixedLens("3.2x Normal", profile))
-        assertNull(TeleOpticalZoom.legacyFixedLens("3.2x ISZ", profile))
-        assertNull(TeleOpticalZoom.legacyFixedLens("1x Normal", profile))
+        val userList = lenses.filterNot { it.id.startsWith("3.2x ") }
+        assertEquals("4.3x DCG", TeleOpticalZoom.legacyFixedLens("3.2x DCG", userList))
+        assertEquals("4.3x Normal", TeleOpticalZoom.legacyFixedLens("3.2x Normal", userList))
+        assertNull(TeleOpticalZoom.legacyFixedLens("3.2x ISZ", userList))
+        assertNull(TeleOpticalZoom.legacyFixedLens("1x Normal", userList))
+        assertNull(TeleOpticalZoom.legacyFixedLens("4.3x DCG", userList))
+        val profile = listOf(
+            LensCapability("1x Normal", "1x Normal", "f1:6.30:9.80x7.30"),
+            LensCapability("Tele Normal", "Tele Normal", "$g:z4.30"),
+            LensCapability("Tele DCG", "Tele DCG", "$g:z4.30")
+        )
+        assertEquals("Tele DCG", TeleOpticalZoom.legacyFixedLens("3.2x DCG", profile))
+        assertEquals("Tele DCG", TeleOpticalZoom.legacyFixedLens("4.3x DCG", profile))
+        assertEquals("Tele DCG", TeleOpticalZoom.teleId("4.3x DCG"))
+        assertEquals("Tele 200>50", TeleOpticalZoom.teleId("3.2x 200>50"))
+        assertEquals("1x DCG", TeleOpticalZoom.teleId("1x DCG"))
+        assertEquals("3.6x DCG", TeleOpticalZoom.displayName(profile[2], 85))
     }
 
     @Test
