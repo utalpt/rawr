@@ -4,6 +4,20 @@ Fork of [Rawr](https://github.com/adityawarmanfw/rawr) for the Xiaomi 17 Ultra.
 Releases follow Ed's version: `0.5.1-17u.N`. Test work lands on `yuv-probe`
 first and moves to `xiaomi-17u` once verified.
 
+## Unreleased (on the `debug` build, not in a release yet)
+
+### Tele lenses
+
+- The tele opens at **75 mm (3.2x)**, where the stock camera and other apps open it, and a double tap on the TELE
+  cell goes back there (it went to 100 mm).
+- **Settings > Lenses** lists 7 tele lenses instead of 14: the seven "3.2x ..." lenses were the "4.3x ..." ones
+  without the zoom keys (the periscope at its 75 mm rest), so they are gone, and the rest are named **"Tele Normal",
+  "Tele DCG", "Tele 50MP", "Tele 200>50", "Tele 200>25", "Tele 200 SF", "Tele ISZ"**. The lens buttons keep
+  showing the zoom the optics are at (3.2x to 4.3x).
+- A saved or restored "3.2x ..." or "4.3x ..." lens, and the per-lens look and multiframe tuning stored under it,
+  move to "Tele ..." (a "3.2x" one at 75 mm). A lens list you edited yourself keeps its entries: use
+  **Settings > Lenses > Reset to device default** to get the new list.
+
 ## 0.5.1-17u.16
 
 Tape, a fifth look for the tele's zoom control, a see-through Dial, and the settings path fixed in the notes.

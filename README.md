@@ -81,7 +81,8 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   **Tape** (the FOCAL tape alone) or
   **Wheel**, **Dial** or **Rocker** on the viewfinder's edge, reused from the
   [Telezoom](https://github.com/utalpt/x17u-telezoom) module; **Tele Zoom Always On** keeps it on screen while
-  the tele is selected. EXIF and DNG name the real focal length. The
+  the tele is selected. The tele opens at 75 mm (3.2x) like the stock camera; Settings > Lenses lists its modes as
+  "Tele Normal", "Tele DCG"... EXIF and DNG name the real focal length. The
   vendor tags were found by Anton Tretiakov (@designation_zero).
 
   <img src="docs/assets/screens/tele-zoom-controls.jpg" alt="Tele Zoom Control: Bar, Tape, Wheel, Dial, Rocker" width="540">
