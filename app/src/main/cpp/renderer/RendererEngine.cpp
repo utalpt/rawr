@@ -856,6 +856,8 @@ std::vector<uint8_t> RendererEngine::render(DngSource& source, const std::string
     // Absent or invalid profiles force strength 0 (never hallucinate).
     context.denoiseNoiseA = 0.0f;
     context.denoiseNoiseB = 0.0f;
+    context.denoiseNoiseB2 = 0.0f;
+    context.denoiseNoiseThreshold = 0.0f;
     if (context.denoiseStrength > 0.0f) {
         const int g0 = (source.cfa == 1u || source.cfa == 2u) ? 0 : 1;
         const int g1 = (source.cfa == 1u || source.cfa == 2u) ? 3 : 2;
@@ -871,6 +873,11 @@ std::vector<uint8_t> RendererEngine::render(DngSource& source, const std::string
                                                 float(black), float(white), na, nb)) {
             context.denoiseNoiseA = na;
             context.denoiseNoiseB = nb;
+            // Rawr 17U fork: LOFIC merge, second noise part (same normalized domain: black 0, white 1.0).
+            if (source.loficNoiseThreshold > 0.0 && black == 0.0) {
+                context.denoiseNoiseB2 = float(source.loficNoiseB2);
+                context.denoiseNoiseThreshold = float(source.loficNoiseThreshold);
+            }
         } else {
             context.denoiseStrength = 0.0f;
         }

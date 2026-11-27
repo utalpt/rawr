@@ -41,6 +41,8 @@ void recordPostDemosaic(RenderResources& resources, RenderCommandSession& comman
     denoiseRequest.garrote = rendered.denoiseGarrote;
     denoiseRequest.noiseA = rendered.denoiseNoiseA;
     denoiseRequest.noiseB = rendered.denoiseNoiseB;
+    denoiseRequest.noiseB2 = rendered.denoiseNoiseB2;
+    denoiseRequest.noiseThreshold = rendered.denoiseNoiseThreshold;
     // One submission per wavelet tile: the whole-frame denoise is
     // ~400 ms of GPU work and stalled the viewfinder as one submit.
     resources.postDemosaic().setDenoiseTileBoundary([&] { commands.submitAndRestart("denoise-tile"); });

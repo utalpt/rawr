@@ -65,6 +65,10 @@ struct DenoiseRequest {
     float detail = 1.0f;    // shadow-preservation fulcrum (higher = more texture)
     float noiseA = 0.0f;    // normalized-domain S (green), variance = a*x + b
     float noiseB = 0.0f;    // normalized-domain O (green)
+    // Rawr 17U fork: second noise part (raw_denoise::DenoiseParams::noiseB2 /
+    // noiseThreshold), 0 = off.
+    float noiseB2 = 0.0f;
+    float noiseThreshold = 0.0f;
     // Luma-band force (Y0 threshold scale, 0..1, default 0.25 = shipped
     // gentle-luma tuning). Higher smooths luma grain harder; chroma force
     // stays fixed at 0.75. Clamped to [0,1] at record time.

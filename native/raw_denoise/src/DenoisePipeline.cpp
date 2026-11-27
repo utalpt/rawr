@@ -309,7 +309,7 @@ DenoisePipeline::DenoisePipeline(VkPhysicalDevice physical, VkDevice device, Den
     im.thrLayout = makeLayout(device, {{0, STORAGE_BUFFER}, {1, STORAGE_BUFFER}}, 32,
                               &im.thrPipeLayout);
     im.backLayout = makeLayout(device, {{0, STORAGE_IMAGE}, {1, STORAGE_IMAGE}, {2, STORAGE_IMAGE}},
-                               96, &im.backPipeLayout);
+                               100, &im.backPipeLayout);
     im.prePipe = makePipe(device, im.pre, im.prePipeLayout);
     im.atrPipe = makePipe(device, im.atr, im.atrPipeLayout);
     im.thrPipe = makePipe(device, im.thr, im.thrPipeLayout);
@@ -385,6 +385,11 @@ void DenoisePipeline::record(VkCommandBuffer command, VkImageView srcView, VkIma
     const float compensateP = fulcrum / std::pow(fulcrum, params.shadows);
     float a = params.noiseA * compensateP;
     float b = params.noiseB;
+    float b2 = params.noiseB2;
+    const float threshold = params.noiseThreshold > 0.0f && std::isfinite(params.noiseThreshold) &&
+                                    std::isfinite(params.noiseB2) && params.noiseB2 >= 0.0f
+                                ? params.noiseThreshold
+                                : 0.0f;
     // WB-adaptive Y0U0V0 rows then strength scaling (mirrors set_up_conversion_matrices).
     float m[9] = {1.0f / 3, 1.0f / 3, 1.0f / 3, 0.5f, 0.0f, -0.5f, 0.25f, -0.5f, 0.25f};
     if (params.wbColourAxes) {
@@ -395,6 +400,7 @@ void DenoisePipeline::record(VkCommandBuffer command, VkImageView srcView, VkIma
         for (int c = 0; c < 3; c++) p[c] = 1.0f;
         a = params.noiseA;
         b = params.noiseA > 0.0f ? params.noiseB / params.noiseA : 0.0f;
+        b2 = params.noiseA > 0.0f ? params.noiseB2 / params.noiseA : 0.0f;
         float s[3];
         for (int c = 0; c < 3; c++) s[c] = std::sqrt(wb[c] > 0.0f && std::isfinite(wb[c]) ? wb[c] : 1.0f);
         const float rows[9] = {s[0], s[1], s[2], s[0], 0.0f, -s[2], 0.5f * s[0], -s[1], 0.5f * s[2]};
@@ -509,7 +515,7 @@ void DenoisePipeline::record(VkCommandBuffer command, VkImageView srcView, VkIma
                     uint32_t srcW, srcH;
                     int32_t ox, oy;
                     uint32_t tileE;
-                    float a, p0, p1, p2, b, pad0, pad1;
+                    float a, p0, p1, p2, b, b2, threshold;
                     float m[12];
                 } pp{};
                 pp.srcW = width;
@@ -522,6 +528,8 @@ void DenoisePipeline::record(VkCommandBuffer command, VkImageView srcView, VkIma
                 pp.p1 = p[1];
                 pp.p2 = p[2];
                 pp.b = b;
+                pp.b2 = b2;
+                pp.threshold = threshold;
                 // GLSL mat3 is column-major: column c must hold column c of
                 // the row-major yuvM, i.e. upload the transpose.
                 for (int col = 0; col < 3; col++)
@@ -564,8 +572,9 @@ void DenoisePipeline::record(VkCommandBuffer command, VkImageView srcView, VkIma
             {
                 struct PB {
                     uint32_t tileW, tileH, outX, outY, halo;
-                    float a, p0, p1, p2, b, bias, pad;
+                    float a, p0, p1, p2, b, bias, b2;
                     float m[12];
+                    float threshold;
                 } pb{};
                 pb.tileW = tw;
                 pb.tileH = th;
@@ -578,6 +587,8 @@ void DenoisePipeline::record(VkCommandBuffer command, VkImageView srcView, VkIma
                 pb.p2 = p[2];
                 pb.b = b;
                 pb.bias = 0.0f;
+                pb.b2 = b2;
+                pb.threshold = threshold;
                 for (int col = 0; col < 3; col++)
                     for (int row = 0; row < 3; row++) pb.m[col * 4 + row] = rgbM[row * 3 + col];
                 dispatch(im.backPipe, im.backPipeLayout, im.backSet, &pb, sizeof(pb),

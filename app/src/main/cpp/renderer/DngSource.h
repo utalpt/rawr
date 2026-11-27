@@ -51,6 +51,10 @@ class DngSource {
     // for profiled denoise. Count 0 = absent (denoise resolves to off).
     std::array<double, 8> noiseProfile{};
     uint16_t noiseProfileCount = 0;
+    // Rawr 17U fork: second noise part of a Rawr LOFIC merge (k x Short above
+    // the merge ramp), in the normalized domain; 0 = none.
+    double loficNoiseB2 = 0.0;
+    double loficNoiseThreshold = 0.0;
     double whiteLevel = 0.0;
     std::array<float, 3> wb{1, 1, 1};
     std::array<float, 9> cameraToSrgb{};  // row-major, applied after wb

@@ -41,6 +41,12 @@ struct DenoiseParams {
     // Normalized-domain noise model (green channel): variance = a*x + b.
     float noiseA = 0.0f;
     float noiseB = 0.0f;
+    // Rawr 17U fork: a second noise part (LOFIC merge, k x Short above the Long
+    // part): variance = a*x + noiseB2 for x >= noiseThreshold (same domain as
+    // noiseA/noiseB). The variance-stabilizing transform is piecewise there,
+    // continuous at the threshold, with unit noise on both sides. 0 = off.
+    float noiseB2 = 0.0f;
+    float noiseThreshold = 0.0f;
     // Camera white-balance multipliers (green = 1), pre-WB domain.
     std::array<float, 3> whiteBalance{1.0f, 1.0f, 1.0f};
     int maxScale = 7;

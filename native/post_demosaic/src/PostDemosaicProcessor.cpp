@@ -647,6 +647,8 @@ void PostDemosaicProcessor::record(VkCommandBuffer cmd, VkImage sourceImage, VkI
         dp.shadows = std::isfinite(denoise.detail) ? std::clamp(denoise.detail, 0.0f, 1.8f) : 1.0f;
         dp.noiseA = denoise.noiseA;
         dp.noiseB = denoise.noiseB;
+        dp.noiseB2 = denoise.noiseB2;
+        dp.noiseThreshold = denoise.noiseThreshold;
         dp.whiteBalance = gains;
         dp.forceY = std::isfinite(denoise.forceY) ? std::clamp(denoise.forceY, 0.0f, 1.0f) : 0.25f;
         dp.maxScale = std::clamp(denoise.maxScale, 1, 7);

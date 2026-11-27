@@ -29,8 +29,8 @@ layout(push_constant) uniform Parameters {
     float p1;
     float p2;
     float b; // b_green
-    float _pad0;
-    float _pad1;
+    float b2; // Rawr 17U fork: second noise part's b above threshold (0 threshold = off)
+    float threshold;
     mat3 toYuv; // WB-adaptive, strength-scaled, GLSL column order
 }
 p;
@@ -47,6 +47,12 @@ void main() {
     vec3 expon = 1.0 - pv * 0.5;
     vec3 scale = 2.0 / ((2.0 - pv) * sqrt(p.a));
     vec3 tmp = pow(max(rgb + p.b, vec3(0.0)), expon) * scale;
+    if (p.threshold > 0.0) {
+        // Second noise part from the threshold up, offset so the transform is continuous there.
+        vec3 offset = (pow(vec3(p.threshold + p.b), expon) - pow(vec3(p.threshold + p.b2), expon)) * scale;
+        vec3 high = pow(max(rgb + p.b2, vec3(0.0)), expon) * scale + offset;
+        tmp = mix(tmp, high, step(vec3(p.threshold), rgb));
+    }
     vec3 yuv = p.toYuv * tmp;
     imageStore(tileImage, ivec2(lx, ly), vec4(yuv, 0.0));
 }

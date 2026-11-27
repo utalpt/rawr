@@ -30,8 +30,9 @@ layout(push_constant) uniform Parameters {
     float p2;
     float b; // b_green
     float bias;
-    float _pad;
+    float b2; // Rawr 17U fork: second noise part's b above threshold (0 threshold = off)
     mat3 toRgb; // inverse of the strength-scaled toYuv, GLSL column order
+    float threshold;
 }
 p;
 
@@ -48,5 +49,15 @@ void main() {
     vec3 xc = max(rgb, vec3(0.0));
     vec3 z1 = (xc + sqrt(max(xc * xc + p.bias, vec3(0.0)))) * scale;
     vec3 out_ = pow(z1, expon) - p.b;
+    if (p.threshold > 0.0) {
+        // Inverse of the precondition's second part: above the transformed threshold.
+        vec3 fwdExpon = 1.0 - pv * 0.5;
+        vec3 fwdScale = 2.0 / ((2.0 - pv) * sqrt(p.a));
+        vec3 edge = pow(vec3(p.threshold + p.b), fwdExpon) * fwdScale;
+        vec3 offset = edge - pow(vec3(p.threshold + p.b2), fwdExpon) * fwdScale;
+        vec3 xh = max(rgb - offset, vec3(0.0));
+        vec3 z2 = (xh + sqrt(max(xh * xh + p.bias, vec3(0.0)))) * scale;
+        out_ = mix(out_, pow(z2, expon) - p.b2, step(edge, rgb));
+    }
     imageStore(outImage, ivec2(p.outOriginX + lx, p.outOriginY + ly), vec4(out_, 1.0));
 }

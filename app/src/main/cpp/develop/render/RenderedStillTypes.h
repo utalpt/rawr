@@ -79,6 +79,9 @@ struct RenderedStillContext {
     // from the frame SENSOR_NOISE_PROFILE with the demosaic normalization.
     float denoiseNoiseA = 0.0f;
     float denoiseNoiseB = 0.0f;
+    // Rawr 17U fork: second noise part of a LOFIC merge (k x Short), 0 = off.
+    float denoiseNoiseB2 = 0.0f;
+    float denoiseNoiseThreshold = 0.0f;
     // 1A multiframe sensor-clip OR evidence. Set by MfsrCaptureJob when
     // the reference RAW sensor bits were ORed into the clip mask; used only
     // for accurate logging/diagnostics (behavior already baked into the mask).

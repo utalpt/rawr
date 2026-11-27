@@ -208,6 +208,24 @@ DngSource::DngSource(const std::string& path, const CfaOverride& cfaOverride)
                 noiseProfile[size_t(site) * 2 + 1] = ov * scale * scale;
             }
             noiseProfileCount = valid ? 8 : 0;
+            // A Rawr LOFIC merge (UniqueCameraModel ".../ LOFIC <setup> / ..."):
+            // above the middle of its merge ramp (12500 Long DN) the samples are
+            // k x Short, whose fixed noise is 0.5 Short DN^2 (measured on the
+            // 27 Nov test DNGs) = 0.5 / 959^2 normalized whatever k and ISO;
+            // 1.0 = k x 959 = 2^BaselineExposure x 15359 Long DN.
+            const char* model = root->raw.unique_camera_model ? root->raw.unique_camera_model
+                                                               : p.raw.unique_camera_model;
+            const bool baseline = root->raw.has_baseline_exposure || p.raw.has_baseline_exposure;
+            const double exposure =
+                root->raw.has_baseline_exposure ? root->raw.baseline_exposure : p.raw.baseline_exposure;
+            if (noiseProfileCount == 8 && model && std::strstr(model, "/ LOFIC ") && baseline &&
+                std::isfinite(exposure)) {
+                const double fullScale = std::exp2(exposure) * 15359.0;
+                if (fullScale > 12500.0) {
+                    loficNoiseThreshold = 12500.0 / fullScale;
+                    loficNoiseB2 = 0.5 / (959.0 * 959.0);
+                }
+            }
         }
         rawWhite_ = p.raw.white_level_present ? double(p.raw.white_level[0]) : double((1u << p.bits_per_sample) - 1);
         if (floatSamples_) {
