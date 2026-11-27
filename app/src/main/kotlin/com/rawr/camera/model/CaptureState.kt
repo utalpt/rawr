@@ -60,6 +60,8 @@ data class FocusUiState(
     val mfNormalized: Float = .57f,
     /** Live lens position from CaptureResult in diopters; null before first result. */
     val appliedFocusDiopters: Float? = null,
+    /** The camera's AF reports focus (PASSIVE_FOCUSED or FOCUSED_LOCKED), whether or not a box is shown. */
+    val afFocused: Boolean = false,
     val backendNativeReadout: String? = null
 )
 

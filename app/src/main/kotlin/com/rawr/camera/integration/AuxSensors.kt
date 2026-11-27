@@ -31,6 +31,11 @@ import kotlin.math.abs
  * - `xiaomi.sensor.tof` (Visionics VI5300, continuous, 10 Hz): [0] distance mm (about -5 when covered,
  *   up to 4000), [1] status: 0 for a real target, 255 for none. Aimed at an overcast sky it still gives
  *   1.7-2.8 m, with status 255, so only status 0 counts as a distance.
+ *   Xiaomi 17 Ultra (ST "L8 TOF Sensor", measured by utalpt): [0..7] four distance/status pairs, one per
+ *   horizontal band of the frame from top to bottom (portrait), [8..15] unset. A flat wall reads
+ *   993/1018/1040/1072 mm, a hand over the top half changes only bands 0 and 1. Aimed at open sky all four
+ *   report 520-630 mm with status 0, and sunlit surfaces at 1.2-1.9 m read 0.4-0.65 m too, so the status
+ *   cannot tell (see tofDistanceForFocus).
  * - `TYPE_PRESSURE`: [0] hPa. `TYPE_ROTATION_VECTOR`: quaternion, heading from magnetic north.
  * - Front, beside the display (ams TCS3720): `xiaomi.sensor.front_cct_strm` (continuous) [0] CCT K, [8] lux;
  *   `xiaomi.sensor.front_cct` (on change) [0] CCT K, [3] lux; any phone's `TYPE_LIGHT` [0] lux.
@@ -80,6 +85,7 @@ class AuxSensors(
     private val light: LightSide? get() = if (frontCamera) frontLight else rearLight
     private val flickerSensor: Sensor? = find(FLICKER_TYPE)
     private val tofSensor: Sensor? = find(TOF_TYPE)
+    private val tofLayout: TofLayout = tofLayoutFor(tofSensor?.name)
     private val pressureSensor: Sensor? = runCatching { manager?.getDefaultSensor(Sensor.TYPE_PRESSURE) }.getOrNull()
     private val rotationSensor: Sensor? = runCatching { manager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) }.getOrNull()
 
@@ -234,7 +240,7 @@ class AuxSensors(
 
     private fun tofListener() = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
-            tofDistanceMm = tofDistanceMm(event.values)
+            tofDistanceMm = tofDistanceMm(event.values, tofLayout)
             tofAtNanos = nowNanos()
             publish()
         }
@@ -318,17 +324,34 @@ class AuxSensors(
         /** The VI5300 reads about -5 mm when covered and reports up to 4 m. */
         const val MIN_TOF_MM = 10f
         const val MAX_TOF_MM = 4_000f
-        /** The VI5300's range status for a real target; with no target it reads 255 and a made-up distance. */
+        /** The range status for a real target; the VI5300 reads 255 and a made-up distance with none. */
         const val TOF_STATUS_VALID = 0f
+        /** The ST L8 summary: four distance/status pairs, horizontal bands from the top of the frame. */
+        const val TOF_BANDS = 4
+
+        /** How a ToF event lays out its values, from the sensor's name (the L8 says so, the VI5300 does not). */
+        internal fun tofLayoutFor(name: String?): TofLayout =
+            if (name != null && Regex("""\bL8\b""", RegexOption.IGNORE_CASE).containsMatchIn(name)) TofLayout.Bands
+            else TofLayout.Single
 
         /**
-         * The distance of a ToF event, or null when there is no real target: out of range, or a status
-         * other than valid. An event without a status (one value) is taken at its distance.
+         * The distance of a ToF event, or null when no zone in use has a real target (out of range, or a
+         * status other than valid). An event without a status (one value) is taken at its distance.
+         *
+         * Single zone: that distance. Bands: the nearer of the two middle bands, which hold the centre of
+         * the frame in portrait and landscape alike (the top and bottom bands often see the floor, a desk or
+         * a corridor behind the subject).
          */
-        internal fun tofDistanceMm(values: FloatArray): Float? {
-            val status = values.getOrNull(1)
-            if (status != null && status != TOF_STATUS_VALID) return null
-            return values.getOrNull(0)?.takeIf { it.isFinite() && it in MIN_TOF_MM..MAX_TOF_MM }
+        internal fun tofDistanceMm(values: FloatArray, layout: TofLayout = TofLayout.Single): Float? {
+            fun zone(index: Int): Float? {
+                val status = values.getOrNull(index * 2 + 1)
+                if (status != null && status != TOF_STATUS_VALID) return null
+                return values.getOrNull(index * 2)?.takeIf { it.isFinite() && it in MIN_TOF_MM..MAX_TOF_MM }
+            }
+            return when (layout) {
+                TofLayout.Single -> zone(0)
+                TofLayout.Bands -> listOfNotNull(zone(1), zone(2)).minOrNull()
+            }
         }
         const val MAX_CCT_K = 25_000f
 
@@ -356,3 +379,11 @@ internal fun isFrontCamera(context: Context, cameraId: String): Boolean = runCat
         ?.get(android.hardware.camera2.CameraCharacteristics.LENS_FACING) ==
         android.hardware.camera2.CameraCharacteristics.LENS_FACING_FRONT
 }.getOrDefault(false)
+
+/** How a ToF sensor lays out its event values. */
+internal enum class TofLayout {
+    /** One distance and its status ([0], [1]): the Xiaomi 15's VI5300. */
+    Single,
+    /** Four distance/status pairs, horizontal bands from the top of the frame: the Xiaomi 17 Ultra's ST L8. */
+    Bands
+}

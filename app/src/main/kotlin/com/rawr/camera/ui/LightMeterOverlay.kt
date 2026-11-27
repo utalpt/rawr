@@ -79,11 +79,13 @@ internal fun LightMeterOverlay(
     orientation: Orientation,
     modifier: Modifier = Modifier,
     /** Manual focus at a ToF distance (FocusControls.kt tofFocusNormalized); null = the pill is not tappable. */
-    focusAtDistance: ((Float) -> Boolean)? = null
+    focusAtDistance: ((Float) -> Boolean)? = null,
+    /** The ToF distance to show and focus at (AuxSensorReading.kt tofDistanceForFocus); null hides it. */
+    tofForFocus: (AuxSensorReading) -> Float? = { it.tofDistanceMm }
 ) {
     val source = LocalAuxSensors.current ?: return
     val reading by source.collectAsStateWithLifecycle()
-    val current = reading ?: return
+    val current = reading?.let { it.copy(tofDistanceMm = tofForFocus(it)) } ?: return
     if (current.lux == null && current.cctK == null && !current.flickerSensor && current.tofDistanceMm == null) return
     val text = lightMeterText(current, exposureTimeNs)
     val haptics = LocalCaptureHaptics.current

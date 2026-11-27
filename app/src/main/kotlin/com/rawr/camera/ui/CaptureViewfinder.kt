@@ -34,6 +34,7 @@ import com.rawr.camera.architecture.PickWhiteBalanceAt
 import com.rawr.camera.architecture.ToggleMonitorPanel
 import com.rawr.camera.architecture.ToggleWhiteBalancePanel
 import com.rawr.camera.model.*
+import com.rawr.camera.integration.tofDistanceForFocus
 
 @Composable
 internal fun CaptureViewfinder(
@@ -367,6 +368,7 @@ internal fun CaptureViewfinder(
                 LightMeterOverlay(
                     exposureTimeNs = state.appliedExposureTimeNs,
                     orientation = state.orientation,
+                    tofForFocus = { tofDistanceForFocus(it, state.focus, state.capabilities.manualFocus) },
                     focusAtDistance = { mm ->
                         tofFocusNormalized(mm, state.capabilities.manualFocus)?.let {
                             dispatch(com.rawr.camera.architecture.SetManualFocus(it))

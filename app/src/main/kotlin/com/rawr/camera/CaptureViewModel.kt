@@ -21,6 +21,7 @@ import com.rawr.camera.settings.model.effectiveLensProfiles
 import com.rawr.camera.integration.NativeCaptureScreenController
 import com.rawr.camera.integration.RawPreviewCoordinator
 import com.rawr.camera.integration.StillCaptureCoordinator
+import com.rawr.camera.integration.tofDistanceForFocus
 import com.rawr.camera.model.FilmSimQuickState
 import com.rawr.camera.model.HighlightQuickMode
 import com.rawr.camera.model.RenderProfileQuickState
@@ -126,7 +127,13 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             onDngPublished = ::refreshLatestGalleryImage,
             gpsSnapshot = cameraLocation::snapshot,
             levelSnapshot = levelSensor::snapshot,
-            ambientSnapshot = auxSensors::snapshot
+            // The DNG records the ToF distance the viewfinder offers: none at the sky (tofDistanceForFocus).
+            ambientSnapshot = {
+                auxSensors.snapshot()?.let { reading ->
+                    val state = controller.state.value
+                    reading.copy(tofDistanceMm = tofDistanceForFocus(reading, state.focus, state.capabilities.manualFocus))
+                }
+            }
         )
     val controller: CaptureScreenController =
         NativeCaptureScreenController(

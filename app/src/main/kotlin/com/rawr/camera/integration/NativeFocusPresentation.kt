@@ -31,6 +31,7 @@ internal object NativeFocusPresentation {
     ): FocusUiState {
         val telemetry = current.copy(
             appliedFocusDiopters = snapshot.appliedFocusDistance,
+            afFocused = snapshot.afState == 2 || snapshot.afState == 4,
             backendNativeReadout = if (distanceReadoutTrustworthy)
                 snapshot.appliedFocusDistance?.let(ExposureFormat::formatFocusDistance) else null
         )
