@@ -400,12 +400,11 @@ Java_com_rawr_camera_renderer_RendererNative_render(JNIEnv* e, jobject, jlong id
                 tone.aePostGain = std::clamp(wanted, 1.0f, kMaxGain);
                 // Past the gain limit the rest goes to the render exposure (after
                 // the shadow lift in tonemap.comp), at most 3 EV; with local tone
-                // mapping on (the import's default) its shadow lift does that
-                // instead, keeping the highlights in range.
-                const float extraEv =
-                    rawr::local_tone::fusionActive(tone.localTone.shadowsEv)
-                        ? 0.0f
-                        : std::clamp(std::log2(wanted / float(tone.aePostGain)), 0.0f, 3.0f);
+                // mapping on (the import's default) at most 1 EV: its shadow lift
+                // does the rest and its highlight protection (2 EV) keeps the
+                // window in range (r8: 0 EV left the AE shots at median 60/255).
+                const float extraEv = std::clamp(std::log2(wanted / float(tone.aePostGain)), 0.0f,
+                                                 rawr::local_tone::fusionActive(tone.localTone.shadowsEv) ? 1.0f : 3.0f);
                 tone.exposureEV += extraEv;
                 if (o.context.ultraHdrEnabled)
                     o.context.gainmapParams.hdrExposure =
