@@ -19,6 +19,7 @@
 #include <utility>
 
 #include "camera/CameraControlCapabilities.h"
+#include "imaging/LoficGrab.h"
 #include "imaging/RawPixelSource.h"
 #include "camera/CameraDiscovery.h"
 #include "camera/CameraKeyInjection.h"
@@ -144,6 +145,7 @@ void CameraDeviceSession::releaseLoficReaders(bool orphan) noexcept {
         *reader = nullptr;
     }
     loficVideoWindow_ = loficShortWindow_ = nullptr;
+    imaging::LoficGrab::instance().setActive(false);
     CameraRequestPipeline::loficBareHold.store(false, std::memory_order_relaxed);
     if (orphan) (void)loficBare_.release();
     else loficBare_.reset();
@@ -171,6 +173,21 @@ ANativeWindow* CameraDeviceSession::addDrainedReader(uint32_t width, uint32_t he
             static std::atomic<uint32_t> counter{0};
             AImage* image = nullptr;
             while (AImageReader_acquireNextImage(r, &image) == AMEDIA_OK && image) {
+                if (imaging::LoficGrab::instance().wanted()) {
+                    uint8_t* data = nullptr;
+                    int length = 0;
+                    int32_t width = 0, height = 0;
+                    int64_t timestampNs = 0;
+                    AImage_getWidth(image, &width);
+                    AImage_getHeight(image, &height);
+                    AImage_getTimestamp(image, &timestampNs);
+                    if (AImage_getPlaneData(image, 0, &data, &length) == AMEDIA_OK && data && width > 0) {
+                        const size_t rowBytes = size_t(width) / 4u * 5u;
+                        const uint32_t rows = imaging::filledRows(
+                            data, rowBytes, uint32_t(std::min<int64_t>(height, int64_t(length) / int64_t(rowBytes))));
+                        imaging::LoficGrab::instance().offerShort(timestampNs, data, uint32_t(width), rows);
+                    }
+                }
                 if ((counter++ % 90u) == 0u) {
                     uint8_t* data = nullptr;
                     int length = 0;
@@ -806,6 +823,7 @@ bool CameraDeviceSession::createSession(ANativeWindow* window, const std::option
         outputs.push_back({loficShortWindow_, std::string(), 0});
         outputs.push_back({rawWindow_, std::string(), recipe.rawStreamUseCase});
         diag("CAMERA_LOFIC_LAYOUT outputs=" + std::to_string(outputs.size()) + " long=last template=record");
+        imaging::LoficGrab::instance().setActive(true);
     }
 
     auto* callbackContext = callbacks.sessionContext(generation_);

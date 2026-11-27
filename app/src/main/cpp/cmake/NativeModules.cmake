@@ -42,6 +42,7 @@ rawrcam_module(imaging
     imaging/FrameIngressQueue.cpp
     imaging/Raw16CpuSnapshot.cpp
     imaging/RawPixelSource.cpp
+    imaging/LoficGrab.cpp
 )
 
 rawrcam_module(vulkan

@@ -6,6 +6,7 @@
 #include "camera/CameraResultReader.h"
 #include "diagnostics/logging/RuntimeTraceRecorder.h"
 #include "metadata/CameraMetadataReader.h"
+#include "imaging/LoficGrab.h"
 #include "metadata/MetadataDiagnostics.h"
 
 namespace rawrcam::camera {
@@ -42,6 +43,17 @@ CameraResultActions CameraResultProcessor::process(const CameraRequest* requestC
         frame->blackLevelPhysicalRggb = staticLevels->blackRggb;
         frame->effectiveWhiteLevel = staticLevels->white;
         frame->effectiveWhiteLevelSource = metadata::EffectiveWhiteLevelSource::ProfileStatic;
+    }
+    if (frame && cameraContext && cameraContext->rawPacked14) {
+        // LOFIC photos: the frame's ISO, shutter and as-shot neutral (else the inverse of the AWB gains).
+        std::array<float, 3> neutral = frame->neutralColorPoint;
+        if (!frame->hasNeutralColorPoint) {
+            const auto& g = frame->colorCorrectionGainsRggb;
+            const float green = 0.5f * (g[1] + g[2]);
+            neutral = {g[0] > 0 ? green / g[0] : 0.0f, 1.0f, g[3] > 0 ? green / g[3] : 0.0f};
+        }
+        imaging::LoficGrab::instance().offerResult(int64_t(frame->timestampNs), frame->sensitivity,
+                                                   frame->exposureTimeNs, neutral);
     }
     if (frame) {
         frame->requestedExposureTimeNs = requestObservation.exposureTimeNs;

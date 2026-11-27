@@ -154,6 +154,17 @@ class StillCaptureCoordinator(
         CameraSounds.shutter(input.settings.shutterSound)  // Rawr 17U fork: Settings > Photo > Shutter Sound
         var accepted = false
         try {
+            // Rawr 17U fork: the "1x LOFIC" lens takes its photo from the viewfinder's Long/Short pair (L2); the
+            // app's own still path is left out (it would read the packed Long as RAW16).
+            if (com.rawr.camera.lofic.LoficSaver.handles()) {
+                com.rawr.camera.lofic.LoficSaver.capture(application) { message ->
+                    Log.i(TAG, message)
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        android.widget.Toast.makeText(application, message, android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+                return 0L
+            }
             val id = captureInternal(format.jpeg, input)
             accepted = id != 0L
             return id

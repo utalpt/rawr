@@ -441,6 +441,7 @@ add_library(rawrcam_native SHARED
   jni/SessionEngineApi.cpp
   jni/NativeEngineJni.cpp
   jni/StabilizerJni.cpp
+  jni/LoficJni.cpp
   jni/DevelopSettingsReader.cpp
   jni/VideoGpuProbeJni.cpp
   jni/EncoderAbProbeJni.cpp
