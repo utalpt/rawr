@@ -63,9 +63,15 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   Rawr: Ed's #150.)*
 
 **Lenses and controls**
-- One lens button per focal length (0.6x, 1x, 3.2x, 4.3x; the periscope moves to 100 mm for 4.3x) with a
+- One lens button per focal length (0.6x, 1x, tele) with a
   variant picker: `Normal`, `50MP`, `200>50` / `200>25` / `200 SF`, `ISZ` (in-sensor zoom) and the dual-gain
   readouts `DCG`, `DSG`, `DAG` (14-bit, with a per-lens ISO cap).
+- **Tele optical zoom from 75 to 100 mm:** the periscope moves to any focal length in between (one tele
+  button, named by the zoom the optics are at, 3.2x to 4.3x), from a **TELE** cell in the exposure row. Settings
+  > Capture > Tele Zoom Control picks the control: **Bar** (presets and a FOCAL tape above the exposure row) or
+  **Wheel**, **Dial** or **Rocker** on the viewfinder's edge, reused from the
+  [Telezoom](https://github.com/utalpt/x17u-telezoom) module. EXIF and DNG name the real focal length. The
+  vendor tags were found by Anton Tretiakov (@designation_zero).
 - Lens bar grouping (Auto / Grouped / All) and button size (Compact / Normal / Large), from the eye panel.
 - **Exposure memory** (Settings > Viewfinder & controls > Control Style): **Per camera**, each lens keeps its own exposure mode,
   ISO, shutter, EV and WB, or **Shared**, one set for every lens (focus stays per lens).
@@ -106,6 +112,8 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
 - **Scopes:** translucent, borderless cards with the mode in the corner (LUMA, RGB, PARADE, VECTOR), lines at
   0/50/100% and clipping in red, and an **RGB PARADE** waveform mode; they hide while a film card is held.
 - **Scrub readout:** a slim capsule near the top of the viewfinder while a control is scrubbed.
+- **Shutter Sound** (off by default): the system's camera sounds for photos and for the start and end of a
+  recording, the start tone played before the microphone opens. Asked for by @iG0Lka_ru.
 - **Settings by intent:** Photo, Look, RAW development, Video, Viewfinder & controls, Lenses, System, with a
   **search** whose index is generated at build time from the settings pages (a result opens its page with
   the setting highlighted). The lens editor keeps the basics on the lens page and the sensor tuning under
@@ -134,6 +142,8 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
 - **60 fps sensor modes:** the blank rows they pad are left out of the viewfinder, metering and recording
   (`image.cropEdgesHighFps`), on the rear lenses and the front camera. *(Already in Rawr: Ed's #150.)*
 - **Open Gate** at 60 fps records 3408x2560 (4:3), the same box as the viewfinder; 4096x3072 at 30 fps.
+- **The tele's DCG and ISZ record at 30 fps** (their sensor modes run 30; at 60 the camera HAL aborted), with the
+  fps button showing 30 there; the ceiling check is the-marox's from his PR #3.
 - **Recording aspect ratios (cinema formats):** 1.43:1 IMAX 70mm, 1.66:1 European, 1.85:1 Flat, 1.90:1 DCI /
   IMAX digital, 2:1 Univisium, 2.20:1 Todd-AO 70mm, 2.39:1 Scope, 2.76:1 Ultra Panavision 70 and XPan
   65:24.
@@ -155,7 +165,7 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
 - GLES bridge for RAW16 where the Vulkan driver refuses the camera buffers, and for RAW10, whose packed MIPI
   plane the bridge's compute shader decodes to 16-bit on the GPU (no CPU copy, no downgraded preview); 60 fps
   only where a sensor mode
-  delivers the RAW stream; sensed flicker for AE; ToF focus and light-sensor WB (both also work on the
+  delivers the RAW stream (on the 17 Ultra, the same check now holds the tele's DCG and ISZ at 30 fps); sensed flicker for AE; ToF focus and light-sensor WB (both also work on the
   17 Ultra); 1080p from the full sensor width. The mirrored-lens preview fix of #3 is *(already in Rawr:
   Ed's #150)*.
 - The HEVC encoder prepared before the shutter and split YUV drop counters (#7, #8), the sensor mode behind a

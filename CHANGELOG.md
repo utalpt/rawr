@@ -4,15 +4,57 @@ Fork of [Rawr](https://github.com/adityawarmanfw/rawr) for the Xiaomi 17 Ultra.
 Releases follow Ed's version: `0.5.1-17u.N`. Test work lands on `yuv-probe`
 first and moves to `xiaomi-17u` once verified.
 
-## Unreleased (on the `debug` build, not in a release yet)
+## 0.5.1-17u.15
 
-### Camera
+The tele's optical zoom from 75 to 100 mm with one tele button and four controls to pick from, the tele's DCG and
+ISZ video held at the 30 fps they run, and an optional shutter sound, checked on the Xiaomi 17 Ultra. No sync
+with Ed's main in this release (still up to #165).
 
-- Shutter Sound (Settings → Photo, off by default): the system's camera sounds, through Android's MediaActionSound -
-  the shutter click on a photo, and the start and stop tones of a video recording. The start tone plays before the
-  microphone opens, so it is not recorded into the video. Where the law asks for the shutter sound
-  (MediaActionSound.mustPlayShutterSound, for example Japan and Korea) it plays even when off. Asked for by
-  @iG0Lka_ru in the Telegram group.
+### Tele optical zoom
+
+- The periscope's optics move to any focal length from 75 to 100 mm (3.2x to 4.3x), through the vendor key the
+  4.3x lenses already send (`xiaomi.zoomRatio.debug.setZoomRatioCode`) on the running request, so with no new
+  camera session. The vendor tags were found by Anton Tretiakov (@designation_zero); the mm-to-value mapping is
+  the one of the Telezoom module ([utalpt/x17u-telezoom](https://github.com/utalpt/x17u-telezoom)).
+- One tele button: the 3.2x lenses are the 4.3x ones at 75 mm, so the lens bar keeps only the movable ones and
+  names them by the zoom the optics are at (3.2x, 3.6x, 3.8x, 4.3x...). A saved 3.2x choice opens the same mode
+  at 75 mm. The 4.3x DCG gets the 3.2x DCG's ISO cap (320), missing from its profile.
+- A **TELE** cell in the exposure row on the tele: a tap opens the zoom control, the cell scrubs too, a double
+  tap goes back to 100 mm. The focal length is kept between launches and across the tele's modes.
+- **Settings > Capture > Tele Zoom Control** picks the control: **Bar** (a sheet above the exposure row in the WB
+  strip's style, with 75 / 85 / 90 / 100 mm presets and a FOCAL tape that slides under a fixed mark), or
+  **Wheel**, **Dial** or **Rocker**, vertical on the viewfinder's right edge. The bars are reused from the
+  Telezoom module ([utalpt/x17u-telezoom](https://github.com/utalpt/x17u-telezoom), its Wheel, Arc and Rocker),
+  redrawn for Rawr.
+- EXIF and DNG name the focal length the optics were at (the HAL reports the 75 mm end at every position).
+- While recording, a finger on the revealed controls keeps them up (they hid 3 s after the swipe, even under a
+  TELE drag).
+- Checked on the 17U: framing at 75 / 85 / 90 / 100 mm (the optics move, 4080x3072 every time), 255 zoom
+  changes in one session all accepted, EXIF / DNG 19.9 mm (75) and 26.53 mm (100), the four controls, no camera
+  error in photo or video.
+
+### Video
+
+- The tele's DCG and ISZ hold the sensor in a 30 fps mode (`current_mode` 6 and 9, 4080x3072@30 in the vendor
+  sensor-mode table); asked for 60 fps, the camera HAL aborted and reconnected every few seconds
+  (CamxResultExtIFEEPRFail). On the 17 Ultra the sensor-mode fps ceiling from the-marox's PR #3 now also applies
+  to lenses held in one mode, so they record at 30 with 60 chosen, and the fps button and the recording monitor
+  show 30 there (60 comes back on the other modes). A lens without the chosen rate records at the next one down
+  instead of not recording.
+- Checked on the 17U: DCG with 60 chosen records 4K30 (1006 frames in 33.5 s, no gaps), no HAL abort; 1x Normal
+  still records 60 (59.9 fps).
+
+### Camera sounds
+
+- **Shutter Sound** (Settings > Capture, off by default): the system's camera sounds through Android's
+  MediaActionSound - the shutter click on a photo, and the start and stop tones of a video recording. The start
+  tone plays before the microphone opens, so it is not recorded into the video. Where the law asks for the
+  shutter sound (MediaActionSound.mustPlayShutterSound, for example Japan and Korea) it plays even when off.
+  Asked for by @iG0Lka_ru in the Telegram group. On the debug build since 27 Nov.
+- Checked on the 17U: click and both tones heard; the start tone is not in the file (loudest point -41 dB);
+  the stop tone is not recorded either.
+
+Not in this release: the-marox's #6 (ToF on the 17 Ultra), #10, #11 and #15.
 
 ## 0.5.1-17u.14
 
