@@ -377,6 +377,41 @@ Java_com_rawr_camera_renderer_RendererNative_render(JNIEnv* e, jobject, jlong id
         s->source.wb = {wb[0], (wb[1] + wb[2]) * .5f, wb[3]};
         array("cameraToLinearSrgbRowMajor", s->source.cameraToSrgb.data(), 9);
         s->source.dcpWeight1 = std::clamp(float(frame.number("calibrationWeight1", s->source.dcpWeight1)), 0.0f, 1.0f);
+        // Rawr 17U fork: float DNGs from other apps (LOFIC) leave the Long several
+        // stops under a normal exposure (the phone tone-maps it up). The gain the
+        // import set (2^BaselineExposure) rises until the scene key sits at the
+        // Natural target, at most 64x (the tonemapper's limit, the rest as render
+        // exposure); the shadow lift then works on top as on any capture.
+        if (!s->source.rawr && s->source.info().sample_format == TINYDNG_SAMPLEFORMAT_IEEEFP) {
+            if (!s->measuredKey || s->measuredKey->shading != o.shading || s->measuredKey->whiteBalance != s->source.wb)
+                s->measuredKey = Session::MeasuredKey{
+                    o.shading, s->source.wb,
+                    rawrcam::renderer::measureSceneKey(
+                        s->source, o.shading, s->source.wb,
+                        rawrcam::color::math::cameraToWorkingColumnMajor(s->source.cameraToSrgb))};
+            auto& tone = o.context.tonemapParams;
+            if (s->measuredKey->key && std::isfinite(s->measuredKey->key->keyEv)) {
+                constexpr float kMaxGain = 64.0f;
+                const float base = std::clamp(float(tone.aePostGain), 1.0e-6f, kMaxGain);
+                const float wanted = std::exp2(std::log2(rawrcam::color::autoKeyPolicy(
+                                                   rawrcam::color::AutoKeyMode::Natural).targetLuma) -
+                                               s->measuredKey->key->keyEv);
+                tone.aePostGain = std::clamp(wanted, base, kMaxGain);
+                // Past the gain limit the rest goes to the render exposure (after
+                // the shadow lift in tonemap.comp), at most 3 EV.
+                const float extraEv = std::clamp(std::log2(wanted / float(tone.aePostGain)), 0.0f, 3.0f);
+                tone.exposureEV += extraEv;
+                if (o.context.ultraHdrEnabled)
+                    o.context.gainmapParams.hdrExposure =
+                        o.context.filmEnabled ? std::exp2(rawrcam::color::filmExposureEv(
+                                                    o.context.filmLook, float(tone.aePostGain), float(tone.exposureEV)))
+                                              : float(tone.aePostGain) * std::exp2(float(tone.exposureEV));
+                __android_log_print(ANDROID_LOG_INFO, "RawrRenderer",
+                                    "FLOAT_DNG_GAIN keyEv=%.2f base=%.2f gain=%.2f extraEv=%.2f",
+                                    double(s->measuredKey->key->keyEv), double(base), double(tone.aePostGain),
+                                    double(extraEv));
+            }
+        }
         resolveAdaptiveTone(*s, o);
         const auto proxyPath = path + ".proxy";
         if (o.bayerBin2x) path += "-natural2x-f32-v1";

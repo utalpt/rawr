@@ -191,13 +191,15 @@ internal class RendererStore private constructor(private val context: Context) {
         val resolved = ext?.optString("com.rawrcam.processing.resolved.v1")?.takeIf { it.isNotBlank() }?.let(::JSONObject)
         val frame = ext?.optString("com.rawrcam.processing.frame.v1")?.takeIf { it.isNotBlank() }?.let(::JSONObject)
         // Rawr 17U fork: a float DNG from another app (LOFIC) has no capture gain
-        // or shadow lift; it is seen at its BaselineExposure (LOFIC keeps 1.0 at
-        // the Short's clip, stops above the scene) with the Strong lift, as the
-        // phone's LOFIC exposure leaves the Long dark for its own tone mapping.
+        // or shadow lift; it is seen at least at its BaselineExposure (LOFIC keeps
+        // 1.0 at the Short's clip, stops above the scene; 6 EV at most, the
+        // tonemapper's 64x gain limit) with the Strong lift, as the phone's LOFIC
+        // exposure leaves the Long dark for its own tone mapping. The renderer
+        // raises the gain further from the scene key (RendererJni).
         val floatDng = if (!rawr && resolved == null) FloatDngInfo.read(repository.source(job))?.takeIf { it.floatSamples } else null
         val frozen = JSONObject(original).apply {
             put("aePostGain", resolved?.optDouble("aePostGain", 1.0)
-                ?: floatDng?.baselineExposure?.let { Math.pow(2.0, it.coerceIn(-8.0, 16.0)) } ?: 1.0)
+                ?: floatDng?.baselineExposure?.let { Math.pow(2.0, it.coerceIn(-8.0, 6.0)) } ?: 1.0)
             if (floatDng != null) put("adaptiveToneMode", FLOAT_DNG_LIFT)
             resolved?.optJSONObject("tonemap")?.optJSONObject("adaptiveTone")?.let { put("adaptiveTone", it) }
             resolved?.optJSONObject("tonemap")?.optJSONObject("localTone")?.let { put("localTone", it) }
