@@ -709,7 +709,7 @@ data class SettingsValues(
     /** Photo aspect ratio id (PhotoAspect); crops the JPEG only. */
     val photoAspectId: String = "native",
     /** Rawr 17U fork: the tele's optical zoom on the 4.3x lenses, 75 to 100 mm (TeleOpticalZoom). */
-    val teleZoomMm: Int = 100,
+    val teleZoomMm: Int = 75,
     val videoLogProfile: VideoLogProfile = VideoLogProfile.LogC3,
     val pipelineDiagnosticsEnabled: Boolean = false,
     val experimentalZeroCopyEnabled: Boolean = true,

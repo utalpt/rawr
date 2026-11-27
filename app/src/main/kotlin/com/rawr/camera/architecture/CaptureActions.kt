@@ -25,7 +25,7 @@ data class RestoreCapturePreferences(
     val videoLogEnabled: Boolean = false,
     val videoAspect: com.rawr.camera.video.VideoAspect = com.rawr.camera.video.VideoAspect.Native,
     val photoAspect: com.rawr.camera.model.PhotoAspect = com.rawr.camera.model.PhotoAspect.Native,
-    val teleZoomMm: Int = com.rawr.camera.model.TeleOpticalZoom.MAX_MM,
+    val teleZoomMm: Int = com.rawr.camera.model.TeleOpticalZoom.MIN_MM,
     val selfTimer: com.rawr.camera.settings.model.SelfTimer =
         com.rawr.camera.settings.model.SelfTimer.Off
 ) : PresentationCaptureAction

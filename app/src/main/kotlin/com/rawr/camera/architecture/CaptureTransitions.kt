@@ -42,9 +42,12 @@ object CaptureTransitions {
                 appliedFocusDiopters = null
             )
 
+        // Rawr 17U fork: a saved "3.2x ..." lens (no longer in the profile) is the "4.3x ..." one at 75 mm.
+        val legacyTele = TeleOpticalZoom.legacyFixedLens(state.selectedLensId, capabilities.lenses)
         val selectedLensId =
             state.selectedLensId
                 .takeIf { id -> capabilities.lenses.any { it.id == id } }
+                ?: legacyTele
                 ?: capabilities.lenses.first().id
 
         // White-balance intent survives a camera change only when the new
@@ -87,6 +90,7 @@ object CaptureTransitions {
             rawFps = null,
             viewfinderFps = null,
             selectedLensId = selectedLensId,
+            teleZoomMm = if (legacyTele != null && selectedLensId == legacyTele) TeleOpticalZoom.MIN_MM else state.teleZoomMm,
             whiteBalanceMode = reconciledWhiteBalanceMode,
             whiteBalanceTemperatureK =
                 state.whiteBalanceTemperatureK.coerceIn(
@@ -374,8 +378,12 @@ object CaptureTransitions {
             (!state.filmSimEnabled || state.captureMode == CaptureMode.Video) &&
             !(state.captureMode == CaptureMode.Video && state.videoLogEnabled)
 
-    fun selectLens(state: CaptureUiState, lensId: String): CaptureUiState =
-        if (state.capabilities.lenses.any { it.id == lensId }) state.copy(selectedLensId = lensId) else state
+    fun selectLens(state: CaptureUiState, lensId: String): CaptureUiState {
+        if (state.capabilities.lenses.any { it.id == lensId }) return state.copy(selectedLensId = lensId)
+        // Rawr 17U fork: a saved "3.2x ..." lens (no longer in the profile) opens the "4.3x ..." one at 75 mm.
+        val twin = TeleOpticalZoom.legacyFixedLens(lensId, state.capabilities.lenses) ?: return state
+        return state.copy(selectedLensId = twin, teleZoomMm = TeleOpticalZoom.MIN_MM)
+    }
 
     fun setManualFocus(state: CaptureUiState, normalized: Float): CaptureUiState {
         if (state.focus.mode != FocusMode.Mf || !state.capabilities.manualFocus.supported) return state

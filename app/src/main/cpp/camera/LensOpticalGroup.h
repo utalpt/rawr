@@ -14,7 +14,7 @@ struct LensRoute;
 
 // The same, split further by an optical zoom position the lens asks the HAL for: a periscope that moves
 // its optics per request (Xiaomi 17 Ultra tele, xiaomi.zoomRatio.debug.setZoomRatioCode) is one camera id
-// but two focal lengths, so 3.2x and 4.3x get their own lens buttons.
+// but two focal lengths (75 to 100 mm on the 4.3x lenses, TeleOpticalZoom on the Kotlin side).
 [[nodiscard]] std::string lensOpticalGroup(const LensRoute& route);
 
 }  // namespace rawrcam::camera

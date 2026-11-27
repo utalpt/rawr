@@ -49,6 +49,15 @@ class TeleOpticalZoomTwinTest {
     }
 
     @Test
+    fun savedFixedTeleLensesOpenTheMovableOne() {
+        val profile = lenses.filterNot { it.id.startsWith("3.2x ") }
+        assertEquals("4.3x DCG", TeleOpticalZoom.legacyFixedLens("3.2x DCG", profile))
+        assertEquals("4.3x Normal", TeleOpticalZoom.legacyFixedLens("3.2x Normal", profile))
+        assertNull(TeleOpticalZoom.legacyFixedLens("3.2x ISZ", profile))
+        assertNull(TeleOpticalZoom.legacyFixedLens("1x Normal", profile))
+    }
+
+    @Test
     fun buttonNamesFollowTheOptics() {
         assertEquals("3.2x DCG", TeleOpticalZoom.displayName(lenses[4], 75))
         assertEquals("3.6x Normal", TeleOpticalZoom.displayName(lenses[3], 85))

@@ -148,7 +148,7 @@ data class CaptureUiState(
     /** Photo aspect ratio; crops the JPEG, never the DNG. */
     val photoAspect: PhotoAspect = PhotoAspect.Native,
     /** Rawr 17U fork: the tele's optical zoom on the 4.3x lenses, 75 to 100 mm (TeleOpticalZoom). */
-    val teleZoomMm: Int = TeleOpticalZoom.MAX_MM,
+    val teleZoomMm: Int = TeleOpticalZoom.MIN_MM,
     val jpegEnabled: Boolean = true,
     val dngEnabled: Boolean = true,
     val grid: GridMode = GridMode.Off,

@@ -86,10 +86,10 @@ internal fun CompactTeleZoomButton(state: CaptureUiState, dispatch: CaptureDispa
         icon = Icons.Outlined.Tune,
         title = "TELE",
         valueText = valueText,
-        locked = mm != TeleOpticalZoom.MAX_MM || TeleZoomSheetState.open || TeleZoomSheetState.alwaysOn,
+        locked = mm != TeleOpticalZoom.MIN_MM || TeleZoomSheetState.open || TeleZoomSheetState.alwaysOn,
         testTag = COMPACT_TELE_ZOOM,
         semanticsDescription = "Tele optical zoom $valueText. Tap for the zoom sheet, scrub to adjust, " +
-            "double tap for ${TeleOpticalZoom.MAX_MM} mm.",
+            "double tap for ${TeleOpticalZoom.MIN_MM} mm.",
         scaleLabels = labels,
         scaleIndex = index,
         modifier = modifier
@@ -105,7 +105,7 @@ internal fun CompactTeleZoomButton(state: CaptureUiState, dispatch: CaptureDispa
                     onDoubleTap = {
                         if (!dragging) {
                             haptics.selection()
-                            dispatch(SetTeleZoomMm(TeleOpticalZoom.MAX_MM))
+                            dispatch(SetTeleZoomMm(TeleOpticalZoom.MIN_MM))
                         }
                     }
                 )

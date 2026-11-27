@@ -48,6 +48,16 @@ object TeleOpticalZoom {
         }
     }
 
+    /**
+     * The movable lens for a saved id of a fixed 75 mm tele lens that is no longer in the profile ("3.2x DCG" ->
+     * "4.3x DCG"). Null when the id is not one of those or the twin is missing.
+     */
+    fun legacyFixedLens(id: String, lenses: List<LensCapability>): String? {
+        if (!id.startsWith("3.2x ")) return null
+        val twin = "4.3x " + id.removePrefix("3.2x ")
+        return lenses.firstOrNull { it.id == twin && supports(it) }?.id
+    }
+
     /** The lens bar's lenses: the fixed tele lenses that have a movable twin are left out. */
     fun visibleLenses(lenses: List<LensCapability>): List<LensCapability> = lenses.filter { twinOf(it, lenses) == null }
 
