@@ -4,7 +4,10 @@ Fork of [Rawr](https://github.com/adityawarmanfw/rawr) for the Xiaomi 17 Ultra.
 Releases follow Ed's version: `0.5.1-17u.N`. Test work lands on `yuv-probe`
 first and moves to `xiaomi-17u` once verified.
 
-## Unreleased (on the `debug` build, not in a release yet)
+## 0.5.1-17u.16
+
+Tape, a fifth look for the tele's zoom control, a see-through Dial, and the settings path fixed in the notes.
+Checked on the Xiaomi 17 Ultra. No sync with Ed's main (still up to #165).
 
 ### Tele optical zoom
 
@@ -14,6 +17,7 @@ first and moves to `xiaomi-17u` once verified.
   ticks and labels of the edge controls are neutral white instead of blue-tinted.
 - The settings path in the 0.5.1-17u.15 notes and the README: Shutter Sound, Tele Zoom Control and Tele Zoom
   Always On are in **Settings > Photo > Capture** (not "Settings > Capture").
+- Checked on the 17U: Bar, Tape, Wheel, Dial and Rocker on the tele (75 to 100 mm), Tele Zoom Always On.
 
 ## 0.5.1-17u.15
 
