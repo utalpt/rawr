@@ -113,6 +113,9 @@ class LoficActivity : Activity() {
 
     private val results = LinkedHashMap<Long, TotalCaptureResult>()
 
+    // White balance of the newest result that had one: some frames come back without it.
+    @Volatile private var lastNeutral: Array<Rational>? = null
+
     @Volatile private var setup = LoficSetup.FOUR_THREE_30
     @Volatile private var autoExposure = true
     @Volatile private var exposureNs = 1_000_000L
@@ -509,6 +512,21 @@ class LoficActivity : Activity() {
         }
     }
 
+    /** AsShotNeutral of a result: the HAL's neutral point, otherwise the inverse of its white balance gains. */
+    private fun neutralOf(result: CaptureResult): Array<Rational>? {
+        result.get(CaptureResult.SENSOR_NEUTRAL_COLOR_POINT)?.let { n ->
+            if (n.size == 3 && n.all { it.toDouble() > 0.0 }) return n
+        }
+        val g = result.get(CaptureResult.COLOR_CORRECTION_GAINS) ?: return null
+        val green = (g.greenEven + g.greenOdd) / 2f
+        if (g.red <= 0f || green <= 0f || g.blue <= 0f) return null
+        return arrayOf(
+            Rational((green / g.red * 1_000_000f).toInt(), 1_000_000),
+            Rational(1, 1),
+            Rational((green / g.blue * 1_000_000f).toInt(), 1_000_000)
+        )
+    }
+
     private fun <T> readResult(result: CaptureResult, key: CaptureResult.Key<T>): T? =
         try { result.get(key) } catch (ignored: IllegalArgumentException) { null }
 
@@ -523,6 +541,7 @@ class LoficActivity : Activity() {
             exposureCount = readResult(result, exposureCountKey)?.firstOrNull() ?: -1
             resultExposureNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME) ?: 0L
             resultIso = result.get(CaptureResult.SENSOR_SENSITIVITY) ?: 0
+            neutralOf(result)?.let { lastNeutral = it }
             if (lastTimestamp > 0 && ts > lastTimestamp) {
                 val f = 1e9 / (ts - lastTimestamp)
                 fps = if (fps <= 0) f else fps * 0.9 + f * 0.1
@@ -641,6 +660,13 @@ class LoficActivity : Activity() {
             val model = LoficSetup.modelK(frameIso)
             val baseline = log2(ratio.k * LoficMerge.SHORT_RANGE / LoficMerge.LONG_CLIP)
             val c = characteristics
+            val frameNeutral = result?.let { neutralOf(it) }
+            val neutral = frameNeutral ?: lastNeutral
+            val neutralSource = when {
+                frameNeutral != null -> "frame"
+                neutral != null -> "latest"
+                else -> "none"
+            }
             val writer = LoficDngWriter(
                 width = LoficSetup.RAW_WIDTH,
                 height = s.rows,
@@ -660,7 +686,7 @@ class LoficActivity : Activity() {
                 calibration2 = matrix(c?.get(CameraCharacteristics.SENSOR_CALIBRATION_TRANSFORM2)),
                 illuminant1 = c?.get(CameraCharacteristics.SENSOR_REFERENCE_ILLUMINANT1),
                 illuminant2 = c?.get(CameraCharacteristics.SENSOR_REFERENCE_ILLUMINANT2)?.toInt(),
-                asShotNeutral = result?.get(CaptureResult.SENSOR_NEUTRAL_COLOR_POINT)
+                asShotNeutral = neutral
             )
             val name = "RAWR_" + SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.ROOT).format(Date()) + "_LOFIC.dng"
             val values = ContentValues().apply {
@@ -687,7 +713,7 @@ class LoficActivity : Activity() {
             contentResolver.update(uri, values, null, null)
             val headroom = log2(LoficMerge.SHORT_RANGE * ratio.k / LoficMerge.LONG_CLIP)
             val module = ratio.measured && ratio.k > 0.75 * model && ratio.k < 1.25 * model
-            Log.i(TAG, "LOFIC_SAVED name=$name setup=${s.name} mode=$frameMode rows=${s.rows} k=%.1f measured=${ratio.measured} samples=${ratio.samples} model=%.1f iso=$frameIso exposureNs=$frameExposure headroom=%.2f module=$module"
+            Log.i(TAG, "LOFIC_SAVED name=$name setup=${s.name} mode=$frameMode rows=${s.rows} k=%.1f measured=${ratio.measured} samples=${ratio.samples} model=%.1f iso=$frameIso exposureNs=$frameExposure headroom=%.2f module=$module result=${if (result != null) "matched" else "missing"} neutral=$neutralSource ${neutral?.joinToString(",") { "%.3f".format(Locale.ROOT, it.toDouble()) } ?: "-"}"
                 .format(Locale.ROOT, ratio.k, model, headroom))
             message("Saved DCIM/Camera/$name\nk=%.0f (%s, model %.0f) · up to %.1f stops above the Long clip · module %s"
                 .format(Locale.ROOT, ratio.k, if (ratio.measured) "measured" else "model", model, headroom,
