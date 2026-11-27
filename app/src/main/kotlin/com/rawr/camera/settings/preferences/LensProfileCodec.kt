@@ -297,6 +297,7 @@ internal object LensProfileCodec {
             choice(session, "cameraApi", CAMERA_API_CHOICES)
             choice(session, "params", SESSION_PARAMS_POLICIES)
             choice(session, "template", listOf("preview", "still"))
+            choice(session, "layout", listOf("lofic"))
             if (session.has("opMode")) {
                 number(session, "opMode", 0.0..Int.MAX_VALUE.toDouble(), true)
                 require(session.getInt("opMode") != 1 && session.getInt("opMode") != 2) { "Invalid opMode" }
@@ -449,6 +450,7 @@ internal object LensProfileCodec {
                 if (s.gate.isNotEmpty()) put("name", s.gate)
                 s.gateHold?.let { put("hold", it) }
             })
+            if (s.lofic) put("layout", "lofic")
             if (s.stopViewfinderForPhotos) put("stopViewfinderForPhotos", true)
             if (s.separatePhotoSession) put("separatePhotoSession", true)
             if (s.workarounds.isNotEmpty()) put("workarounds", JSONArray(s.workarounds))
@@ -593,6 +595,7 @@ internal object LensProfileCodec {
                 gateHold = gate?.optString("hold")?.takeIf { it in GATE_HOLDS },
                 stopViewfinderForPhotos = session?.optBoolean("stopViewfinderForPhotos") ?: false,
                 separatePhotoSession = session?.optBoolean("separatePhotoSession") ?: false,
+                lofic = session?.optString("layout") == "lofic",
                 workarounds = session?.optJSONArray("workarounds")
                     ?.let { a -> (0 until a.length()).map { a.getString(it) }.filter { it in CAMERA_WORKAROUNDS } } ?: emptyList()
             ),

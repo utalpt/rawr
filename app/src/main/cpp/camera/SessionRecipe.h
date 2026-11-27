@@ -77,6 +77,8 @@ struct SessionRecipe {
     int64_t photoStreamUseCase = 0;
     int64_t companionStreamUseCase = 0;
     int64_t auxJpegStreamUseCase = 0;
+    // LensRoute::lofic: the LOFIC output layout and the RECORD template.
+    bool lofic = false;
 };
 
 // Per-start facts the lens itself cannot know.
@@ -105,6 +107,7 @@ struct RecipeInputs {
     r.repeatingStillTemplate = lens.stillTemplate.value_or(false);
     r.captureStillTemplate = lens.stillTemplate.value_or(true);
     r.photoIncludePreview = lens.photoIncludePreview;
+    r.lofic = lens.lofic;
     if (companionStreamEnabled(lens, in.forcedCompanion, in.automaticCompanion)) {
         CompanionRecipe c;
         c.privateFormat = lens.companionPrivate;

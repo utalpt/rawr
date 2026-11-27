@@ -8,10 +8,14 @@ namespace rawrcam::geometry {
 
 // Sensor RAW layouts the camera can deliver. RAW16 (Camera2 RAW_SENSOR) is one
 // uint16 per pixel; RAW10 packs four pixels into five bytes (MIPI RAW10).
-enum class RawPixelFormat : uint8_t { Raw16 = 0, Raw10 = 1 };
+// Raw14Packed is never a stream format: it is what a Xiaomi 17 Ultra LOFIC RAW16 buffer holds (4 pixels in 7
+// bytes: 4 MSB bytes, then 3 bytes of 6-bit LSBs, little-endian; rows width*7/4 bytes apart).
+enum class RawPixelFormat : uint8_t { Raw16 = 0, Raw10 = 1, Raw14Packed = 2 };
 
 [[nodiscard]] constexpr const char* rawPixelFormatName(RawPixelFormat format) noexcept {
-    return format == RawPixelFormat::Raw10 ? "RAW10" : "RAW16";
+    return format == RawPixelFormat::Raw10         ? "RAW10"
+           : format == RawPixelFormat::Raw14Packed ? "RAW14P"
+                                                   : "RAW16";
 }
 
 struct RawGeometryLimits {
@@ -56,7 +60,7 @@ struct RawStreamPreference {
                                                                        const RawGeometryLimits& limits = {}) {
     const auto usable = [&](const RawStreamOption& o) {
         return isSupportedRawGeometry(o.width, o.height, limits) &&
-               (o.format != RawPixelFormat::Raw10 || o.width % 4u == 0u);
+               (o.format == RawPixelFormat::Raw16 || o.width % 4u == 0u);
     };
     if (preference.width && preference.height) {
         for (const auto& o : available)

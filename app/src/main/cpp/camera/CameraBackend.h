@@ -11,7 +11,7 @@ namespace rawrcam::camera {
 struct CameraSessionCallbackContext;
 
 // Numeric values of ACameraDevice_request_template.
-enum class RequestTemplate : int32_t { Preview = 1, StillCapture = 2 };
+enum class RequestTemplate : int32_t { Preview = 1, StillCapture = 2, Record = 3 };
 
 // One stream of a capture session.
 struct SessionOutput {

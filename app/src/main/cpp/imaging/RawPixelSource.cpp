@@ -13,6 +13,7 @@ namespace rawrcam::imaging {
 
 size_t minimumRowBytes(RawPixelFormat format, uint32_t width) noexcept {
     if (format == RawPixelFormat::Raw10) return static_cast<size_t>(width) / 4u * 5u;
+    if (format == RawPixelFormat::Raw14Packed) return static_cast<size_t>(width) / 4u * 7u;
     return static_cast<size_t>(width) * sizeof(uint16_t);
 }
 
@@ -22,6 +23,12 @@ uint16_t readRawPixel(const RawPixelSource& source, uint32_t x, uint32_t y) noex
         const uint8_t* group = row + static_cast<size_t>(x / 4u) * 5u;
         const uint32_t lane = x % 4u;
         return static_cast<uint16_t>((static_cast<uint16_t>(group[lane]) << 2) | ((group[4] >> (lane * 2u)) & 0x3u));
+    }
+    if (source.format == RawPixelFormat::Raw14Packed) {
+        const uint8_t* group = row + static_cast<size_t>(x / 4u) * 7u;
+        const uint32_t lsb = group[4] | (uint32_t(group[5]) << 8) | (uint32_t(group[6]) << 16);
+        const uint32_t lane = x % 4u;
+        return static_cast<uint16_t>((uint32_t(group[lane]) << 6) | ((lsb >> (6u * lane)) & 0x3fu));
     }
     uint16_t value = 0;
     std::memcpy(&value, row + static_cast<size_t>(x) * sizeof(uint16_t), sizeof(value));
@@ -38,16 +45,30 @@ void unpackRaw10Row(const uint8_t* packed, uint32_t width, uint16_t* destination
     }
 }
 
+// Xiaomi 17 Ultra LOFIC Long frame (layout from Anton Tretiakov's X17U LOFIC RAW v1.0 spec, measured on the 17U):
+// 4 MSB bytes then 3 bytes holding four 6-bit LSBs, little-endian; value = msb << 6 | lsb.
+void unpackRaw14Row(const uint8_t* packed, uint32_t width, uint16_t* destination) noexcept {
+    for (uint32_t x = 0; x + 3u < width; x += 4u, packed += 7) {
+        const uint32_t lsb = packed[4] | (uint32_t(packed[5]) << 8) | (uint32_t(packed[6]) << 16);
+        destination[x + 0] = static_cast<uint16_t>((uint32_t(packed[0]) << 6) | (lsb & 0x3fu));
+        destination[x + 1] = static_cast<uint16_t>((uint32_t(packed[1]) << 6) | ((lsb >> 6) & 0x3fu));
+        destination[x + 2] = static_cast<uint16_t>((uint32_t(packed[2]) << 6) | ((lsb >> 12) & 0x3fu));
+        destination[x + 3] = static_cast<uint16_t>((uint32_t(packed[3]) << 6) | ((lsb >> 18) & 0x3fu));
+    }
+}
+
 bool copyRawToPackedRaw16(const RawPixelSource& source, uint16_t* destination) noexcept {
     if (!source.base || !destination || source.width == 0 || source.height == 0) return false;
     if (source.rowStrideBytes < minimumRowBytes(source.format, source.width)) return false;
-    if (source.format == RawPixelFormat::Raw10 && source.width % 4u != 0) return false;
+    if (source.format != RawPixelFormat::Raw16 && source.width % 4u != 0) return false;
     const auto rows = [&](uint32_t begin, uint32_t end) noexcept {
         for (uint32_t y = begin; y < end; ++y) {
             const uint8_t* row = source.base + static_cast<size_t>(y) * source.rowStrideBytes;
             uint16_t* out = destination + static_cast<size_t>(y) * source.width;
             if (source.format == RawPixelFormat::Raw10)
                 unpackRaw10Row(row, source.width, out);
+            else if (source.format == RawPixelFormat::Raw14Packed)
+                unpackRaw14Row(row, source.width, out);
             else
                 std::memcpy(out, row, static_cast<size_t>(source.width) * sizeof(uint16_t));
         }
@@ -56,7 +77,7 @@ bool copyRawToPackedRaw16(const RawPixelSource& source, uint16_t* destination) n
     // Smaller frames stay on the calling thread. A thread that cannot be started leaves its rows to this one.
     const uint64_t pixels = static_cast<uint64_t>(source.width) * source.height;
     const uint32_t threads =
-        pixels >= 24'000'000ull ? std::clamp(std::thread::hardware_concurrency(), 1u, 8u) : 1u;
+        pixels >= 24'000'000ull || source.format == RawPixelFormat::Raw14Packed ? std::clamp(std::thread::hardware_concurrency(), 1u, 8u) : 1u;
     if (threads <= 1u || source.height < threads) {
         rows(0, source.height);
         return true;

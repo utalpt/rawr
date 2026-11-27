@@ -667,6 +667,7 @@ std::string serializeCameraProfile(const CameraProfile& profile) {
         }
         if (r.stopViewfinderForPhotos) session.flag("stopViewfinderForPhotos", true);
         if (r.separatePhotoSession) session.flag("separatePhotoSession", true);
+        if (r.lofic) session.text("layout", "lofic");
         if (r.workarounds.any()) {
             std::string list = "[";
             for (const auto& name : workaroundNames(r.workarounds)) {
@@ -1115,6 +1116,13 @@ std::optional<LensRoute> readLens(const Json& l, std::string* error) {
     r.startupDelayMs = int32_t(std::clamp(session.num("startupDelayMs"), 0.0, 5000.0));
     r.stopViewfinderForPhotos = session.flag("stopViewfinderForPhotos", false);
     r.separatePhotoSession = session.flag("separatePhotoSession", false);
+    if (const std::string layout = session.str("layout"); !layout.empty()) {
+        if (layout != "lofic") {
+            if (error) *error = "unknown session layout " + layout + " for lens " + r.lensId;
+            return std::nullopt;
+        }
+        r.lofic = true;
+    }
     if (!readWorkarounds(session.array("workarounds"), r.workarounds, error, "lens " + r.lensId)) return std::nullopt;
     const Json& gate = object(&session, "gate");
     r.vendorGate = gate.str("name");

@@ -337,6 +337,86 @@
       }
     },
     {
+      "id": "1x LOFIC",
+      "camera": {
+        "id": "2",
+        "physical": ""
+      },
+      "streams": {
+        "raw": {
+          "format": "RAW16",
+          "width": 4096,
+          "height": 3072
+        },
+        "companion": {
+          "mode": "fixed",
+          "width": 1440,
+          "height": 1080,
+          "format": "private",
+          "targeted": true,
+          "detach": false,
+          "buffers": {
+            "usage": "0x100"
+          }
+        },
+        "auxJpeg": {
+          "width": 4096,
+          "height": 3072
+        }
+      },
+      "session": {
+        "opMode": 61456,
+        "frameRate": 30,
+        "layout": "lofic"
+      },
+      "vendorKeys": [
+        {
+          "tag": "xiaomi.app.module",
+          "type": "int32",
+          "scope": "sessionAndRequest",
+          "values": [
+            180
+          ],
+          "enabled": true
+        },
+        {
+          "tag": "com.xiaomi.sessionparams.enableLofic",
+          "type": "int32",
+          "scope": "sessionAndRequest",
+          "values": [
+            1
+          ],
+          "enabled": true
+        },
+        {
+          "tag": "com.xiaomi.camera.eiParams.loficEnable",
+          "type": "byte",
+          "scope": "request",
+          "values": [
+            1
+          ],
+          "enabled": true
+        }
+      ],
+      "image": {
+        "levels": {
+          "static": true,
+          "black": [
+            1024,
+            1024,
+            1024,
+            1024
+          ],
+          "white": 16383
+        },
+        "exposure": {
+          "extended": false,
+          "isoMax": 797,
+          "shutterMaxNs": 0
+        }
+      }
+    },
+    {
       "id": "Tele Normal",
       "camera": {
         "id": "4",

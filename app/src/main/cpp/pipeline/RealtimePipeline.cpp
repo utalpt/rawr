@@ -136,6 +136,7 @@ void RealtimePipeline::shutdown() noexcept {
     frameSlots_.destroy();
 }
 bool RealtimePipeline::configureCamera(uint64_t generation, const metadata::CameraContextMetadata& metadata) {
+    realtime_.setPacked14(metadata.rawPacked14);
     return configureGeometry(generation, metadata.geometry.rawBufferWidth, metadata.geometry.rawBufferHeight,
                              metadata.rawPreviewCfa, metadata.cfaBlock, metadata.cfaLiveQuality,
                              metadata.baselineBlackLevelPhysicalRggb,

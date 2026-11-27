@@ -189,6 +189,10 @@ struct LensRoute {
     // shutter, a photo-only session takes the stills, then the viewfinder session is configured again.
     // For HALs that fail when a full-size output is configured beside the viewfinder (vivo X200 Ultra).
     bool separatePhotoSession = false;
+    // Xiaomi 17 Ultra LOFIC layout (session "layout":"lofic", from Anton Tretiakov's X17U LOFIC RAW v1.0 spec):
+    // drained dummy RAW, preview, video and JPEG outputs, then the Short RAW and the viewfinder RAW (the Long, packed
+    // 14-bit in a RAW16 buffer) last, all on the RECORD template.
+    bool lofic = false;
     // Extra JPEG output configured with the session but never targeted.
     std::optional<std::pair<uint32_t, uint32_t>> auxJpegSize;
     std::optional<uint64_t> auxJpegBufferUsage;  // absent: the reader default
@@ -301,7 +305,7 @@ struct LensRoute {
 inline bool carriesRecipe(const LensRoute& route) {
     return !route.vendorKeys.empty() || route.photoStream || route.companionSize || route.auxJpegSize || route.frameRate > 0 ||
            route.stillTemplate || route.startupDelayMs > 0 || route.disableCompanion || route.companionPrivate ||
-           !route.companionTargeted || route.stopViewfinderForPhotos || route.separatePhotoSession || route.rawBufferUsage || route.photoBufferUsage ||
+           !route.companionTargeted || route.stopViewfinderForPhotos || route.separatePhotoSession || route.lofic || route.rawBufferUsage || route.photoBufferUsage ||
            !route.vendorGate.empty() || route.highResLive || route.workarounds.any() || route.gateHold ||
            route.sessionParams != SessionParamsPolicy::Cadence || route.requestDefaults != RequestDefaults::Rawr ||
            route.companionBufferUsage || route.companionBufferCount || route.companionPhysical || route.companionDetach ||

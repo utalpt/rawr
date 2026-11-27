@@ -141,10 +141,15 @@ rawrcam::vulkan::ImportedRaw& RawCpuUploadPool::upload(uint32_t slotIndex, AImag
     Slot& slot = slots_[slotIndex];
     if (!slot.buffer) allocateBuffer(slot);
 
-    const auto format = rawrcam::imaging::rawPixelFormatOf(image);
+    auto format = rawrcam::imaging::rawPixelFormatOf(image);
     int32_t rowStride = 0;
     if (!format || AImage_getPlaneRowStride(image, 0, &rowStride) != AMEDIA_OK || rowStride <= 0)
         throw std::runtime_error("RAW CPU upload: unsupported camera image layout");
+    if (packed14_ && *format == rawrcam::imaging::RawPixelFormat::Raw16) {
+        // The LOFIC Long ignores the plane's row stride: its rows are packed back to back.
+        format = rawrcam::imaging::RawPixelFormat::Raw14Packed;
+        rowStride = int32_t(rawrcam::imaging::minimumRowBytes(*format, width_));
+    }
     AHardwareBuffer_Desc desc{};
     AHardwareBuffer_describe(ahb, &desc);
     if (desc.width != width_ || desc.height != height_)

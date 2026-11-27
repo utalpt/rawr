@@ -166,6 +166,10 @@ class CameraDeviceSession final {
     // Adds an output no request targets (LensRoute::auxJpegSize).
     bool addAuxJpegStream(const std::pair<uint32_t, uint32_t>& size, std::optional<uint64_t> usage,
                           int64_t streamUseCase, std::vector<SessionOutput>& outputs, const Diagnostic&);
+    // A reader whose frames are dropped on arrival (LOFIC dummy RAW, video and Short outputs).
+    ANativeWindow* addDrainedReader(uint32_t width, uint32_t height, int32_t format, uint64_t usage,
+                                    AImageReader*& reader, const char* label, const Diagnostic&);
+    void releaseLoficReaders(bool orphan) noexcept;
     // The configured session as facts for the CAMERA_SESSION_RECIPE line.
     SessionRecipeFacts recipeFacts(const std::optional<LensRoute>& selected, const SessionRecipe& recipe,
                                    RequestTemplate repeatingTemplate) const;
@@ -207,6 +211,13 @@ class CameraDeviceSession final {
     CameraCallbacks* viewfinderCallbacks_ = nullptr;
     CameraRequestPipeline* viewfinderPipeline_ = nullptr;
     AImageReader* auxJpegReader_ = nullptr;
+    // LensRoute::lofic outputs. The Long arrives in rawWindow_, the last output; the Short is requested on every
+    // frame but not read yet.
+    AImageReader* loficDummyReader_ = nullptr;
+    AImageReader* loficVideoReader_ = nullptr;
+    AImageReader* loficShortReader_ = nullptr;
+    ANativeWindow* loficVideoWindow_ = nullptr;
+    ANativeWindow* loficShortWindow_ = nullptr;
     bool auxJpegConfigured_ = false;
     ACameraMetadata* characteristics_ = nullptr;
     ANativeWindow* rawWindow_ = nullptr;

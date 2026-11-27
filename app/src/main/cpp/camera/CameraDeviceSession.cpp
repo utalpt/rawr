@@ -1,6 +1,7 @@
 #include "camera/CameraDeviceSession.h"
 #include "camera/VendorCameraGate.h"
 
+#include <android/hardware_buffer.h>
 #include <camera/NdkCameraMetadataTags.h>
 
 #include <algorithm>
@@ -108,6 +109,7 @@ void CameraDeviceSession::releaseRequestOutputs(bool orphan) noexcept {
         companionFromProfile_ = false;
         auxJpegReader_ = nullptr;
         auxJpegConfigured_ = false;
+        releaseLoficReaders(true);
         return;
     }
     request_.reset();
@@ -129,6 +131,41 @@ void CameraDeviceSession::releaseRequestOutputs(bool orphan) noexcept {
     auxJpegConfigured_ = false;
     if (auxJpegReader_) AImageReader_delete(auxJpegReader_);
     auxJpegReader_ = nullptr;
+    releaseLoficReaders(false);
+}
+void CameraDeviceSession::releaseLoficReaders(bool orphan) noexcept {
+    for (AImageReader** reader : {&loficDummyReader_, &loficVideoReader_, &loficShortReader_}) {
+        // An orphaned session may still write to them.
+        if (*reader && !orphan) AImageReader_delete(*reader);
+        *reader = nullptr;
+    }
+    loficVideoWindow_ = loficShortWindow_ = nullptr;
+}
+ANativeWindow* CameraDeviceSession::addDrainedReader(uint32_t width, uint32_t height, int32_t format, uint64_t usage,
+                                                     AImageReader*& reader, const char* label, const Diagnostic& diag) {
+    const auto fail = [&](const char* stage, int status) -> ANativeWindow* {
+        diag(std::string("CAMERA_LOFIC_STREAM output=") + label + " size=" + std::to_string(width) + "x" +
+             std::to_string(height) + " stage=" + stage + " status=" + std::to_string(status));
+        return nullptr;
+    };
+    const media_status_t ms = AImageReader_newWithUsage(int32_t(width), int32_t(height), format, usage, 2, &reader);
+    if (ms != AMEDIA_OK || !reader) return fail("reader", ms);
+    AImageReader_ImageListener listener{};
+    listener.onImageAvailable = [](void*, AImageReader* r) {
+        AImage* image = nullptr;
+        while (AImageReader_acquireNextImage(r, &image) == AMEDIA_OK && image) {
+            AImage_delete(image);
+            image = nullptr;
+        }
+    };
+    if (const auto ls = AImageReader_setImageListener(reader, &listener); ls != AMEDIA_OK) return fail("listener", ls);
+    ANativeWindow* window = nullptr;
+    if (const auto ws = AImageReader_getWindow(reader, &window); ws != AMEDIA_OK || !window) return fail("window", ws);
+    std::ostringstream line;
+    line << "CAMERA_LOFIC_STREAM output=" << label << " size=" << width << "x" << height << " format=0x" << std::hex
+         << format << " usage=0x" << usage << " status=0";
+    diag(line.str());
+    return window;
 }
 void CameraDeviceSession::releaseCharacteristics() noexcept {
     if (characteristics_) ACameraMetadata_free(characteristics_);
@@ -279,6 +316,7 @@ std::optional<LensRoute> CameraDeviceSession::select(const LensRoute& requested,
     parsed->photoBufferCount = route.photoBufferCount;
     parsed->guardStillExposure = requiresStillExposureGuard(route);
     parsed->cfaBlock = route.sensorLayoutBlock;
+    parsed->rawPacked14 = route.lofic;
     parsed->photoCfaBlock = route.photoSensorLayoutBlock;
     parsed->cropLeft = route.cropLeft;
     parsed->cropTop = route.cropTop;
@@ -602,7 +640,9 @@ SessionRecipeFacts CameraDeviceSession::recipeFacts(const std::optional<LensRout
     f.photoUseCase = recipe.photoStreamUseCase;
     f.companionUseCase = recipe.companionStreamUseCase;
     f.auxJpegUseCase = recipe.auxJpegStreamUseCase;
-    f.requestTemplate = repeatingTemplate == RequestTemplate::StillCapture ? "still" : "preview";
+    f.requestTemplate = repeatingTemplate == RequestTemplate::StillCapture ? "still"
+                        : repeatingTemplate == RequestTemplate::Record    ? "record"
+                                                                          : "preview";
     f.fpsRange = "none";
     if (RequestEntry e{};
         sessionParameters_ && sessionParameters_->get(ACAMERA_CONTROL_AE_TARGET_FPS_RANGE, &e) == ACAMERA_OK &&
@@ -663,8 +703,20 @@ bool CameraDeviceSession::createSession(ANativeWindow* window, const std::option
     RequestStatus s = ACAMERA_OK;
     const std::string physicalCameraId = selected ? selected->physicalCameraId : std::string();
     std::vector<SessionOutput> outputs;
-    outputs.push_back({rawWindow_, physicalCameraId, recipe.rawStreamUseCase});
     const uint32_t rawWidth = selected ? selected->stream.width : 0, rawHeight = selected ? selected->stream.height : 0;
+    // LOFIC (Anton Tretiakov's X17U LOFIC RAW v1.0 spec): a drained dummy RAW comes first and the two LOFIC RAW
+    // outputs last, the Long in the last one (measured on the LOFIC screen: always the last RAW output). The
+    // viewfinder reads the Long, so rawWindow_ goes last.
+    const bool lofic = recipe.lofic && selected;
+    if (lofic) {
+        if (!physicalCameraId.empty()) return fail("lofic", "reason=physical_camera_unsupported");
+        ANativeWindow* dummy = addDrainedReader(rawWidth, rawHeight, AIMAGE_FORMAT_RAW16,
+                                                AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, loficDummyReader_, "dummy_raw", diag);
+        if (!dummy) return fail("lofic", "reason=dummy_raw");
+        outputs.push_back({dummy, std::string(), 0});
+    } else {
+        outputs.push_back({rawWindow_, physicalCameraId, recipe.rawStreamUseCase});
+    }
     profileCompanionTargeted_ = !selected || selected->companionTargeted;
     stopViewfinderForPhotos_ = selected && selected->stopViewfinderForPhotos;
     separatePhotoSession_ = selected && selected->separatePhotoSession && captureWindow_;
@@ -691,6 +743,15 @@ bool CameraDeviceSession::createSession(ANativeWindow* window, const std::option
         companionFacts_.reset();
     }
 
+    if (lofic) {
+        // The spec's video output: PRIVATE with video-encode usage, 4:3 2880x2160 or 16:10 3840x2160.
+        const bool wide = rawHeight && double(rawWidth) / rawHeight > 1.45;
+        loficVideoWindow_ = addDrainedReader(wide ? 3840u : 2880u, 2160u, AIMAGE_FORMAT_PRIVATE,
+                                             AHARDWAREBUFFER_USAGE_VIDEO_ENCODE, loficVideoReader_, "video", diag);
+        if (!loficVideoWindow_) return fail("lofic", "reason=video");
+        outputs.push_back({loficVideoWindow_, std::string(), 0});
+    }
+
     if (recipe.auxJpeg) {
         if (!physicalCameraId.empty()) return fail("aux_jpeg", "reason=physical_camera_unsupported");
         if (!addAuxJpegStream(*recipe.auxJpeg, recipe.auxJpegBufferUsage, recipe.auxJpegStreamUseCase, outputs, diag))
@@ -708,6 +769,15 @@ bool CameraDeviceSession::createSession(ANativeWindow* window, const std::option
         }
     }
 
+    if (lofic) {
+        loficShortWindow_ = addDrainedReader(rawWidth, rawHeight, AIMAGE_FORMAT_RAW16,
+                                             AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, loficShortReader_, "short_raw", diag);
+        if (!loficShortWindow_) return fail("lofic", "reason=short_raw");
+        outputs.push_back({loficShortWindow_, std::string(), 0});
+        outputs.push_back({rawWindow_, std::string(), recipe.rawStreamUseCase});
+        diag("CAMERA_LOFIC_LAYOUT outputs=" + std::to_string(outputs.size()) + " long=last template=record");
+    }
+
     auto* callbackContext = callbacks.sessionContext(generation_);
     callbackContext->physicalCameraId = physicalCameraId;
     callbackContext->outputWindows.clear();
@@ -717,6 +787,9 @@ bool CameraDeviceSession::createSession(ANativeWindow* window, const std::option
         callbackContext->outputLabels.push_back(o.window == rawWindow_         ? "raw"
                                                 : o.window == companionWindow_ ? "companion"
                                                 : o.window == captureWindow_   ? "capture"
+                                                : o.window == loficVideoWindow_ ? "lofic_video"
+                                                : o.window == loficShortWindow_ ? "lofic_short"
+                                                : lofic && o.window == outputs.front().window ? "lofic_dummy"
                                                                                : "aux_jpeg");
     }
     callbackContext->ignoreLostCompanion = selected && effectiveWorkarounds(*selected).ignoreLostCompanion;
@@ -731,8 +804,9 @@ bool CameraDeviceSession::createSession(ANativeWindow* window, const std::option
     // TEMPLATE_PREVIEW 30/30 assumption and clamp shutter priority near 1/30.
     // Build one session-parameter request, then add the lens profile's
     // session keys (e.g. a vendor sensor/readout mode).
-    const RequestTemplate repeatingTemplate =
-        recipe.repeatingStillTemplate ? RequestTemplate::StillCapture : RequestTemplate::Preview;
+    const RequestTemplate repeatingTemplate = lofic                          ? RequestTemplate::Record
+                                              : recipe.repeatingStillTemplate ? RequestTemplate::StillCapture
+                                                                              : RequestTemplate::Preview;
     const bool minimalDefaults = recipe.requestDefaults == RequestDefaults::Minimal;
     const auto joined = [](const std::vector<std::string>& items) {
         std::string out;
@@ -843,6 +917,12 @@ bool CameraDeviceSession::createSession(ANativeWindow* window, const std::option
         if (!ok(s)) return fail("add_companion_target", "status=" + statusText(s));
         companionTargeted_ = true;
     }
+    // The spec targets the video and both LOFIC RAW outputs on every repeating request.
+    for (ANativeWindow* window : {loficVideoWindow_, loficShortWindow_}) {
+        if (!window) continue;
+        s = request_->addTarget(window);
+        if (!ok(s)) return fail("add_lofic_target", "status=" + statusText(s));
+    }
 
     applyPreviewRequestDefaults(request_.get(), *cameraContext_, minimalDefaults);
     // Stills, multiframe bursts and video all come from this repeating RAW
@@ -869,7 +949,9 @@ bool CameraDeviceSession::createSession(ANativeWindow* window, const std::option
     }
     diag("CAMERA_NDK_SESSION_RUNNING companion=" + std::string(companionWindow_ ? "1" : "0") +
          " photoStream=" + (captureConfigured_ ? (separatePhotoSession_ ? "separate" : "1") : "0") + " auxJpeg=" + (auxJpegConfigured_ ? "1" : "0") +
-         " template=" + (repeatingTemplate == RequestTemplate::StillCapture ? "still" : "preview"));
+         " template=" + (repeatingTemplate == RequestTemplate::StillCapture ? "still"
+                         : repeatingTemplate == RequestTemplate::Record    ? "record"
+                                                                           : "preview"));
     const auto& raw = cameraContext_->geometry;
     diagnostics::RuntimeTraceRecorder::instance().record(
         diagnostics::RuntimeTraceStage::CameraSessionCreated, 0, generation_, -1, 0, 0, companionWindow_ ? 1u : 0u,
@@ -1168,6 +1250,7 @@ void CameraDeviceSession::releaseViewfinderOutputs() noexcept {
     auxJpegConfigured_ = false;
     if (auxJpegReader_) AImageReader_delete(auxJpegReader_);
     auxJpegReader_ = nullptr;
+    releaseLoficReaders(false);
 }
 bool CameraDeviceSession::openPhotoSession(std::unique_lock<std::mutex>& lock, const Diagnostic& diag) {
     if (!device_ || !captureWindow_ || !viewfinderCallbacks_) return false;

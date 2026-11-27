@@ -56,7 +56,10 @@ struct CameraContextMetadata {
     // order before anything else reads it. Never persisted: stored frames
     // are already Bayer.
     uint32_t cfaBlock = 1;
-    uint32_t photoCfaBlock = 1;  // CFA of the separate photo output before remosaic.
+    uint32_t photoCfaBlock = 1;
+    // LensRoute::lofic: the viewfinder RAW16 buffer holds packed 14-bit samples (4 MSB bytes, then 3 bytes of
+    // 6-bit LSBs per 4 pixels); ingress unpacks them on the CPU.
+    bool rawPacked14 = false;  // CFA of the separate photo output before remosaic.
     // Raw columns/rows the HAL pads with no image (LensRoute::crop*). All four
     // are multiples of the CFA period, so the kept area keeps the camera's own
     // colour order. Zeroed on a frame whose edges have already been dropped.

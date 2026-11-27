@@ -287,6 +287,12 @@ data class LensSession(
      * after the photos. For cameras that fail with a full-size output beside the viewfinder (vivo X200 Ultra).
      */
     val separatePhotoSession: Boolean = false,
+    /**
+     * Xiaomi 17 Ultra LOFIC layout ("layout":"lofic"): dummy RAW, preview, video and JPEG outputs before two RAW
+     * outputs, the RECORD template, and the RAW reader carrying the packed 14-bit Long frame. From Anton Tretiakov's
+     * (@designation_zero) X17U LOFIC RAW v1.0 spec.
+     */
+    val lofic: Boolean = false,
     /** Provider behaviours this lens avoids, from [CAMERA_WORKAROUNDS]. */
     val workarounds: List<String> = emptyList()
 )

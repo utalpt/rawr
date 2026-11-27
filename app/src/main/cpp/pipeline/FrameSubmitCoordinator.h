@@ -183,8 +183,16 @@ class FrameSubmitCoordinator final {
     // import (the driver rejects this device's camera AHBs), or forced for
     // testing. Readers must then be CPU-readable; RAW10 streams always are.
     [[nodiscard]] bool cpuIngressRequired() const noexcept {
-        return cpuIngressLatched_.load(std::memory_order_relaxed) || forceCpuIngress_.load(std::memory_order_relaxed);
+        return cpuIngressLatched_.load(std::memory_order_relaxed) || forceCpuIngress_.load(std::memory_order_relaxed) ||
+               packed14_.load(std::memory_order_relaxed);
     }
+    // LOFIC lens (CameraContextMetadata::rawPacked14): the RAW16 buffers hold packed 14-bit samples, so every
+    // frame goes through the CPU upload, which unpacks them. Set before the RAW reader is created.
+    void setPacked14(bool packed) noexcept {
+        packed14_.store(packed, std::memory_order_relaxed);
+        cpuUpload_.setPacked14(packed);
+    }
+    [[nodiscard]] bool packed14() const noexcept { return packed14_.load(std::memory_order_relaxed); }
     // True once this configuration delivered a frame through CPU upload
     // (latched fallback, forced, or a RAW10 stream). Surfaced to the UI.
     // RAW16 readers then need GPU buffer access instead of image usage. A
@@ -314,6 +322,7 @@ class FrameSubmitCoordinator final {
     bool bridgeLogged_ = false;
     std::atomic<bool> bridgeSelected_{false};  // sticky: readers keep image usage
     std::atomic<bool> cpuIngressLatched_{false};
+    std::atomic<bool> packed14_{false};
     std::atomic<bool> forceCpuIngress_{false};
     std::atomic<bool> cpuIngressActive_{false};
     bool cpuIngressLogged_ = false;

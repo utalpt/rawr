@@ -39,6 +39,8 @@ class RawCpuUploadPool final {
     void initialize(VkPhysicalDevice physical, VkDevice device, uint32_t queueFamily) noexcept;
     // Resources are allocated lazily per slot on first upload.
     void configure(uint32_t width, uint32_t height) noexcept;
+    // LOFIC lens: the camera's RAW16 buffers hold packed 14-bit rows width*7/4 bytes apart (see RawPixelFormat).
+    void setPacked14(bool packed) noexcept { packed14_ = packed; }
     // Block-CFA lens: every route below fills the owned image by remosaicing
     // to Bayer in `order` (block 1 = off). Takes effect on the next frame.
     void configureRemosaic(uint32_t block, uint32_t order, uint32_t quality, float black = 0.0f) noexcept;
@@ -98,6 +100,7 @@ class RawCpuUploadPool final {
     uint32_t width_ = 0;
     uint32_t height_ = 0;
     std::array<Slot, rawrcam::imaging::kRealtimeFramesInFlight> slots_{};
+    bool packed14_ = false;
 };
 
 // Barriers for the frame's RAW image. Camera AHB imports are foreign-owned and
