@@ -6,7 +6,7 @@
 
 > **Rawr 17U - unofficial modified version of Rawr.**
 > Based on Rawr 0.5.1 by adityawarmanfw (GPL-3.0-only, see `NOTICE` and `LICENSE`), synced with its main
-> branch up to #152:
+> branch up to #165:
 > [github.com/adityawarmanfw/rawr](https://github.com/adityawarmanfw/rawr)
 >
 > Modified by Paulo Gonçalves ([@utalpt](https://github.com/utalpt)), November 2026. Not affiliated with
@@ -14,6 +14,15 @@
 > [What this fork adds](#what-this-fork-adds-xiaomi-17-ultra).
 > The release build installs as `x17u.rawr.camera` ("Rawr 17U") and the debug build as
 > `x17u.rawr.camera.debug`, next to the official app.
+
+<table align="center">
+  <tr>
+    <td align="center"><img src="docs/assets/screens/film-sheet.jpg" alt="Film sheet" width="200"><br><sub>Film looks</sub></td>
+    <td align="center"><img src="docs/assets/screens/lens-modes-wb.jpg" alt="Lens modes and white balance" width="200"><br><sub>Lens modes and WB</sub></td>
+    <td align="center"><img src="docs/assets/screens/tele-bar.jpg" alt="Tele zoom bar" width="200"><br><sub>Tele zoom 75-100 mm</sub></td>
+    <td align="center"><img src="docs/assets/screens/tele-dial.jpg" alt="Tele zoom dial" width="200"><br><sub>Tele zoom dial</sub></td>
+  </tr>
+</table>
 
 ## Download (Xiaomi 17 Ultra)
 
@@ -74,6 +83,9 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   [Telezoom](https://github.com/utalpt/x17u-telezoom) module; **Tele Zoom Always On** keeps it on screen while
   the tele is selected. EXIF and DNG name the real focal length. The
   vendor tags were found by Anton Tretiakov (@designation_zero).
+
+  <img src="docs/assets/screens/tele-zoom-controls.jpg" alt="Tele Zoom Control: Bar, Tape, Wheel, Dial, Rocker" width="540">
+
 - Lens bar grouping (Auto / Grouped / All) and button size (Compact / Normal / Large), from the eye panel.
 - **Exposure memory** (Settings > Viewfinder & controls > Control Style): **Per camera**, each lens keeps its own exposure mode,
   ISO, shutter, EV and WB, or **Shared**, one set for every lens (focus stays per lens).
