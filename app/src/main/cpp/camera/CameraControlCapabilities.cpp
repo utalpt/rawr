@@ -123,7 +123,7 @@ CameraControlState readInitialCameraControlState(const ACameraMetadata* characte
         char setting[PROP_VALUE_MAX]{};
         __system_property_get("ro.product.device", device);
         __system_property_get("debug.rawr.sensor_mode_fps", setting);
-        const bool applied = sensorModeFpsCeilingAllowed(device, setting[0]);
+        bool applied = sensorModeFpsCeilingAllowed(device, setting[0]);
         // The diagnosis is collected wherever the vendor table is exposed, applied or not: a lens held in
         // a 30 fps mode has to name that entry even on a device the ceiling has not been validated on.
         const auto tag =
@@ -141,6 +141,10 @@ CameraControlState readInitialCameraControlState(const ACameraMetadata* characte
                 route.stream.height - std::min(route.stream.height, std::max(route.cropBottom, route.highFpsCropBottom)));
             const auto modes = parseQuicSensorModeTable(table->data.i32, table->count);
             const auto decision = sensorModeFpsDecision(modes, caps.rawWidth, caps.rawHeight, keptRowsEnd, forcedMode);
+            // Rawr 17U fork: a lens held in one mode gets that mode's ceiling on the 17 Ultra too (SensorModeFpsPolicy.h).
+            if (decision.reason == SensorModeFpsReason::kForcedMode &&
+                sensorModeForcedFpsCeilingAllowed(device, setting[0]))
+                applied = true;
             if (applied) caps.sensorModeFpsCeiling = decision.ceiling;
             // Name the cause next to the number: which table entry the ceiling comes from, which mode the
             // lens holds the sensor in, and the whole table so the index can be read back.

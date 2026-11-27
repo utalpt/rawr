@@ -44,7 +44,12 @@ internal class SliderBarSpec(
     val labels: List<String>,
     val autoLabel: String?,
     val onAuto: (() -> Unit)?,
-    val onSelect: (Int) -> Unit
+    val onSelect: (Int) -> Unit,
+    /** Rawr 17U fork: the indices that get a long tick and a label (the tele zoom's 75/85/90/100 mm); null = every
+     *  Nth by the number of values. */
+    val majors: Set<Int>? = null,
+    /** Rawr 17U fork: finger travel per value (the tele zoom's 26 values use less, so 75 to 100 mm is one swipe). */
+    val spacingDp: Float = 14f
 )
 
 /**
@@ -134,7 +139,7 @@ internal fun SliderBarView(modifier: Modifier = Modifier) {
 private fun SliderRuler(spec: SliderBarSpec, modifier: Modifier, onDetent: () -> Unit) {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val spacingPx = with(density) { 14.dp.toPx() }
+    val spacingPx = with(density) { spec.spacingDp.dp.toPx() }
     var dragPx by remember(spec.tag) { mutableFloatStateOf(0f) }
     val labelEvery = if (spec.labels.size <= 16) 1 else if (spec.labels.size <= 40) 3 else 5
     val accent = CaptureColors.Accent
@@ -189,7 +194,7 @@ private fun SliderRuler(spec: SliderBarSpec, modifier: Modifier, onDetent: () ->
                 if (i !in spec.labels.indices) continue
                 val x = cx + k * spacingPx + dragPx
                 if (x < 0f || x > size.width) continue
-                val major = i % labelEvery == 0
+                val major = spec.majors?.contains(i) ?: (i % labelEvery == 0)
                 val tickTop = baseY - if (major) 10.dp.toPx() else 5.dp.toPx()
                 drawLine(Color.White.copy(alpha = if (k == 0) 0f else .45f), Offset(x, tickTop), Offset(x, baseY), 1.5f)
                 if (major && k != 0 && abs(k) * spacingPx > 26.dp.toPx()) {

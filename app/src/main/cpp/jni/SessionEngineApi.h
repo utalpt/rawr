@@ -102,6 +102,7 @@ void setWhiteBalanceLocked(EngineHandle handle, int32_t temperatureK, int32_t ti
 void setManualExposureTimeNs(EngineHandle handle, int64_t value) noexcept;
 void setManualSensitivity(EngineHandle handle, int32_t value) noexcept;
 void setExposureCompensationSteps(EngineHandle handle, int32_t value) noexcept;
+void setOpticalZoomCode(EngineHandle handle, double code) noexcept;  // Rawr 17U fork
 void setSpotAeTarget(EngineHandle handle, bool active, float x, float y) noexcept;
 void pickWhiteBalance(EngineHandle handle, float x, float y) noexcept;
 void setFocusMode(EngineHandle handle, int mode, float x, float y, uint64_t requestId) noexcept;

@@ -67,6 +67,8 @@ std::string serializeCameraControlState(const CameraControlState& st) {
       << ",\"isoPrioritySupported\":" << (c.isoPrioritySupported ? "true" : "false")
        << ",\"tapAfSupported\":" << (c.tapAfSupported ? "true" : "false")
        << ",\"dngOnly\":" << (c.dngOnly ? "true" : "false")
+       // Rawr 17U fork: the highest video frame rate the lens's sensor mode runs (0 = no limit), for the fps button.
+       << ",\"videoFpsMax\":" << c.sensorModeFpsCeiling
        << ",\"lensUnavailable\":" << (c.lensUnavailable ? "true" : "false")
        << ",\"profileError\":" << quoted(c.profileError)
        << ",\"faceDetectSupported\":" << (c.faceDetectSupported ? "true" : "false")

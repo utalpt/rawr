@@ -975,6 +975,11 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_rawr_camera_integration_NativePreviewEngine_setExposureCompensationSteps(JNIEnv*, jobject, jlong h, jint v) {
     rawrcam::session::setExposureCompensationSteps(handle(h), static_cast<int32_t>(v));
 }
+// Rawr 17U fork: the tele's optical zoom position (3.2 = 75 mm to 4.3 = 100 mm); <= 0 gives the profile's value back.
+extern "C" JNIEXPORT void JNICALL
+Java_com_rawr_camera_integration_NativePreviewEngine_setOpticalZoomCode(JNIEnv*, jobject, jlong h, jdouble code) {
+    rawrcam::session::setOpticalZoomCode(handle(h), static_cast<double>(code));
+}
 extern "C" JNIEXPORT void JNICALL Java_com_rawr_camera_integration_NativePreviewEngine_setWhiteBalanceMode(
     JNIEnv*, jobject, jlong h, jint v, jlong requestId) {
     rawrcam::session::setWhiteBalanceMode(handle(h), v, requestId);

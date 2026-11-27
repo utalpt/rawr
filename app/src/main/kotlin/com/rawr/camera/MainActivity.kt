@@ -21,6 +21,7 @@ import com.rawr.camera.architecture.VIDEO_FPS_CHOICES
 import com.rawr.camera.architecture.TriggerCapture
 import com.rawr.camera.integration.NativeCameraUiSnapshot
 import com.rawr.camera.model.CaptureMode
+import com.rawr.camera.model.effectiveVideoFps
 import com.rawr.camera.settings.SettingsActivity
 import com.rawr.camera.ui.CaptureRoute
 import com.rawr.camera.ui.CaptureTheme
@@ -204,10 +205,10 @@ class MainActivity : ComponentActivity() {
             val viewfinderQuick by captureViewModel.viewfinderQuick.collectAsStateWithLifecycle()
             val latestGalleryImage by captureViewModel.latestGalleryImage.collectAsStateWithLifecycle()
             val videoSelection = androidx.compose.runtime.remember(captureViewModel) {
-                captureViewModel.controller.state.map { it.videoResolution to it.videoFps }.distinctUntilChanged()
+                captureViewModel.controller.state.map { it.videoResolution to it.effectiveVideoFps() }.distinctUntilChanged()
             }
             val initialVideoSelection = androidx.compose.runtime.remember(captureViewModel) {
-                captureViewModel.controller.state.value.let { it.videoResolution to it.videoFps }
+                captureViewModel.controller.state.value.let { it.videoResolution to it.effectiveVideoFps() }
             }
             val selectedVideo by videoSelection.collectAsStateWithLifecycle(initialVideoSelection)
             val recording by captureViewModel.recording.state.collectAsStateWithLifecycle()

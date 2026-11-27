@@ -79,6 +79,16 @@ internal fun CaptureSettings(state: SettingsUiState, dispatch: SettingsDispatch)
                 testTag = SettingsTestTags.row("Capture", "shutter_sound")
             ) { dispatch.invoke(SetShutterSound(it)) }
             SettingDivider()
+            // Rawr 17U fork: the tele optical zoom control's look (bar above the exposure row, or a vertical
+            // wheel / dial / rocker on the viewfinder's edge, ported from the Telezoom module).
+            val teleStyle = com.rawr.camera.model.TeleZoomStyle.fromId(state.values.teleZoomStyle)
+            SettingsRow(
+                title = "Tele Zoom Control",
+                value = teleStyle.label,
+                testTag = SettingsTestTags.row("Capture", "tele_zoom_style"),
+                onClick = { dispatch.invoke(SetTeleZoomStyle(teleStyle.next().id)) }
+            )
+            SettingDivider()
             SettingsSwitchRow(
                 title = "Location Tagging",
                 checked = state.values.locationTagging && locationGranted,

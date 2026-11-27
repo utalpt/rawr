@@ -1,5 +1,6 @@
 package com.rawr.camera.video
 
+import com.rawr.camera.model.effectiveVideoFps
 import android.app.Application
 import com.rawr.camera.architecture.CaptureScreenController
 import com.rawr.camera.integration.RawPreviewCoordinator
@@ -25,7 +26,8 @@ internal class CaptureRecordingBackend(
     suspend fun start(options: RecordingOptions, gps: CaptureGps?): VideoRecording {
         val captureSnapshot = controller.state.value
         val selectedMode = captureSnapshot.videoResolution
-        val selectedFps = captureSnapshot.videoFps
+        // Rawr 17U fork: the rate this lens runs (60 chosen on the tele's DCG / ISZ records at 30).
+        val selectedFps = captureSnapshot.effectiveVideoFps()
         val imageSettings = settingsSnapshot()
         val encoder = imageSettings.videoEncoder.sanitized()
         val log = imageSettings.videoLogEnabled

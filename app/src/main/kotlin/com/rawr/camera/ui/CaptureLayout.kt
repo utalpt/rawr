@@ -83,9 +83,13 @@ internal fun PhysicalCaptureLayout(
     val recordingNow = isVideo && videoControls.recording
     var revealTick by remember { mutableStateOf(0) }
     var revealed by remember { mutableStateOf(false) }
-    LaunchedEffect(revealTick) {
+    // Rawr 17U fork: a finger on the revealed controls keeps them up (a TELE drag while recording no longer has the
+    // row vanish under it); they hide 3 s after the last touch ends.
+    var touching by remember { mutableStateOf(false) }
+    LaunchedEffect(revealTick, touching) {
         if (revealTick > 0) {
             revealed = true
+            if (touching) return@LaunchedEffect
             delay(3_000L)
             revealed = false
         }
@@ -140,7 +144,20 @@ internal fun PhysicalCaptureLayout(
                     // With the controls shown, gestures pass through untouched.
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                        if (!cleanNow.value) return@awaitEachGesture
+                        if (!cleanNow.value) {
+                            // Rawr 17U fork: revealed - the touch keeps the controls up until it ends.
+                            if (revealed) {
+                                touching = true
+                                revealTick++
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!change.pressed) break
+                                }
+                                touching = false
+                            }
+                            return@awaitEachGesture
+                        }
                         val slop = viewConfiguration.touchSlop
                         var swiping = false
                         while (true) {

@@ -166,6 +166,7 @@ internal object NativeCapabilityProjection {
                 supportedWhiteBalanceModes = supportedWbModes,
                 manualWhiteBalanceSupported = s.manualWhiteBalanceSupported,
                 dngOnly = s.dngOnly,
+                videoFpsMax = s.videoFpsMax,
                 lensUnavailable = s.lensUnavailable,
                 profileError = s.profileError
             )

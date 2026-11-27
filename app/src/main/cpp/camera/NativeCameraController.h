@@ -96,6 +96,8 @@ class NativeCameraController {
     // File keeping, across launches, the lenses the start ladder proved need RAW-only (no companion).
     void setStartLadderStore(const std::string& path);
     void setExposureCompensationSteps(int32_t steps);
+    // Rawr 17U fork: the tele's optical zoom position (3.2 to 4.3); <= 0 gives the lens profile's value back.
+    void setOpticalZoomCode(double code);
     // rawr auto exposure (opt-in, color/RawrAutoExposure.h). When enabled
     // and eligible (A/S/I mode, manual sensor control, stills, no spot AE,
     // known ISO coordinate) the repeating request runs AE OFF with the pair

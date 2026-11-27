@@ -845,6 +845,11 @@
             1024
           ],
           "white": 16383
+        },
+        "exposure": {
+          "extended": false,
+          "isoMax": 320,
+          "shutterMaxNs": 0
         }
       }
     },

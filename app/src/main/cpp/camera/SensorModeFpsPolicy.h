@@ -153,4 +153,13 @@ inline constexpr size_t kSensorModeTableLogEntries = 64;
     return productDevice == "dada";
 }
 
+// Rawr 17U fork: on the Xiaomi 17 Ultra (nezha) the ceiling of a lens that holds the sensor in one mode
+// (current_mode: the tele's DCG and ISZ, mode 6 and 9, both 4080x3072@30) applies too: at 60 fps the HAL aborts
+// and reconnects every few seconds there (CamxResultExtIFEEPRFail, 27/11 tests; 24 and 30 fps run clean).
+// The other lenses keep the full ceiling off, as before. debug.rawr.sensor_mode_fps=0 turns this off as well.
+[[nodiscard]] inline bool sensorModeForcedFpsCeilingAllowed(std::string_view productDevice, char setting) noexcept {
+    if (setting == '0') return false;
+    return productDevice == "nezha";
+}
+
 }  // namespace rawrcam::camera

@@ -279,7 +279,8 @@ internal fun LensSelector(
         modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(if (buttons) 6.dp else 3.dp)
     ) {
-        state.capabilities.lenses.forEach { lens ->
+        // Rawr 17U fork: one tele button (TeleOpticalZoom.visibleLenses).
+        com.rawr.camera.model.TeleOpticalZoom.visibleLenses(state.capabilities.lenses).forEach { lens ->
             val lensSelected = state.selectedLensId == lens.id
             val buttonShape = RoundedCornerShape(10.dp)
             Box(
@@ -335,7 +336,7 @@ internal fun LensSelector(
             ) {
                 if (buttons) {
                     // "3.2x 50MP": the zoom on top, the rest below in small mono.
-                    val name = lens.displayName.trim()
+                    val name = com.rawr.camera.model.TeleOpticalZoom.displayName(lens, state.teleZoomMm).trim()
                     val split = name.indexOf(' ')
                     val top = if (split > 0) name.substring(0, split) else name
                     val bottom = if (split > 0) name.substring(split + 1).trim() else ""
@@ -366,7 +367,7 @@ internal fun LensSelector(
                     }
                 } else {
                 Text(
-                    lens.displayName,
+                    com.rawr.camera.model.TeleOpticalZoom.displayName(lens, state.teleZoomMm),
                     color =
                         if (state.selectedLensId ==
                             lens.id

@@ -25,6 +25,7 @@ data class RestoreCapturePreferences(
     val videoLogEnabled: Boolean = false,
     val videoAspect: com.rawr.camera.video.VideoAspect = com.rawr.camera.video.VideoAspect.Native,
     val photoAspect: com.rawr.camera.model.PhotoAspect = com.rawr.camera.model.PhotoAspect.Native,
+    val teleZoomMm: Int = com.rawr.camera.model.TeleOpticalZoom.MAX_MM,
     val selfTimer: com.rawr.camera.settings.model.SelfTimer =
         com.rawr.camera.settings.model.SelfTimer.Off
 ) : PresentationCaptureAction
@@ -70,6 +71,9 @@ data object ToggleVideoLog : PresentationCaptureAction
 data class SetVideoAspect(val value: com.rawr.camera.video.VideoAspect) : PresentationCaptureAction
 
 data class SetPhotoAspect(val value: com.rawr.camera.model.PhotoAspect) : PresentationCaptureAction
+
+/** Rawr 17U fork: the tele's optical zoom on the 4.3x lenses, 75 to 100 mm (TeleOpticalZoom). */
+data class SetTeleZoomMm(val mm: Int) : PresentationCaptureAction
 
 /** Cycles the self-timer Off → 3s → 5s → 10s → Off; cancels any active countdown. */
 data object CycleSelfTimer : PresentationCaptureAction

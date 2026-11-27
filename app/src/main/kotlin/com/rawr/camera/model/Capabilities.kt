@@ -79,6 +79,11 @@ data class CameraCapabilities(
     val manualWhiteBalanceSupported: Boolean = false,
     /** The lens saves DNG only (200 MP): the output format is shown and captured as DNG. */
     val dngOnly: Boolean = false,
+    /**
+     * Rawr 17U fork: the highest video frame rate the lens's sensor mode runs (the 17 Ultra tele's DCG / ISZ: 30);
+     * 0 = no limit. The fps button shows and cycles only the rates up to it; the chosen rate comes back on other lenses.
+     */
+    val videoFpsMax: Int = 0,
     /** The lens's camera session never delivered a frame and recovery gave up. */
     val lensUnavailable: Boolean = false,
     /** Why the last lens profile was refused (the previous one stays in force); empty when none. */
@@ -90,6 +95,7 @@ data class CameraCapabilities(
         require(lenses.map(LensCapability::id).distinct().size == lenses.size) { "Lens ids must be unique" }
         require(fpsChoices.all { it > 0 }) { "FPS choices must be positive" }
         require(fpsChoices.distinct().size == fpsChoices.size) { "FPS choices must be unique" }
+        require(videoFpsMax >= 0) { "Video fps ceiling must not be negative" }
         require(stabilizationOptions.none(String::isBlank)) { "Stabilization option labels must not be blank" }
     }
 }

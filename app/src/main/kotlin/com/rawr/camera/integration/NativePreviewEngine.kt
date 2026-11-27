@@ -316,6 +316,8 @@ class NativePreviewEngine {
     external fun setManualSensitivity(handle: Long, sensitivity: Int)
 
     external fun setExposureCompensationSteps(handle: Long, steps: Int)
+    /** Rawr 17U fork: the tele's optical zoom position (3.2 = 75 mm to 4.3 = 100 mm); <= 0 gives the profile's back. */
+    external fun setOpticalZoomCode(handle: Long, code: Double)
 
     external fun setWhiteBalanceMode(handle: Long, mode: Int, requestId: Long)
 

@@ -75,6 +75,7 @@ internal fun SettingsValues.withCapturePreferenceChanges(
     videoLogEnabled = if (before.videoLogEnabled != after.videoLogEnabled) after.videoLogEnabled else videoLogEnabled,
     videoEncoder = if (before.videoAspect != after.videoAspect) videoEncoder.copy(aspect = after.videoAspect) else videoEncoder,
     photoAspectId = if (before.photoAspect != after.photoAspect) after.photoAspect.id else photoAspectId,
+    teleZoomMm = if (before.teleZoomMm != after.teleZoomMm) after.teleZoomMm else teleZoomMm,
     videoFps = if (before.videoFps != after.videoFps) videoFpsOrDefault(after.videoFps) else videoFps,
     selfTimer = if (before.selfTimer != after.selfTimer) after.selfTimer else selfTimer
 )
@@ -98,5 +99,6 @@ internal fun SettingsValues.capturePreferences(lenses: List<LensProfile> = empty
     videoLogEnabled = videoLogEnabled,
     videoAspect = videoEncoder.sanitized().aspect,
     photoAspect = com.rawr.camera.model.PhotoAspect.fromId(photoAspectId),
+    teleZoomMm = teleZoomMm,
     selfTimer = selfTimer
 )

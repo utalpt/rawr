@@ -1539,6 +1539,18 @@ struct NativeCameraController::Impl final : CameraEventSink {
                                        requests.latestSubmittedSerial());
         captureChanged.notify_all();
         if (!actions.frame) return;
+        // Rawr 17U fork: on the tele, the HAL reports the 75 mm focal length whatever position the optics were sent to
+        // (xiaomi.zoomRatio.debug.setZoomRatioCode, 3.2 = 75 mm to 4.3 = 100 mm, 0.044 per mm as in Telezoom). The
+        // frame's focal length follows the position its own result carries, so EXIF and DNG name the real one.
+        // Only while the HAL still reports the 75 mm end (19.9 mm on the 17 Ultra), so a HAL that reports the real
+        // focal length is never scaled twice.
+        if (actions.frame->focalLengthMm && *actions.frame->focalLengthMm < 21.0f) {
+            if (const auto code = deviceSession.vendorResultReal(result, "xiaomi.zoomRatio.debug.setZoomRatioCode");
+                code && *code >= 3.2 && *code <= 4.31) {
+                const double mm = 75.0 + (*code - 3.2) / 0.044;
+                actions.frame->focalLengthMm = float(*actions.frame->focalLengthMm * mm / 75.0);
+            }
+        }
         // The decision frame only fills the discarded companion: no viewfinder
         // or capture consumer may see its metadata.
         if (actions.frame->optimizedStillRequestId == metadata::kFullSizeDecisionRequestId) {
@@ -1928,6 +1940,17 @@ struct NativeCameraController::Impl final : CameraEventSink {
         control.requestedEvSteps = std::clamp(value, control.capabilities.evMinSteps, control.capabilities.evMaxSteps);
         diag("CAMERA_CONTROL_REQUEST evSteps=" + std::to_string(control.requestedEvSteps));
         submitRepeatingLocked();
+    }
+    // Rawr 17U fork: the tele's optical zoom position (CameraDeviceSession::setOpticalZoomCode); <= 0 gives the
+    // lens profile's value back at the next session.
+    void setOpticalZoomCode(double code) {
+        std::lock_guard<std::mutex> lock(mutex);
+        deviceSession.setOpticalZoomCode(code > 0 ? std::optional<double>(code) : std::nullopt);
+        const bool applied = code > 0 && deviceSession.applyOpticalZoomCode([this](const std::string& line) { diag(line); });
+        std::ostringstream line;
+        line << "CAMERA_CONTROL_REQUEST opticalZoomCode=" << code << " applied=" << (applied ? "true" : "false");
+        diag(line.str());
+        if (applied) submitRepeatingLocked();
     }
     float evStepEvLocked() const {
         const auto& caps = control.capabilities;
@@ -2488,6 +2511,7 @@ void NativeCameraController::setStartLadderStore(const std::string& path) {
     impl_->loadLadderStoreLocked();
 }
 void NativeCameraController::setExposureCompensationSteps(int32_t value) { impl_->setEvSteps(value); }
+void NativeCameraController::setOpticalZoomCode(double code) { impl_->setOpticalZoomCode(code); }
 std::string NativeCameraController::exportCameraControls() { return impl_->exportCameraControlsText(); }
 void NativeCameraController::importCameraControls(const std::string& text, bool applyOpen) {
     impl_->importCameraControlsText(text, applyOpen);

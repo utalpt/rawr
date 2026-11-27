@@ -510,6 +510,7 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
                     ?: d.dngCompressionId,
             saveBaseDng = p[Keys.saveBaseDng] ?: true,
             shutterSound = p[Keys.shutterSound] ?: d.shutterSound,
+            teleZoomStyle = p[Keys.teleZoomStyle] ?: d.teleZoomStyle,
             gridMode = enumOrDefault(p[Keys.gridMode], d.gridMode),
             lensBarGrouping = enumOrDefault(p[Keys.lensBarGrouping], d.lensBarGrouping),
             lensBarSize = enumOrDefault(p[Keys.lensBarSize], d.lensBarSize),
@@ -568,6 +569,8 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
             videoUserLutProfileId = p[Keys.videoUserLutProfileId]?.takeIf { it.isNotEmpty() },
             videoLogEnabled = p[Keys.videoLogEnabled] ?: false,
             photoAspectId = p[Keys.photoAspectId] ?: d.photoAspectId,
+            teleZoomMm = (p[Keys.teleZoomMm] ?: d.teleZoomMm)
+                .coerceIn(com.rawr.camera.model.TeleOpticalZoom.MIN_MM, com.rawr.camera.model.TeleOpticalZoom.MAX_MM),
             videoLogProfile = enumOrDefault(p[Keys.videoLogProfile], VideoLogProfile.LogC3),
             selectedUserLutProfileId = p[Keys.selectedUserLutProfileId],
             userLutProfiles = LutProfileCodec.decode(p[Keys.userLutProfiles]),
@@ -729,6 +732,7 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         p[Keys.dngCompressionId] = v.dngCompressionId
         p[Keys.saveBaseDng] = v.saveBaseDng
         p[Keys.shutterSound] = v.shutterSound
+        p[Keys.teleZoomStyle] = v.teleZoomStyle
         p[Keys.gridMode] = v.gridMode.name
         p[Keys.lensBarGrouping] = v.lensBarGrouping.name
         p[Keys.lensBarSize] = v.lensBarSize.name
@@ -748,6 +752,7 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         p[Keys.videoUserLutProfileId] = v.videoUserLutProfileId.orEmpty()
         p[Keys.videoLogEnabled] = v.videoLogEnabled
         p[Keys.photoAspectId] = v.photoAspectId
+        p[Keys.teleZoomMm] = v.teleZoomMm
         p[Keys.videoLogProfile] = v.videoLogProfile.name
         p[Keys.colorRenderProfile] = v.colorRenderProfile.name
         p[Keys.rec709ToneRenderExposure] = v.rec709Tone.renderExposure
@@ -1104,6 +1109,7 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         val dngCompressionId = stringPreferencesKey("capture_dng_compression_id")
         val saveBaseDng = booleanPreferencesKey("capture_save_base_dng")
         val shutterSound = booleanPreferencesKey("capture_shutter_sound")
+        val teleZoomStyle = stringPreferencesKey("capture_tele_zoom_style")  // Rawr 17U fork
         val gridMode = stringPreferencesKey("capture_grid_mode")
         val lensBarGrouping = stringPreferencesKey("lens_bar_grouping")
         val lensBarSize = stringPreferencesKey("lens_bar_size")
@@ -1155,6 +1161,7 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         val videoUserLutProfileId = stringPreferencesKey("video_user_lut_profile_id")
         val videoLogEnabled = booleanPreferencesKey("video_log_enabled")
         val photoAspectId = stringPreferencesKey("photo_aspect_id")
+        val teleZoomMm = intPreferencesKey("tele_zoom_mm")  // Rawr 17U fork
         val videoLogProfile = stringPreferencesKey("video_log_profile")
         val colorRenderProfile = stringPreferencesKey("color_render_profile")
         val selectedUserLutProfileId = stringPreferencesKey("selected_user_lut_profile_id")

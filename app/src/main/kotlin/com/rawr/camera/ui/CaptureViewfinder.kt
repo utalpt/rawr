@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -86,9 +87,11 @@ internal fun CaptureViewfinder(
         val lookSheetOpen = LookSheetState.open
         androidx.compose.runtime.LaunchedEffect(lookSheetOpen) {
             if (lookSheetOpen && state.whiteBalancePanelOpen) dispatch(ToggleWhiteBalancePanel)
+            if (lookSheetOpen) TeleZoomSheetState.open = false
         }
         androidx.compose.runtime.LaunchedEffect(state.whiteBalancePanelOpen) {
             if (state.whiteBalancePanelOpen) LookSheetState.open = false
+            if (state.whiteBalancePanelOpen) TeleZoomSheetState.open = false
         }
         // The rail shares the right edge with the compact scopes; keep it below them.
         val density = LocalDensity.current
@@ -253,17 +256,24 @@ internal fun CaptureViewfinder(
             // Focus bottom controls sit above the scrim (z21 vs z20) so they stay
             // interactive; taps on the image area still dismiss. Modal palettes
             // keep full coverage.
+            var scrimCoords by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
             Box(
                 Modifier
                     .matchParentSize()
                     .zIndex(20f)
+                    .onGloballyPositioned { scrimCoords = it }
                     .pointerInput(
                         state.focus.selectorOpen,
                         state.monitorPanelOpen,
                         state.whiteBalancePanelOpen
                     ) {
                         detectTapGestures(
-                            onTap = {
+                            onTap = { at ->
+                                // Rawr 17U fork: a tap on the TELE cell under the WB scrim switches to the TELE sheet.
+                                val root = scrimCoords?.takeIf { it.isAttached }?.localToRoot(at)
+                                if (state.whiteBalancePanelOpen && root != null &&
+                                    TeleZoomSheetState.cellBounds?.contains(root) == true
+                                ) TeleZoomSheetState.open = true
                                 if (state.focus.selectorOpen) dispatch(CloseFocusSelector)
                                 if (state.monitorPanelOpen) dispatch(ToggleMonitorPanel)
                                 if (state.whiteBalancePanelOpen) dispatch(ToggleWhiteBalancePanel)
@@ -313,6 +323,14 @@ internal fun CaptureViewfinder(
             }
         }
         if (state.captureFlash) Box(Modifier.matchParentSize().background(Color.White.copy(alpha = .12f)))
+        // Rawr 17U fork: the TELE control on the right edge (Wheel / Dial / Rocker, Settings > Tele Zoom Control).
+        if (TeleZoomSheetState.open && TeleZoomSheetState.style != com.rawr.camera.model.TeleZoomStyle.BAR &&
+            state.teleZoomAvailable() && !state.whiteBalancePanelOpen
+        ) {
+            Box(controlFrameModifier.zIndex(4f), contentAlignment = Alignment.CenterEnd) {
+                TeleEdgeControl(state, dispatch, Modifier.padding(end = 6.dp))
+            }
+        }
         Box(controlFrameModifier.zIndex(3f)) {
             androidx.compose.animation.AnimatedVisibility(
                 visible = quickPanelOpen && !popupOpen,

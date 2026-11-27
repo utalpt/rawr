@@ -80,6 +80,7 @@ class SessionEngine {
     void setManualExposureTimeNs(int64_t value);
     void setManualSensitivity(int32_t value);
     void setExposureCompensationSteps(int32_t value);
+    void setOpticalZoomCode(double code);  // Rawr 17U fork: tele optical zoom
     void setWhiteBalanceMode(int mode, int64_t requestId);
     void setWhiteBalanceTempTint(int32_t temperatureK, int32_t tint, int32_t editedAxes, int64_t requestId);
     void setWhiteBalanceLocked(int32_t temperatureK, int32_t tint, int64_t requestId);

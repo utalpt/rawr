@@ -44,6 +44,7 @@ import com.rawr.camera.architecture.ToggleWhiteBalancePanel
 import com.rawr.camera.model.CaptureMode
 import com.rawr.camera.model.CaptureUiState
 import com.rawr.camera.model.WhiteBalanceMode
+import com.rawr.camera.model.effectiveVideoFps
 import com.rawr.camera.settings.model.SelfTimer
 import com.rawr.camera.video.VideoResolutionMode
 
@@ -86,9 +87,9 @@ internal fun CaptureTopBar(
             TopBarSlot {
                 VideoTopBarChoice(
                     icon = Icons.Outlined.SlowMotionVideo,
-                    label = "${state.videoFps}",
+                    label = "${state.effectiveVideoFps()}",
                     testTag = CaptureTestTags.TOPBAR_VIDEO_FPS,
-                    description = "Video frame rate ${state.videoFps} fps. Tap to change.",
+                    description = "Video frame rate ${state.effectiveVideoFps()} fps. Tap to change.",
                     enabled = !videoLocked,
                     orientation = state.orientation,
                     onClick = {

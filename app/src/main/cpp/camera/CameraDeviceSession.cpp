@@ -151,6 +151,21 @@ std::optional<int64_t> CameraDeviceSession::vendorResultValue(const ACameraMetad
         default: return std::nullopt;
     }
 }
+std::optional<double> CameraDeviceSession::vendorResultReal(const ACameraMetadata* result, const std::string& name) {
+    if (!result || !characteristics_ || !cameraContext_) return std::nullopt;
+    auto it = vendorTags_.find(name);
+    if (it == vendorTags_.end())
+        it = vendorTags_.emplace(name, resolveMetadataTagByNameCompat(characteristics_, cameraContext_->cameraId.c_str(),
+                                                                      name.c_str(), nullptr)).first;
+    if (!it->second) return std::nullopt;
+    ACameraMetadata_const_entry e{};
+    if (ACameraMetadata_getConstEntry(result, *it->second, &e) != ACAMERA_OK || e.count == 0) return std::nullopt;
+    switch (e.type) {
+        case ACAMERA_TYPE_FLOAT: return e.data.f[0];
+        case ACAMERA_TYPE_DOUBLE: return e.data.d[0];
+        default: return std::nullopt;
+    }
+}
 void CameraDeviceSession::logKeyResultsOnce(const ACameraMetadata* result, const Diagnostic& diag) {
     if (!resultKeysPending_ || !result) return;
     resultKeysPending_ = false;
@@ -688,7 +703,7 @@ bool CameraDeviceSession::createSession(ANativeWindow* window, const std::option
         // A separate photo session configures the photo stream at the shutter instead.
         if (!separatePhotoSession_) outputs.push_back({captureWindow_, std::string(), recipe.photoStreamUseCase});
         if (selected) {
-            stillKeys_ = selected->vendorKeys;
+            stillKeys_ = keysForLens(*selected);
             stillKeysCameraId_ = selected->cameraId;
         }
     }
@@ -738,7 +753,7 @@ bool CameraDeviceSession::createSession(ANativeWindow* window, const std::option
             // request-scope keys and the control state. The HAL only reads the keys it lists as session keys.
             applyPreviewRequestDefaults(sessionParameters_.get(), *cameraContext_, minimalDefaults);
             if (selected) {
-                const auto requestKeys = applyCameraKeySettings(sessionParameters_.get(), characteristics_, selected->vendorKeys,
+                const auto requestKeys = applyCameraKeySettings(sessionParameters_.get(), characteristics_, keysForLens(*selected),
                                                                 selected->cameraId.c_str(),
                                                                 CameraKeySetting::Scope::Request, "lens_in_session", diag);
                 if (!requestKeys.failures.empty())
@@ -833,12 +848,13 @@ bool CameraDeviceSession::createSession(ANativeWindow* window, const std::option
     // Stills, multiframe bursts and video all come from this repeating RAW
     // request, so request-scope keys only need to be set here.
     if (selected) {
-        const auto lensKeys = applyCameraKeySettings(request_.get(), characteristics_, selected->vendorKeys, selected->cameraId.c_str(),
+        const auto keys = keysForLens(*selected);
+        const auto lensKeys = applyCameraKeySettings(request_.get(), characteristics_, keys, selected->cameraId.c_str(),
                                                      CameraKeySetting::Scope::Request, "lens", diag);
         if (!lensKeys.failures.empty())
             return fail("lens_request_keys", "lensId=" + selected->lensId + " failed=" + joined(lensKeys.failures));
-        logCarriedKeys(sessionParameters_.get(), request_.get(), characteristics_, selected->vendorKeys, selected->cameraId.c_str(), diag);
-        resultKeys_ = selected->vendorKeys;
+        logCarriedKeys(sessionParameters_.get(), request_.get(), characteristics_, keys, selected->cameraId.c_str(), diag);
+        resultKeys_ = keys;
         resultKeysLensId_ = selected->lensId;
         resultKeysCameraId_ = selected->cameraId;
         resultKeysPending_ = !resultKeys_.empty();
@@ -1293,4 +1309,35 @@ bool CameraDeviceSession::restoreViewfinderSession(std::unique_lock<std::mutex>&
          std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count()));
     return created;
 }
+// Rawr 17U fork: the tele's optical zoom position (see CameraDeviceSession.h). The key and its use are from the
+// Telezoom module's work on the 17 Ultra (the vendor tags found by Anton Tretiakov, @designation_zero).
+namespace {
+constexpr const char* kOpticalZoomTag = "xiaomi.zoomRatio.debug.setZoomRatioCode";
+}
+
+std::vector<CameraKeySetting> CameraDeviceSession::keysForLens(const LensRoute& route) const {
+    auto keys = route.vendorKeys;
+    if (!opticalZoomCode_) return keys;
+    for (auto& key : keys)
+        if (key.enabled && key.tag == kOpticalZoomTag && !key.values.empty()) key.values = {*opticalZoomCode_};
+    return keys;
+}
+
+bool CameraDeviceSession::applyOpticalZoomCode(const Diagnostic& diag) {
+    if (!request_ || !opticalZoomCode_) return false;
+    // resultKeys_ holds the running lens's keys (read by the result logging): only a copy is changed here.
+    for (const auto& sent : resultKeys_) {
+        if (!sent.enabled || sent.tag != kOpticalZoomTag || sent.values.empty()) continue;
+        auto key = sent;
+        key.values = {*opticalZoomCode_};
+        const auto applied = applyCameraKeySettings(request_.get(), characteristics_, {key}, resultKeysCameraId_.c_str(),
+                                                    CameraKeySetting::Scope::Request, "optical_zoom", diag);
+        for (auto& still : stillKeys_)
+            if (still.enabled && still.tag == kOpticalZoomTag && !still.values.empty()) still.values = key.values;
+        return applied.failures.empty() && applied.applied > 0;
+    }
+    return false;
+}
+
 }  // namespace rawrcam::camera
+

@@ -124,6 +124,8 @@ data class SetExperimentalMultiframeEnabled(val enabled: Boolean) : SettingsAppl
 data class SetUltraHdrEnabled(val enabled: Boolean) : SettingsApplicationAction
 /** Rawr 17U fork: the camera sounds on or off. */
 data class SetShutterSound(val enabled: Boolean) : SettingsApplicationAction
+/** Rawr 17U fork: the TELE control's look (TeleZoomStyle id). */
+data class SetTeleZoomStyle(val id: String) : SettingsApplicationAction
 
 data class SetAePriorityDisabled(val disabled: Boolean) : SettingsApplicationAction
 

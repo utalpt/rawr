@@ -190,7 +190,15 @@ class NativeVideoRecorder(private val context: Context, private val preview: Raw
         uri = null
         journal = null
         try {
-            check(preview.beginVideoFps(request.fps)) { "RAW camera could not lock ${request.fps} fps" }
+            // Rawr 17U fork: a lens held in a 30 fps sensor mode (the 17 Ultra tele's DCG / ISZ) has no 60 fps range;
+            // it records at the fastest choice below the one asked for instead of not recording.
+            val fps = com.rawr.camera.architecture.VIDEO_FPS_CHOICES.filter { it <= request.fps }.sortedDescending()
+                .firstOrNull { preview.beginVideoFps(it) }
+            check(fps != null) { "RAW camera could not lock ${request.fps} fps" }
+            if (fps != request.fps) {
+                android.util.Log.i("RawrVideo", "Recording at $fps fps: the lens has no ${request.fps} fps range")
+                settings = request.copy(fps = fps)
+            }
             uri = outputStore.create(request.saveLocationId, displayName, captureTime.wallClockUnixMillis,
                 if (request.audioPcmBits > 0) "video/quicktime" else "video/mp4")
             val recoveryRoot = File(context.noBackupFilesDir, "video_jobs")
@@ -204,7 +212,7 @@ class NativeVideoRecorder(private val context: Context, private val preview: Raw
             index = File(recoveryRoot, "$stem.idx")
             metadataGamut = request.logProfile?.gamut?.label ?: "Rec.709 / sRGB"
             metadataTransfer = request.logProfile?.transfer?.label ?: if (request.rec709) "BT.709" else "sRGB"
-            handle = engine.nativeStart(fd, request.width, request.height, request.fps,
+            handle = engine.nativeStart(fd, request.width, request.height, fps,
                 request.bitrate, request.intraFrames, rotation, request.bitrateMode, request.maxBFrames,
                 request.audioChannels, request.audioBitrate, request.audio.preset, request.audio.deviceId(context),
                 request.audio.gainDb.toFloat(), request.audio.lowCutHz, request.audioPcmBits, request.bitDepth,
@@ -225,7 +233,7 @@ class NativeVideoRecorder(private val context: Context, private val preview: Raw
             append(JSONObject().put("event", "start").put("uri", uri.toString())
                 .put("displayName", displayName).put("saveLocationId", request.saveLocationId)
                 .put("bootNs", SystemClock.elapsedRealtimeNanos()).put("camera", preview.cameraControlSnapshot())
-                .put("fps", request.fps).put("bitrate", request.bitrate)
+                .put("fps", fps).put("bitrate", request.bitrate)
                 .put("mode", request.mode).put("width", request.width).put("height", request.height)
                 .put("intraFrames", request.intraFrames).put("rotationDegrees", rotation)
                 .put("bitrateMode", request.bitrateMode).put("maxBFrames", request.maxBFrames)

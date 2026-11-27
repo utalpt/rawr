@@ -188,7 +188,8 @@ internal fun LensGroupSelector(
     val haptics = LocalCaptureHaptics.current
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("rawr_lens_groups", android.content.Context.MODE_PRIVATE) }
-    val lenses = state.capabilities.lenses
+    // Rawr 17U fork: one tele button - the 3.2x lenses are the 4.3x ones at 75 mm (TeleOpticalZoom).
+    val lenses = com.rawr.camera.model.TeleOpticalZoom.visibleLenses(state.capabilities.lenses)
     // Auto keeps every lens on one row while the row still fits, and groups by optics when it would not.
     // The width is the capsule (60 dp scaled) plus the 6 dp gap, against the usable width less the padding
     // the capture layout puts around this row.
@@ -218,6 +219,13 @@ internal fun LensGroupSelector(
         }
     }
     if (!enabled && expandedGroup != null) expandedGroup = null
+    // Rawr 17U fork: the modes popup opens where the TELE bar sits, so it closes that bar.
+    LaunchedEffect(expandedGroup) {
+        if (expandedGroup != null) {
+            SliderBar.close()
+            TeleZoomSheetState.open = false
+        }
+    }
 
     Row(
         // Scrolls sideways only when the groups don't fit (rare once variants are grouped).
@@ -231,7 +239,7 @@ internal fun LensGroupSelector(
                 ?: members.first()
             Box {
                 LensButtonFace(
-                    displayName = shown.displayName,
+                    displayName = com.rawr.camera.model.TeleOpticalZoom.displayName(shown, state.teleZoomMm),
                     selected = isActive,
                     enabled = enabled,
                     state = state,
@@ -301,7 +309,7 @@ internal fun LensGroupSelector(
                             members.forEach { variant ->
                                 val current = variant.id == state.selectedLensId
                                 LensButtonFace(
-                                    displayName = variant.displayName,
+                                    displayName = com.rawr.camera.model.TeleOpticalZoom.displayName(variant, state.teleZoomMm),
                                     selected = current,
                                     enabled = true,
                                     state = state,

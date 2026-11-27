@@ -745,6 +745,9 @@ class RawPreviewCoordinator(application: Application) : AutoCloseable {
 
     fun setManualSensitivity(sensitivity: Int) = postNative { native.setManualSensitivity(nativeHandle, sensitivity) }
 
+    /** Rawr 17U fork: the tele's optical zoom position; see NativePreviewEngine.setOpticalZoomCode. */
+    fun setOpticalZoomCode(code: Double) = postNative { native.setOpticalZoomCode(nativeHandle, code) }
+
     fun setExposureCompensationSteps(steps: Int) =
         postNative { native.setExposureCompensationSteps(nativeHandle, steps) }
 

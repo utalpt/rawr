@@ -293,6 +293,9 @@ void setManualSensitivity(EngineHandle h, int32_t v) noexcept {
 void setExposureCompensationSteps(EngineHandle h, int32_t v) noexcept {
     if (h) engine(h)->setExposureCompensationSteps(v);
 }
+void setOpticalZoomCode(EngineHandle h, double code) noexcept {
+    if (h) engine(h)->setOpticalZoomCode(code);
+}
 void setSpotAeTarget(EngineHandle h, bool active, float x, float y) noexcept {
     if (h) engine(h)->setSpotAeDisplay(active, x, y);
 }

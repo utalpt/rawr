@@ -135,12 +135,23 @@ class CameraDeviceSession final {
     // Integer value of a vendor result tag, looked up by name once per open
     // camera; nullopt when the camera or this result lacks it.
     std::optional<int64_t> vendorResultValue(const ACameraMetadata* result, const std::string& name);
+    // Rawr 17U fork: the same for a float / double vendor result tag.
+    std::optional<double> vendorResultReal(const ACameraMetadata* result, const std::string& name);
     const std::string& stillGate() const noexcept { return stillGate_; }
     // Logs, once per session, what the first capture result returned for each
     // profile key (CAMERA_KEY_RESULT).
     void logKeyResultsOnce(const ACameraMetadata* result, const Diagnostic& diag);
+    // Rawr 17U fork: the tele's optical zoom position (xiaomi.zoomRatio.debug.setZoomRatioCode, 3.2 = 75 mm to
+    // 4.3 = 100 mm) in place of the lens profile's value, on lenses that carry that key. nullopt gives the profile's
+    // value back. Kept across sessions (a photo session, a restart) until changed; applyOpticalZoomCode puts it on
+    // the running repeating request (resubmit to send it). False when the lens has no such key.
+    void setOpticalZoomCode(std::optional<double> code) { opticalZoomCode_ = code; }
+    bool applyOpticalZoomCode(const Diagnostic& diag);
 
    private:
+    // The lens's profile keys with the optical zoom position above applied.
+    std::vector<CameraKeySetting> keysForLens(const LensRoute& route) const;
+    std::optional<double> opticalZoomCode_;
     void releaseRequestOutputs(bool orphan) noexcept;
     // After the viewfinder session has closed for a photo session: its requests and the outputs only it uses
     // (companion, aux JPEG). The RAW and photo windows stay.

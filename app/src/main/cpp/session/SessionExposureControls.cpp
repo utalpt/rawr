@@ -53,6 +53,11 @@ void SessionEngine::setExposureCompensationSteps(int32_t value) {
     }
     cameraControls_.controller()->setExposureCompensationSteps(value);
 }
+// Rawr 17U fork: the tele's optical zoom position.
+void SessionEngine::setOpticalZoomCode(double code) {
+    if (!cameraControls_.controller()) return;
+    cameraControls_.controller()->setOpticalZoomCode(code);
+}
 void SessionEngine::setFocusMode(int mode, float x, float y, uint64_t requestId) {
     if (!cameraControls_.controller()) return;
     rawrcam::camera::FocusControlMode m = rawrcam::camera::FocusControlMode::Continuous;

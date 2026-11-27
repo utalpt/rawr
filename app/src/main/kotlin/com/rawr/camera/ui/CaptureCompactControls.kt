@@ -177,6 +177,17 @@ private fun CompactStripStack(
             )
         }
         if (quick.showExposure) {
+            // Rawr 17U fork: the TELE sheet (tele optical zoom), above the row like the WB strip.
+            if (TeleZoomSheetState.open && TeleZoomSheetState.style == com.rawr.camera.model.TeleZoomStyle.BAR &&
+                state.teleZoomAvailable() && !state.whiteBalancePanelOpen && !LookSheetState.open
+            ) {
+                TeleZoomSheet(
+                    state, dispatch,
+                    Modifier.fillMaxWidth()
+                        .padding(horizontal = CaptureDimens.CompactParamRowEdgeInset)
+                        .padding(bottom = CaptureDimens.ControlGap)
+                )
+            }
             // Single-tap slider bar (ISO / SS / EV / WB / focus) sits right above the row it edits.
             SliderBarView()
             CompactParamRow(
@@ -239,6 +250,8 @@ internal fun CompactParamRow(
         CompactExposureButton(ExposureParameter.Ev, state, dispatch, Modifier.weight(weights[2]).fillMaxHeight())
         CompactWbButton(state, dispatch, Modifier.weight(weights[3]).fillMaxHeight())
         CompactFocusButton(state, dispatch, Modifier.weight(weights[4]).fillMaxHeight())
+        // Rawr 17U fork: the tele's optical zoom (75 to 100 mm), only on the lenses that move the optics.
+        if (state.teleZoomAvailable()) CompactTeleZoomButton(state, dispatch, Modifier.weight(weights[2]).fillMaxHeight())
         if (onToggleLook != null) LookToggleCell(lookOpen, onToggleLook, Modifier.weight(0.95f).fillMaxHeight())
     }
     }

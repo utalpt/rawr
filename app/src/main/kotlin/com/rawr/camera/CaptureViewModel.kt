@@ -208,6 +208,12 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         // Rawr 17U fork: the camera sounds (CameraSounds.kt): loaded once the setting is on, and the stop tone when a
         // recording ends. The start tone plays in NativeVideoRecorder.start, before the microphone opens.
         viewModelScope.launch {
+            // Rawr 17U fork: the TELE control's look, for the capture UI.
+            launch {
+                settingsEditor.values.map { it.teleZoomStyle }.distinctUntilChanged().collect {
+                    com.rawr.camera.ui.TeleZoomSheetState.style = com.rawr.camera.model.TeleZoomStyle.fromId(it)
+                }
+            }
             settingsEditor.values.map { it.shutterSound }.distinctUntilChanged().collect {
                 com.rawr.camera.integration.CameraSounds.prepare(it)
             }
@@ -248,6 +254,23 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             controller.state.map { it.videoAspect to it.photoAspect }.distinctUntilChanged().collect {
                 if (!videoSelectionLocked())
                     settingsSync.updatePreviewCrop(controller.state.value.captureMode, controller.state.value.videoResolution)
+            }
+        }
+        viewModelScope.launch {
+            // Rawr 17U fork: the tele's optical zoom (75 to 100 mm) to the camera. The native side keeps it across lens
+            // changes and applies it only on lenses that carry the zoom key (the 4.3x lenses).
+            controller.state.map { it.teleZoomMm }.distinctUntilChanged().collect { mm ->
+                previewCoordinator.setOpticalZoomCode(com.rawr.camera.model.TeleOpticalZoom.code(mm))
+            }
+        }
+        viewModelScope.launch {
+            // Rawr 17U fork: one tele button. A fixed 75 mm lens (3.2x) that has a twin which moves the optics (4.3x)
+            // is not in the lens bar; a saved or restored selection of it goes to the twin at 75 mm.
+            controller.state.map { it.selectedLensId to it.capabilities.lenses }.distinctUntilChanged().collect { (id, lenses) ->
+                val lens = lenses.firstOrNull { it.id == id } ?: return@collect
+                val twin = com.rawr.camera.model.TeleOpticalZoom.twinOf(lens, lenses) ?: return@collect
+                controller.dispatch(com.rawr.camera.architecture.SetTeleZoomMm(com.rawr.camera.model.TeleOpticalZoom.MIN_MM))
+                controller.dispatch(com.rawr.camera.architecture.SelectLens(twin.id))
             }
         }
         viewModelScope.launch {

@@ -285,7 +285,7 @@ class NativeCaptureScreenController(
         is ToggleOverlayArmed, is ToggleFalseColor, is ToggleScope -> true
         ToggleFilmSim, ToggleMultiframe -> true
         is SetCaptureLayout -> true
-        is SetCaptureMode, CycleVideoResolution, CycleVideoFps, ToggleVideoLog, is SetVideoAspect, is SetPhotoAspect -> true
+        is SetCaptureMode, CycleVideoResolution, CycleVideoFps, ToggleVideoLog, is SetVideoAspect, is SetPhotoAspect, is SetTeleZoomMm -> true
         CycleSelfTimer, is SetCaptureSelfTimer -> true
         else -> false
     }

@@ -1,5 +1,6 @@
 package com.rawr.camera.integration
 
+import com.rawr.camera.model.effectiveVideoFps
 import com.rawr.camera.architecture.CaptureScreenController
 import com.rawr.camera.architecture.SetControlSurfaceStyle
 import com.rawr.camera.architecture.SyncToneControls
@@ -251,7 +252,7 @@ internal class CaptureSettingsSync(
             VideoResolutionMode.OPEN_GATE -> return null
         }
         return settings.videoEncoder.sanitized().encoderSetup(
-            resolution, frameSize, state.videoFps, settings.effectiveVideoBitDepth())
+            resolution, frameSize, state.effectiveVideoFps(), settings.effectiveVideoBitDepth())
     }
 
     private fun applyTonemapState(tone: com.rawr.camera.model.ImageToneState) {

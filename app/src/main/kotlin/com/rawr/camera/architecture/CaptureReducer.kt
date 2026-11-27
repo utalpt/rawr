@@ -26,6 +26,7 @@ object CaptureReducer {
                 videoLogEnabled = action.videoLogEnabled,
                 videoAspect = action.videoAspect,
                 photoAspect = action.photoAspect,
+                teleZoomMm = action.teleZoomMm,
                 selfTimer = action.selfTimer,
                 // A restored preference never resumes a mid-flight countdown.
                 selfTimerRemainingMs = null
@@ -106,12 +107,16 @@ object CaptureReducer {
         }
 
         is SetPhotoAspect -> state.copy(photoAspect = action.value)
+        is SetTeleZoomMm -> state.copy(teleZoomMm = action.mm.coerceIn(
+            com.rawr.camera.model.TeleOpticalZoom.MIN_MM, com.rawr.camera.model.TeleOpticalZoom.MAX_MM))
         is SetVideoAspect -> if (state.captureMode == CaptureMode.Video) state.copy(videoAspect = action.value) else state
         ToggleVideoLog -> if (state.captureMode == CaptureMode.Video) state.copy(videoLogEnabled = !state.videoLogEnabled) else state
 
         CycleVideoFps -> {
-            val next = VIDEO_FPS_CHOICES.getOrNull(VIDEO_FPS_CHOICES.indexOf(state.videoFps) + 1)
-            state.copy(videoFps = next ?: VIDEO_FPS_CHOICES.first())
+            // Rawr 17U fork: only the rates the lens runs (CameraCapabilities.videoFpsMax), from the one shown.
+            val choices = state.videoFpsChoices()
+            val next = choices.getOrNull(choices.indexOf(state.effectiveVideoFps()) + 1)
+            state.copy(videoFps = next ?: choices.first())
         }
 
         CycleSelfTimer -> {

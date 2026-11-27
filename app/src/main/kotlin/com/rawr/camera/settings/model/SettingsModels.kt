@@ -708,6 +708,8 @@ data class SettingsValues(
     val videoLogEnabled: Boolean = false,
     /** Photo aspect ratio id (PhotoAspect); crops the JPEG only. */
     val photoAspectId: String = "native",
+    /** Rawr 17U fork: the tele's optical zoom on the 4.3x lenses, 75 to 100 mm (TeleOpticalZoom). */
+    val teleZoomMm: Int = 100,
     val videoLogProfile: VideoLogProfile = VideoLogProfile.LogC3,
     val pipelineDiagnosticsEnabled: Boolean = false,
     val experimentalZeroCopyEnabled: Boolean = true,
@@ -787,6 +789,8 @@ data class SettingsValues(
     // Rawr 17U fork: the system's camera sounds (shutter, video start / stop). Off by default; where the law asks
     // for the shutter sound (MediaActionSound.mustPlayShutterSound) it plays regardless.
     val shutterSound: Boolean = false,
+    /** Rawr 17U fork: how the TELE cell's optical zoom control looks - "bar", "wheel", "dial" or "rocker". */
+    val teleZoomStyle: String = "bar",
     // Ignore Camera2 shutter/ISO priority modes: locking SS or ISO always enters
     // full Manual. Off by default.
     val aePriorityDisabled: Boolean = false,

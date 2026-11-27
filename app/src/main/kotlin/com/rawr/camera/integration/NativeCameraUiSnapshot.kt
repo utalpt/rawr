@@ -96,6 +96,8 @@ internal data class NativeCameraUiSnapshot(
     val fullSizeBurstsToSingle: Long = 0L,
     /** Full-size (200 MP) lens: stills save DNG only, whatever the output format. */
     val dngOnly: Boolean = false,
+    /** Rawr 17U fork: the highest video frame rate the lens's sensor mode runs; 0 = no limit. */
+    val videoFpsMax: Int = 0,
     /** The lens never delivered a frame and recovery gave up; switch lens to retry. */
     val lensUnavailable: Boolean = false,
     /** Why the last lens profile was refused (the previous one stays in force); empty when none. */
@@ -207,6 +209,7 @@ internal data class NativeCameraUiSnapshot(
                 fullSizeBinnedStills = j.optLong("fullSizeBinnedStills", 0L),
                 fullSizeBurstsToSingle = j.optLong("fullSizeBurstsToSingle", 0L),
                 dngOnly = j.optBoolean("dngOnly", false),
+                videoFpsMax = j.optInt("videoFpsMax", 0).coerceAtLeast(0),
                 lensUnavailable = j.optBoolean("lensUnavailable", false),
                 profileError = j.optString("profileError", ""),
                 profileLenses = buildList {

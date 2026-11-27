@@ -147,6 +147,8 @@ data class CaptureUiState(
     val videoAspect: com.rawr.camera.video.VideoAspect = com.rawr.camera.video.VideoAspect.Native,
     /** Photo aspect ratio; crops the JPEG, never the DNG. */
     val photoAspect: PhotoAspect = PhotoAspect.Native,
+    /** Rawr 17U fork: the tele's optical zoom on the 4.3x lenses, 75 to 100 mm (TeleOpticalZoom). */
+    val teleZoomMm: Int = TeleOpticalZoom.MAX_MM,
     val jpegEnabled: Boolean = true,
     val dngEnabled: Boolean = true,
     val grid: GridMode = GridMode.Off,
@@ -277,3 +279,14 @@ data class LongExposureUiState(
         if (!active) null
         else (spanMs - (uptimeMs - startMs).toDouble()).coerceAtLeast(0.0).toLong()
 }
+
+/** Rawr 17U fork: the video frame rates this lens runs (VIDEO_FPS_CHOICES up to CameraCapabilities.videoFpsMax). */
+fun CaptureUiState.videoFpsChoices(): List<Int> {
+    val max = capabilities.videoFpsMax
+    val all = com.rawr.camera.architecture.VIDEO_FPS_CHOICES
+    return if (max <= 0) all else all.filter { it <= max }.ifEmpty { listOf(all.first()) }
+}
+
+/** Rawr 17U fork: the frame rate a recording on this lens gets - the chosen one, or the fastest below it it runs. */
+fun CaptureUiState.effectiveVideoFps(): Int =
+    videoFpsChoices().filter { it <= videoFps }.maxOrNull() ?: videoFpsChoices().first()
