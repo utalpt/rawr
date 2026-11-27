@@ -86,6 +86,8 @@ class LoficActivity : Activity() {
     private lateinit var isoBar: SeekBar
     private lateinit var focusBar: SeekBar
     private lateinit var captureButton: Button
+    private lateinit var rendererButton: Button
+    @Volatile private var lastSaved: android.net.Uri? = null
 
     private var cameraThread: HandlerThread? = null
     private var ioThread: HandlerThread? = null
@@ -288,6 +290,24 @@ class LoficActivity : Activity() {
             }
         }
         controls.addView(captureButton)
+        rendererButton = Button(this).apply {
+            text = "Open last DNG in Renderer"
+            isEnabled = false
+            setOnClickListener {
+                val uri = lastSaved ?: return@setOnClickListener
+                try {
+                    startActivity(
+                        android.content.Intent(android.content.Intent.ACTION_VIEW)
+                            .setDataAndType(uri, "image/x-adobe-dng")
+                            .setClass(this@LoficActivity, com.rawr.camera.renderer.RendererActivity::class.java)
+                            .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    )
+                } catch (e: android.content.ActivityNotFoundException) {
+                    message("Renderer not available: ${e.message}")
+                }
+            }
+        }
+        controls.addView(rendererButton)
         messageView = label("Rawr LOFIC (Xiaomi 17 Ultra main camera). Needs the X17U LOFIC RAW module by Anton Tretiakov for the 4:3 setups and a usable Short stream.", 12f)
         controls.addView(messageView)
         val scroll = ScrollView(this).apply { addView(controls) }
@@ -630,14 +650,18 @@ class LoficActivity : Activity() {
         }
         longBuf.duplicate().also { it.position(0) }.get(longBytes)
         shortBuf.duplicate().also { it.position(0) }.get(shortBytes)
-        val result = synchronized(results) { results[a.timestamp] }
+        // The RAW and result timestamps do not always match exactly: take the
+        // nearest result within half a frame, and log how far it was.
+        val nearest = synchronized(results) { results.entries.minByOrNull { kotlin.math.abs(it.key - a.timestamp) } }
+        val resultDeltaNs = nearest?.let { it.key - a.timestamp }
+        val result = if (nearest != null && resultDeltaNs != null && kotlin.math.abs(resultDeltaNs) <= s.minFrameNs / 2) nearest.value else null
         val frameMode = mode
         val work = processor
         if (work == null) {
             saving = false
             return
         }
-        work.execute { save(s, frameMode, longBytes, shortBytes, result) }
+        work.execute { save(s, frameMode, longBytes, shortBytes, result, resultDeltaNs) }
     }
 
     // ---- merge and DNG (processor thread) ----
@@ -652,7 +676,7 @@ class LoficActivity : Activity() {
         else -> 1
     }
 
-    private fun save(s: LoficSetup, frameMode: Int, longBytes: ByteArray, shortBytes: ByteArray, result: TotalCaptureResult?) {
+    private fun save(s: LoficSetup, frameMode: Int, longBytes: ByteArray, shortBytes: ByteArray, result: TotalCaptureResult?, resultDeltaNs: Long?) {
         try {
             val frameIso = result?.get(CaptureResult.SENSOR_SENSITIVITY) ?: resultIso
             val frameExposure = result?.get(CaptureResult.SENSOR_EXPOSURE_TIME) ?: resultExposureNs
@@ -711,9 +735,11 @@ class LoficActivity : Activity() {
             values.clear()
             values.put(MediaStore.MediaColumns.IS_PENDING, 0)
             contentResolver.update(uri, values, null, null)
+            lastSaved = uri
+            main.post { rendererButton.isEnabled = true }
             val headroom = log2(LoficMerge.SHORT_RANGE * ratio.k / LoficMerge.LONG_CLIP)
             val module = ratio.measured && ratio.k > 0.75 * model && ratio.k < 1.25 * model
-            Log.i(TAG, "LOFIC_SAVED name=$name setup=${s.name} mode=$frameMode rows=${s.rows} k=%.1f measured=${ratio.measured} samples=${ratio.samples} model=%.1f iso=$frameIso exposureNs=$frameExposure headroom=%.2f module=$module result=${if (result != null) "matched" else "missing"} neutral=$neutralSource ${neutral?.joinToString(",") { "%.3f".format(Locale.ROOT, it.toDouble()) } ?: "-"}"
+            Log.i(TAG, "LOFIC_SAVED name=$name setup=${s.name} mode=$frameMode rows=${s.rows} k=%.1f measured=${ratio.measured} samples=${ratio.samples} model=%.1f iso=$frameIso exposureNs=$frameExposure headroom=%.2f module=$module result=${if (result != null) "matched" else "missing"} resultDeltaNs=${resultDeltaNs ?: "-"} neutral=$neutralSource ${neutral?.joinToString(",") { "%.3f".format(Locale.ROOT, it.toDouble()) } ?: "-"}"
                 .format(Locale.ROOT, ratio.k, model, headroom))
             message("Saved DCIM/Camera/$name\nk=%.0f (%s, model %.0f) · up to %.1f stops above the Long clip · module %s"
                 .format(Locale.ROOT, ratio.k, if (ratio.measured) "measured" else "model", model, headroom,

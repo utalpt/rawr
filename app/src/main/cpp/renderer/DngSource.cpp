@@ -39,6 +39,27 @@ Matrix inverse(const Matrix& a) {
     for (auto& v : b) v /= d;
     return b;
 }
+// Rawr 17U fork: IEEE half (DNG SampleFormat 3, 16 bits, as the LOFIC DNGs
+// are written) to float.
+float halfToFloat(uint16_t h) {
+    const uint32_t sign = uint32_t(h >> 15) << 31, exponent = (h >> 10) & 0x1fu, mantissa = h & 0x3ffu;
+    uint32_t bits;
+    if (exponent == 0) {
+        if (mantissa == 0) {
+            bits = sign;
+        } else {
+            float v = std::ldexp(float(mantissa), -24);
+            return sign ? -v : v;
+        }
+    } else if (exponent == 31) {
+        bits = sign | 0x7f800000u | (mantissa << 13);
+    } else {
+        bits = sign | ((exponent + 112u) << 23) | (mantissa << 13);
+    }
+    float v;
+    std::memcpy(&v, &bits, sizeof v);
+    return v;
+}
 std::array<double, 3> transform(const Matrix& a, const std::array<double, 3>& b) {
     return {a[0] * b[0] + a[1] * b[1] + a[2] * b[2], a[3] * b[0] + a[4] * b[1] + a[5] * b[2],
             a[6] * b[0] + a[7] * b[1] + a[8] * b[2]};
@@ -93,11 +114,17 @@ DngSource::DngSource(const std::string& path, const CfaOverride& cfaOverride)
         const auto& p = *image_;
         if (p.width < 16 || p.height < 16 || (p.width & 1u) || (p.height & 1u))
             throw std::runtime_error("DNG sensor dimensions must be even and at least 16 pixels");
-        if (p.samples_per_pixel != 1 || p.sample_format != 1 || p.cfa.pattern_dim[0] != 2 ||
+        // Rawr 17U fork: 16-bit float CFA (the LOFIC DNGs) is read too; it becomes
+        // unsigned 16-bit as it is decoded (floatToUnsigned), white 65535.
+        floatSamples_ = p.sample_format == TINYDNG_SAMPLEFORMAT_IEEEFP && p.bits_per_sample == 16 &&
+                        p.compression == 1 && p.raw.linearization_table_count == 0;
+        if (p.samples_per_pixel != 1 || (p.sample_format != 1 && !floatSamples_) || p.cfa.pattern_dim[0] != 2 ||
             p.cfa.pattern_dim[1] != 2 || p.bits_per_sample < 8 || p.bits_per_sample > 16 ||
             (p.compression != 1 && p.compression != 7))
             throw std::runtime_error("Unsupported DNG layout, sample depth, or compression");
-        rawCacheRequired_ = p.compression == TINYDNG_COMPRESSION_NEW_JPEG;
+        // The whole float raster goes through the raw cache, converted once.
+        if (floatSamples_) rawCacheRequired_ = true;
+        rawCacheRequired_ |= p.compression == TINYDNG_COMPRESSION_NEW_JPEG;
         for (size_t i = 0; i < p.segment_count; ++i)
             rawCacheRequired_ |= uint64_t(p.segments[i].w) * p.segments[i].h >= 8'000'000u;
         const uint8_t patterns[4][4] = {{0, 1, 1, 2}, {1, 0, 2, 1}, {1, 2, 0, 1}, {2, 1, 1, 0}};
@@ -161,6 +188,15 @@ DngSource::DngSource(const std::string& path, const CfaOverride& cfaOverride)
             }
         }
         whiteLevel = p.raw.white_level_present ? double(p.raw.white_level[0]) : 0.0;
+        rawWhite_ = p.raw.white_level_present ? double(p.raw.white_level[0]) : double((1u << p.bits_per_sample) - 1);
+        if (floatSamples_) {
+            // Float samples: 0..WhiteLevel (1.0 when absent) maps to 0..65535.
+            const double floatWhite = p.raw.white_level_present && p.raw.white_level[0] > 0 ? double(p.raw.white_level[0]) : 1.0;
+            floatScale_ = float(65535.0 / floatWhite);
+            for (auto& b : black) b *= floatScale_;
+            whiteLevel = 65535.0;
+            rawWhite_ = 65535.0;
+        }
         auto& r = p.raw;
         // "RawrCam ..." markers come from DNGs written before the rename; keep reading them.
         if (r.rawr_private_data && r.rawr_private_size > 31 &&
@@ -353,6 +389,8 @@ void DngSource::ensureRawCache() {
         if (decoded.width != image_->width || decoded.height != image_->height || decoded.bits_per_sample != 16 ||
             decoded.samples_per_pixel != 1)
             throw std::runtime_error("Invalid decoded DNG cache geometry");
+        if (floatSamples_)
+            floatToUnsigned(static_cast<uint16_t*>(mapped), size_t(image_->width) * image_->height);
         if (detectPending_) {
             block = detectBlock(static_cast<const uint16_t*>(mapped));
             checkBlockGeometry();
@@ -414,9 +452,10 @@ std::vector<uint16_t> DngSource::decodeRegion(uint32_t x, uint32_t y, uint32_t w
         throw std::runtime_error("Invalid decoded DNG region");
     }
     std::vector<uint16_t> result(size_t(w) * h);
-    if (pixels.bits_per_sample == 16)
+    if (pixels.bits_per_sample == 16) {
         std::memcpy(result.data(), pixels.data, result.size() * 2);
-    else if (pixels.bits_per_sample == 8)
+        if (floatSamples_) floatToUnsigned(result.data(), result.size());
+    } else if (pixels.bits_per_sample == 8)
         std::copy_n(pixels.data, result.size(), result.begin());
     else {
         tinydng_pixels_free(context_, &pixels);
@@ -424,6 +463,12 @@ std::vector<uint16_t> DngSource::decodeRegion(uint32_t x, uint32_t y, uint32_t w
     }
     tinydng_pixels_free(context_, &pixels);
     return result;
+}
+void DngSource::floatToUnsigned(uint16_t* samples, size_t count) const {
+    for (size_t i = 0; i < count; ++i) {
+        const float v = halfToFloat(samples[i]) * floatScale_;
+        samples[i] = !(v > 0.0f) ? 0 : v >= 65535.0f ? 65535 : uint16_t(v + 0.5f);
+    }
 }
 // Bayer or a block mosaic, from a central region of the stored data: in a
 // Bayer raw the four sites of a 2x2 cell are different colours (R, G, G, B),
@@ -449,7 +494,7 @@ uint32_t DngSource::detectBlock(const uint16_t* raster) {
         px = region.data();
         stride = side;
     }
-    const double white = p.raw.white_level_present ? double(p.raw.white_level[0]) : double((1u << p.bits_per_sample) - 1);
+    const double white = rawWhite_;
     const double black0 = black[0];
     // Means per site of an 8x8 period (covers 2x2, 4x4 and 8x8 cells), clipped samples left out.
     double sum[8][8]{}, count[8][8]{};
@@ -518,7 +563,7 @@ float DngSource::normalizedSample(uint16_t raw, uint32_t sx, uint32_t sy, bool s
     v = raw;
     if (r.linearization_table_count)
         v = r.linearization_table[std::min(size_t(v), r.linearization_table_count - 1)];
-    double white = r.white_level_present ? r.white_level[0] : ((1u << image_->bits_per_sample) - 1);
+    const double white = rawWhite_;
     if (white <= black[site]) throw std::runtime_error("Invalid DNG black/white levels");
     v = (v - black[site]) / (white - black[site]);
 #ifndef NDEBUG

@@ -9,6 +9,19 @@
 namespace rawrcam::convert {
 namespace {
 
+// Rawr 17U fork: IEEE half to double, for 16-bit float CFA DNGs (LOFIC).
+double halfToDouble(uint16_t h) {
+    const int exponent = (h >> 10) & 0x1f, mantissa = h & 0x3ff;
+    double v;
+    if (exponent == 0)
+        v = std::ldexp(double(mantissa), -24);
+    else if (exponent == 31)
+        v = mantissa ? 0.0 : 65504.0;
+    else
+        v = std::ldexp(double(mantissa | 0x400), exponent - 25);
+    return (h & 0x8000) ? -v : v;
+}
+
 struct Document {
     tinydng_context* ctx = nullptr;
     tinydng_document* doc = nullptr;
@@ -116,7 +129,10 @@ std::vector<uint8_t> thumbnailDng(const std::string& path, uint32_t maxSide, uin
                                    : plane;
             if (color[y * 2 + x] > 2) return empty;
         }
-    double white = raw.white_level_present ? raw.white_level[0] : double((1u << image->bits_per_sample) - 1);
+    const bool floatSamples = image->sample_format == TINYDNG_SAMPLEFORMAT_IEEEFP && image->bits_per_sample == 16;
+    double white = raw.white_level_present ? raw.white_level[0]
+                   : floatSamples         ? 1.0
+                                          : double((1u << image->bits_per_sample) - 1);
     double neutral[3] = {1, 1, 1};
     if (raw.has_as_shot_neutral)
         for (int c = 0; c < 3; ++c)
@@ -154,7 +170,9 @@ std::vector<uint8_t> thumbnailDng(const std::string& path, uint32_t maxSide, uin
             return empty;
         auto at = [&](uint32_t x, uint32_t y) -> double {
             const size_t i = size_t(y) * W + x;
-            return px.bits_per_sample == 16 ? reinterpret_cast<const uint16_t*>(px.data)[i] : px.data[i];
+            if (px.bits_per_sample != 16) return px.data[i];
+            const uint16_t v = reinterpret_cast<const uint16_t*>(px.data)[i];
+            return floatSamples ? halfToDouble(v) : double(v);
         };
         for (uint32_t y = y0 & ~1u; y + 1 < y0 + rows; y += 2) {
             if (y % stepY) continue;
@@ -183,7 +201,7 @@ std::vector<uint8_t> thumbnailDng(const std::string& path, uint32_t maxSide, uin
             luma += (0.2126 * sum[i * 3] + 0.7152 * sum[i * 3 + 1] + 0.0722 * sum[i * 3 + 2]) / count[i];
             ++sampled;
         }
-    const double gain = sampled && luma > 0 ? std::clamp(0.18 / (luma / sampled), 0.5, 8.0) : 1.0;
+    const double gain = sampled && luma > 0 ? std::clamp(0.18 / (luma / sampled), 0.5, floatSamples ? 512.0 : 8.0) : 1.0;
     std::vector<uint8_t> out(size_t(ow) * oh * 3);
     for (size_t i = 0; i < size_t(ow) * oh; ++i) {
         const double* cam = &sum[i * 3];
