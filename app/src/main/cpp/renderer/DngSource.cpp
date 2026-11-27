@@ -114,8 +114,10 @@ DngSource::DngSource(const std::string& path, const CfaOverride& cfaOverride)
         const auto& p = *image_;
         if (p.width < 16 || p.height < 16 || (p.width & 1u) || (p.height & 1u))
             throw std::runtime_error("DNG sensor dimensions must be even and at least 16 pixels");
-        // Rawr 17U fork: 16-bit float CFA (the LOFIC DNGs) is read too; it becomes
-        // unsigned 16-bit as it is decoded (floatToUnsigned), white 65535.
+        // Rawr 17U fork: 16-bit float CFA (the LOFIC DNGs) is read too. The half
+        // bits stay as they are in read() and the raw cache (positive halves sort
+        // like their values) and become float in normalizedSample(), so nothing
+        // is rounded to 16-bit integers.
         floatSamples_ = p.sample_format == TINYDNG_SAMPLEFORMAT_IEEEFP && p.bits_per_sample == 16 &&
                         p.compression == 1 && p.raw.linearization_table_count == 0;
         if (p.samples_per_pixel != 1 || (p.sample_format != 1 && !floatSamples_) || p.cfa.pattern_dim[0] != 2 ||
@@ -190,7 +192,7 @@ DngSource::DngSource(const std::string& path, const CfaOverride& cfaOverride)
         whiteLevel = p.raw.white_level_present ? double(p.raw.white_level[0]) : 0.0;
         rawWhite_ = p.raw.white_level_present ? double(p.raw.white_level[0]) : double((1u << p.bits_per_sample) - 1);
         if (floatSamples_) {
-            // Float samples: 0..WhiteLevel (1.0 when absent) maps to 0..65535.
+            // Float samples: 0..WhiteLevel (1.0 when absent) is read as 0..65535.
             const double floatWhite = p.raw.white_level_present && p.raw.white_level[0] > 0 ? double(p.raw.white_level[0]) : 1.0;
             floatScale_ = float(65535.0 / floatWhite);
             for (auto& b : black) b *= floatScale_;
@@ -292,7 +294,14 @@ DngSource::DngSource(const std::string& path, const CfaOverride& cfaOverride)
         }
         // Block mosaic: Rawr's own DNGs are always Bayer; others are checked
         // unless the editor chose the layout.
-        if (cfaOverride.layout == 0 && !rawr && rawCacheRequired_) {
+        if (floatSamples_) {
+            // Detection and remosaic work on integer codes: a float DNG is read as
+            // the Bayer it is tagged with.
+            if (cfaOverride.layout > 1) throw std::runtime_error("Block CFA layouts are not supported for float DNGs");
+            block = 1;
+            cfaSource = cfaOverride.layout == 0 ? "tagged" : "override";
+            rawCachePath_ += "-half";
+        } else if (cfaOverride.layout == 0 && !rawr && rawCacheRequired_) {
             // Read through the raw cache (compressed or large strips): a region
             // decode here would pull the whole image into tinydng's capped
             // memory (an uncompressed 50 MP strip DNG fails its 128 MiB cap).
@@ -390,7 +399,7 @@ void DngSource::ensureRawCache() {
             decoded.samples_per_pixel != 1)
             throw std::runtime_error("Invalid decoded DNG cache geometry");
         if (floatSamples_)
-            floatToUnsigned(static_cast<uint16_t*>(mapped), size_t(image_->width) * image_->height);
+            sanitizeHalves(static_cast<uint16_t*>(mapped), size_t(image_->width) * image_->height);
         if (detectPending_) {
             block = detectBlock(static_cast<const uint16_t*>(mapped));
             checkBlockGeometry();
@@ -454,7 +463,7 @@ std::vector<uint16_t> DngSource::decodeRegion(uint32_t x, uint32_t y, uint32_t w
     std::vector<uint16_t> result(size_t(w) * h);
     if (pixels.bits_per_sample == 16) {
         std::memcpy(result.data(), pixels.data, result.size() * 2);
-        if (floatSamples_) floatToUnsigned(result.data(), result.size());
+        if (floatSamples_) sanitizeHalves(result.data(), result.size());
     } else if (pixels.bits_per_sample == 8)
         std::copy_n(pixels.data, result.size(), result.begin());
     else {
@@ -464,10 +473,13 @@ std::vector<uint16_t> DngSource::decodeRegion(uint32_t x, uint32_t y, uint32_t w
     tinydng_pixels_free(context_, &pixels);
     return result;
 }
-void DngSource::floatToUnsigned(uint16_t* samples, size_t count) const {
+// Negative halves and NaN become 0, infinity the largest finite half, so every
+// stored code is a positive half and sorts like its value.
+void DngSource::sanitizeHalves(uint16_t* samples, size_t count) {
     for (size_t i = 0; i < count; ++i) {
-        const float v = halfToFloat(samples[i]) * floatScale_;
-        samples[i] = !(v > 0.0f) ? 0 : v >= 65535.0f ? 65535 : uint16_t(v + 0.5f);
+        const uint16_t h = samples[i];
+        if (h & 0x8000u) samples[i] = 0;
+        else if ((h & 0x7c00u) == 0x7c00u) samples[i] = (h & 0x3ffu) ? 0 : 0x7bffu;
     }
 }
 // Bayer or a block mosaic, from a central region of the stored data: in a
@@ -560,8 +572,8 @@ float DngSource::normalizedSample(uint16_t raw, uint32_t sx, uint32_t sy, bool s
         v = replayCfa_[size_t(sy) * image_->width + sx];
     } else {
 #endif
-    v = raw;
-    if (r.linearization_table_count)
+    v = floatSamples_ ? double(halfToFloat(raw)) * floatScale_ : double(raw);
+    if (!floatSamples_ && r.linearization_table_count)
         v = r.linearization_table[std::min(size_t(v), r.linearization_table_count - 1)];
     const double white = rawWhite_;
     if (white <= black[site]) throw std::runtime_error("Invalid DNG black/white levels");

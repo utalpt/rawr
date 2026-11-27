@@ -95,7 +95,8 @@ DngInfo probeDng(const std::string& path) {
     info.make = make ? make : "";
     info.model = model ? model : "";
     info.rawr = isRawrProvenance(image->raw);
-    info.convertible = image->samples_per_pixel == 1 && image->cfa.pattern_dim[0] == 2 &&
+    // Rawr 17U fork: float DNGs (LOFIC) open in the Renderer but are not converted.
+    info.convertible = image->sample_format != TINYDNG_SAMPLEFORMAT_IEEEFP && image->samples_per_pixel == 1 && image->cfa.pattern_dim[0] == 2 &&
                        image->cfa.pattern_dim[1] == 2 && image->bits_per_sample >= 8 &&
                        image->bits_per_sample <= 16 && (image->compression == 1 || image->compression == 7) &&
                        image->width >= 16 && image->height >= 16;

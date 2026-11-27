@@ -87,12 +87,12 @@ class DngSource {
     size_t index_ = 0;
     SourceCaptureExif captureExif_;
     bool rawCacheRequired_ = false;
-    // Rawr 17U fork: 16-bit float CFA (LOFIC DNGs), stored as unsigned 16-bit
-    // once decoded: value x floatScale_, white 65535.
+    // Rawr 17U fork: 16-bit float CFA (LOFIC DNGs). read() returns the half
+    // bits; normalizedSample() makes them float x floatScale_ (white 65535).
     bool floatSamples_ = false;
     float floatScale_ = 65535.0f;
     double rawWhite_ = 65535.0;
-    void floatToUnsigned(uint16_t* samples, size_t count) const;
+    static void sanitizeHalves(uint16_t* samples, size_t count);
     std::string rawCachePath_;
     const uint16_t* rawCache_ = nullptr;
     size_t rawCacheBytes_ = 0;
