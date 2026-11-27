@@ -113,6 +113,17 @@ class LoficActivity : Activity() {
     private var latestA: Image? = null
     private var latestB: Image? = null
     private var lastRowsCheckMs = 0L
+    // Which reader carries the Long, frame by frame (for the LOFIC lens design):
+    // counts since the last LOFIC_ASSIGN line, the last owner and the switches.
+    private var assignFrames = 0
+    private var assignA = 0
+    private var assignB = 0
+    private var assignBoth = 0
+    private var assignNone = 0
+    private var assignSwitches = 0
+    private var assignLast = 0
+    private var assignLogMs = 0L
+    private var buffersLogged = false
     private var rowsLong = 0
     private var rowsShort = 0
 
@@ -443,6 +454,9 @@ class LoficActivity : Activity() {
     }
 
     private fun reopenCamera() {
+        // A new session: its own buffer line and no switch counted across sessions.
+        buffersLogged = false
+        assignLast = 0
         closeCamera()
         openCamera()
     }
@@ -662,11 +676,43 @@ class LoficActivity : Activity() {
         val b = latestB ?: return
         if (a.timestamp != b.timestamp) return
         val now = System.currentTimeMillis()
+        logAssignment(a, b, now)
         if (now - lastRowsCheckMs > 1000) {
             lastRowsCheckMs = now
             checkRows(a, b)
         }
         if (captureRequested && focusSettled(now)) grab(a, b)
+    }
+
+    private fun logAssignment(a: Image, b: Image, now: Long) {
+        val rows = setup.rows
+        val aLong = LoficMerge.isLong(a.planes[0].buffer, rows)
+        val bLong = LoficMerge.isLong(b.planes[0].buffer, rows)
+        val owner = when {
+            aLong && bLong -> { assignBoth++; 3 }
+            aLong -> { assignA++; 1 }
+            bLong -> { assignB++; 2 }
+            else -> { assignNone++; 0 }
+        }
+        if (owner == 1 || owner == 2) {
+            if (assignLast != 0 && owner != assignLast) assignSwitches++
+            assignLast = owner
+        }
+        assignFrames++
+        if (!buffersLogged) {
+            buffersLogged = true
+            for ((name, img) in listOf("A" to a, "B" to b)) {
+                val plane = img.planes[0]
+                Log.i(TAG, "LOFIC_BUFFER reader=$name format=0x${Integer.toHexString(img.format)} size=${img.width}x${img.height} " +
+                    "rowStride=${plane.rowStride} pixelStride=${plane.pixelStride} capacity=${plane.buffer.capacity()} setup=${setup.name}")
+            }
+        }
+        if (now - assignLogMs >= 3000) {
+            assignLogMs = now
+            Log.i(TAG, "LOFIC_ASSIGN setup=${setup.name} mode=$mode frames=$assignFrames longA=$assignA longB=$assignB " +
+                "both=$assignBoth none=$assignNone switches=$assignSwitches last=${if (assignLast == 1) "A" else if (assignLast == 2) "B" else "-"}")
+            assignFrames = 0; assignA = 0; assignB = 0; assignBoth = 0; assignNone = 0; assignSwitches = 0
+        }
     }
 
     /**
