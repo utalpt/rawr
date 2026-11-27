@@ -85,6 +85,8 @@ class LoficActivity : Activity() {
     private lateinit var focusLabel: TextView
     private lateinit var exposureBar: SeekBar
     private lateinit var isoBar: SeekBar
+    private lateinit var compensationLabel: TextView
+    private lateinit var compensationBar: SeekBar
     private lateinit var focusBar: SeekBar
     private lateinit var captureButton: Button
     private lateinit var rendererButton: Button
@@ -124,6 +126,11 @@ class LoficActivity : Activity() {
     @Volatile private var exposureNs = 1_000_000L
     @Volatile private var iso = 100
     @Volatile private var autoFocus = true
+    // AE compensation in EV. The phone's LOFIC AE exposes the Long for the highlights,
+    // like a normal AE: in the first tests the Short held almost nothing (<= 0.12% of the
+    // pixels) and the Long's midtones sat about 4.5 EV under mid grey. +3 EV puts the
+    // Long near a normal exposure and leaves the highlights to the Short.
+    @Volatile private var compensationEv = 3.0
     @Volatile private var renderJpeg = true
     @Volatile private var focusDiopters = 0f
     @Volatile private var captureRequested = false
@@ -263,6 +270,14 @@ class LoficActivity : Activity() {
             applyRepeating()
         }
         controls.addView(isoBar)
+        compensationLabel = label("")
+        controls.addView(compensationLabel)
+        compensationBar = bar(COMPENSATION_STEPS) { p ->
+            compensationEv = COMPENSATION_MIN_EV + p * (COMPENSATION_MAX_EV - COMPENSATION_MIN_EV) / COMPENSATION_STEPS
+            updateLabels()
+            applyRepeating()
+        }
+        controls.addView(compensationBar)
 
         val afSwitch = Switch(this).apply {
             text = "Autofocus"
@@ -326,6 +341,8 @@ class LoficActivity : Activity() {
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         exposureBar.progress = progressFromExposure(exposureNs)
         isoBar.progress = progressFromIso(iso)
+        compensationBar.progress = ((compensationEv - COMPENSATION_MIN_EV) / (COMPENSATION_MAX_EV - COMPENSATION_MIN_EV) *
+            COMPENSATION_STEPS).roundToInt()
         updateLabels()
         return root
     }
@@ -367,6 +384,9 @@ class LoficActivity : Activity() {
         focusLabel.text = if (autoFocus) "Focus auto" else "Focus %.2f dpt".format(Locale.ROOT, focusDiopters)
         exposureBar.isEnabled = !autoExposure
         isoBar.isEnabled = !autoExposure
+        compensationLabel.text = if (autoExposure) "AE compensation %+.1f EV".format(Locale.ROOT, compensationEv)
+            else "AE compensation (auto exposure only)"
+        compensationBar.isEnabled = autoExposure
         focusBar.isEnabled = !autoFocus
     }
 
@@ -524,6 +544,7 @@ class LoficActivity : Activity() {
                 setKey(b, loficEnableKey, byteArrayOf(1))
                 if (autoExposure) {
                     b.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                    compensationIndex()?.let { b.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, it) }
                 } else {
                     b.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
                     b.set(CaptureRequest.SENSOR_EXPOSURE_TIME, exposureNs)
@@ -542,6 +563,15 @@ class LoficActivity : Activity() {
                 message("Request failed: ${e.message}")
             }
         }
+    }
+
+    /** AE compensation index for [compensationEv], within the camera's range; null without one. */
+    private fun compensationIndex(): Int? {
+        val c = characteristics ?: return null
+        val range = c.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE) ?: return null
+        val step = c.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP)?.toDouble() ?: return null
+        if (step <= 0.0) return null
+        return (compensationEv / step).roundToInt().coerceIn(range.lower, range.upper)
     }
 
     /** AsShotNeutral of a result: the HAL's neutral point, otherwise the inverse of its white balance gains. */
@@ -797,7 +827,7 @@ class LoficActivity : Activity() {
             val jpeg = if (renderJpeg) queueJpeg(uri, name) else "off"
             val headroom = log2(LoficMerge.SHORT_RANGE * ratio.k / LoficMerge.LONG_CLIP)
             val module = ratio.measured && ratio.k > 0.75 * model && ratio.k < 1.25 * model
-            Log.i(TAG, "LOFIC_SAVED name=$name setup=${s.name} mode=$frameMode rows=${s.rows} k=%.1f measured=${ratio.measured} samples=${ratio.samples} model=%.1f iso=$frameIso exposureNs=$frameExposure headroom=%.2f module=$module result=${if (result != null) "matched" else "missing"} resultDeltaNs=${resultDeltaNs ?: "-"} jpeg=$jpeg af=${result?.get(CaptureResult.CONTROL_AF_STATE) ?: "-"} focus=${result?.get(CaptureResult.LENS_FOCUS_DISTANCE) ?: "-"} neutral=$neutralSource ${neutral?.joinToString(",") { "%.3f".format(Locale.ROOT, it.toDouble()) } ?: "-"}"
+            Log.i(TAG, "LOFIC_SAVED name=$name setup=${s.name} mode=$frameMode rows=${s.rows} k=%.1f measured=${ratio.measured} samples=${ratio.samples} model=%.1f iso=$frameIso exposureNs=$frameExposure headroom=%.2f module=$module result=${if (result != null) "matched" else "missing"} resultDeltaNs=${resultDeltaNs ?: "-"} jpeg=$jpeg aeComp=${if (autoExposure) (result?.get(CaptureResult.CONTROL_AE_EXPOSURE_COMPENSATION) ?: "-") else "manual"} af=${result?.get(CaptureResult.CONTROL_AF_STATE) ?: "-"} focus=${result?.get(CaptureResult.LENS_FOCUS_DISTANCE) ?: "-"} neutral=$neutralSource ${neutral?.joinToString(",") { "%.3f".format(Locale.ROOT, it.toDouble()) } ?: "-"}"
                 .format(Locale.ROOT, ratio.k, model, headroom))
             message("Saved DCIM/Camera/$name\nk=%.0f (%s, model %.0f) · up to %.1f stops above the Long clip · module %s"
                 .format(Locale.ROOT, ratio.k, if (ratio.measured) "measured" else "model", model, headroom,
@@ -813,5 +843,9 @@ class LoficActivity : Activity() {
     private companion object {
         const val TAG = "RawrLofic"
         const val CAMERA_ID = "2"
+        // AE compensation bar: -2..+4 EV in 1/10 EV (the camera's own range and step still apply).
+        const val COMPENSATION_MIN_EV = -2.0
+        const val COMPENSATION_MAX_EV = 4.0
+        const val COMPENSATION_STEPS = 60
     }
 }
