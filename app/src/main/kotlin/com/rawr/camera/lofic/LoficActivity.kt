@@ -127,6 +127,9 @@ class LoficActivity : Activity() {
     @Volatile private var renderJpeg = true
     @Volatile private var focusDiopters = 0f
     @Volatile private var captureRequested = false
+    @Volatile private var captureRequestedAtMs = 0L
+    // Newest AF state from the results (CONTROL_AF_STATE), -1 = none yet.
+    @Volatile private var afState = -1
     @Volatile private var saving = false
 
     // Status, written by the camera thread.
@@ -286,6 +289,7 @@ class LoficActivity : Activity() {
             setOnClickListener {
                 if (!saving && session != null) {
                     saving = true
+                    captureRequestedAtMs = System.currentTimeMillis()
                     captureRequested = true
                     message("Capturing...")
                 }
@@ -587,6 +591,7 @@ class LoficActivity : Activity() {
             exposureCount = readResult(result, exposureCountKey)?.firstOrNull() ?: -1
             resultExposureNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME) ?: 0L
             resultIso = result.get(CaptureResult.SENSOR_SENSITIVITY) ?: 0
+            afState = result.get(CaptureResult.CONTROL_AF_STATE) ?: -1
             neutralOf(result)?.let { lastNeutral = it }
             if (lastTimestamp > 0 && ts > lastTimestamp) {
                 val f = 1e9 / (ts - lastTimestamp)
@@ -631,7 +636,18 @@ class LoficActivity : Activity() {
             lastRowsCheckMs = now
             checkRows(a, b)
         }
-        if (captureRequested) grab(a, b)
+        if (captureRequested && focusSettled(now)) grab(a, b)
+    }
+
+    /**
+     * Continuous AF still scanning: the shot waits for it (up to 1 s), as the
+     * first AE shots came out soft. Manual focus, or no AF state, shoots at once.
+     */
+    private fun focusSettled(now: Long): Boolean {
+        if (!autoFocus) return true
+        val scanning = afState == CaptureResult.CONTROL_AF_STATE_PASSIVE_SCAN ||
+            afState == CaptureResult.CONTROL_AF_STATE_ACTIVE_SCAN
+        return !scanning || now - captureRequestedAtMs > 1000
     }
 
     private fun splitPair(a: Image, b: Image): Pair<Image, Image>? {
@@ -780,7 +796,7 @@ class LoficActivity : Activity() {
             val jpeg = if (renderJpeg) queueJpeg(uri, name) else "off"
             val headroom = log2(LoficMerge.SHORT_RANGE * ratio.k / LoficMerge.LONG_CLIP)
             val module = ratio.measured && ratio.k > 0.75 * model && ratio.k < 1.25 * model
-            Log.i(TAG, "LOFIC_SAVED name=$name setup=${s.name} mode=$frameMode rows=${s.rows} k=%.1f measured=${ratio.measured} samples=${ratio.samples} model=%.1f iso=$frameIso exposureNs=$frameExposure headroom=%.2f module=$module result=${if (result != null) "matched" else "missing"} resultDeltaNs=${resultDeltaNs ?: "-"} jpeg=$jpeg neutral=$neutralSource ${neutral?.joinToString(",") { "%.3f".format(Locale.ROOT, it.toDouble()) } ?: "-"}"
+            Log.i(TAG, "LOFIC_SAVED name=$name setup=${s.name} mode=$frameMode rows=${s.rows} k=%.1f measured=${ratio.measured} samples=${ratio.samples} model=%.1f iso=$frameIso exposureNs=$frameExposure headroom=%.2f module=$module result=${if (result != null) "matched" else "missing"} resultDeltaNs=${resultDeltaNs ?: "-"} jpeg=$jpeg af=${result?.get(CaptureResult.CONTROL_AF_STATE) ?: "-"} focus=${result?.get(CaptureResult.LENS_FOCUS_DISTANCE) ?: "-"} neutral=$neutralSource ${neutral?.joinToString(",") { "%.3f".format(Locale.ROOT, it.toDouble()) } ?: "-"}"
                 .format(Locale.ROOT, ratio.k, model, headroom))
             message("Saved DCIM/Camera/$name\nk=%.0f (%s, model %.0f) · up to %.1f stops above the Long clip · module %s"
                 .format(Locale.ROOT, ratio.k, if (ratio.measured) "measured" else "model", model, headroom,

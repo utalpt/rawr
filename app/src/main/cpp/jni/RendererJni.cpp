@@ -378,10 +378,11 @@ Java_com_rawr_camera_renderer_RendererNative_render(JNIEnv* e, jobject, jlong id
         array("cameraToLinearSrgbRowMajor", s->source.cameraToSrgb.data(), 9);
         s->source.dcpWeight1 = std::clamp(float(frame.number("calibrationWeight1", s->source.dcpWeight1)), 0.0f, 1.0f);
         // Rawr 17U fork: float DNGs from other apps (LOFIC) leave the Long several
-        // stops under a normal exposure (the phone tone-maps it up). The gain the
-        // import set (2^BaselineExposure) rises until the scene key sits at the
-        // Natural target, at most 64x (the tonemapper's limit, the rest as render
-        // exposure); the shadow lift then works on top as on any capture.
+        // stops under a normal exposure (the phone tone-maps it up). The gain
+        // puts the scene key at the Natural target, 1x..64x (the tonemapper's
+        // limit, the rest as render exposure); the shadow lift then works on top
+        // as on any capture. The import's 2^BaselineExposure stays only when the
+        // meter finds no key: as a floor it overexposed longer exposures.
         if (!s->source.rawr && s->source.info().sample_format == TINYDNG_SAMPLEFORMAT_IEEEFP) {
             if (!s->measuredKey || s->measuredKey->shading != o.shading || s->measuredKey->whiteBalance != s->source.wb)
                 s->measuredKey = Session::MeasuredKey{
@@ -396,7 +397,7 @@ Java_com_rawr_camera_renderer_RendererNative_render(JNIEnv* e, jobject, jlong id
                 const float wanted = std::exp2(std::log2(rawrcam::color::autoKeyPolicy(
                                                    rawrcam::color::AutoKeyMode::Natural).targetLuma) -
                                                s->measuredKey->key->keyEv);
-                tone.aePostGain = std::clamp(wanted, base, kMaxGain);
+                tone.aePostGain = std::clamp(wanted, 1.0f, kMaxGain);
                 // Past the gain limit the rest goes to the render exposure (after
                 // the shadow lift in tonemap.comp), at most 3 EV.
                 const float extraEv = std::clamp(std::log2(wanted / float(tone.aePostGain)), 0.0f, 3.0f);
