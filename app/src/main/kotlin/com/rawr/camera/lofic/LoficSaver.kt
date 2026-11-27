@@ -71,6 +71,11 @@ internal object LoficSaver {
         val iso = ints[2].takeIf { it > 0 } ?: 100
         val matched = ints[3] == 1
         val exposureNs = longs[1]
+        if (rows in 16 until LoficSetup.RAW_HEIGHT) {
+            // Without the root module the HAL reads a 16:9 LOFIC mode (2304 rows) with no real Short gain.
+            Log.w(TAG, "LOFIC_PHOTO_FAILED reason=module_missing rows=$rows")
+            return "LOFIC: the X17U LOFIC RAW module is not active (16:9 readout, $rows rows) - no LOFIC photo"
+        }
         if (width != LoficSetup.RAW_WIDTH || rows < 16 ||
             longBytes.size < rows * LoficSetup.LONG_ROW_BYTES || shortBytes.size < rows * LoficSetup.SHORT_ROW_BYTES) {
             Log.w(TAG, "LOFIC_PHOTO_FAILED reason=size width=$width rows=$rows long=${longBytes.size} short=${shortBytes.size}")

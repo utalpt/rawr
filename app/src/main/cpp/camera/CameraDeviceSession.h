@@ -218,9 +218,6 @@ class CameraDeviceSession final {
     AImageReader* loficShortReader_ = nullptr;
     ANativeWindow* loficVideoWindow_ = nullptr;
     ANativeWindow* loficShortWindow_ = nullptr;
-    // Diagnostic (debug.rawr.lofic bit 2): a repeating request built like the LOFIC screen's, held instead of
-    // the app's own.
-    std::unique_ptr<CameraRequest> loficBare_;
     bool auxJpegConfigured_ = false;
     ACameraMetadata* characteristics_ = nullptr;
     ANativeWindow* rawWindow_ = nullptr;

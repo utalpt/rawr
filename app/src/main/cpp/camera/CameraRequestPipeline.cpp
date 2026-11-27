@@ -30,7 +30,6 @@ const CameraRequestProvenance* CameraRequestPipeline::attach(CameraRequest* requ
 bool CameraRequestPipeline::submit(CameraSessionDriver* session, CameraRequest* request,
                                    const CameraControlState& control, const CameraMeteringRequest& metering) {
     if (!session || !request) return false;
-    if (loficBareHold.load(std::memory_order_relaxed)) return true;
     const auto applyResult = applyCameraControlState(request, control, metering);
     if (applyResult.focusStatus != ACAMERA_OK) {
         diag("CAMERA_FOCUS_REQUEST_FAILED status=" + statusText(applyResult.focusStatus));

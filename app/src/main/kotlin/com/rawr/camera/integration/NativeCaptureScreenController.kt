@@ -496,6 +496,8 @@ class NativeCaptureScreenController(
         } finally {
             settleBracketHoldPress()
         }
+        // Rawr 17U fork: the LOFIC lens's photo is taken by LoficSaver, not the app's still path.
+        if (nativeRequestId == 0L && com.rawr.camera.lofic.LoficSaver.handles()) return
         if (nativeRequestId == 0L) {
             capturePresentation.rejected(format.jpeg)
             return

@@ -68,8 +68,14 @@ object TeleOpticalZoom {
         }
     }
 
-    /** The lens bar's lenses: the fixed tele lenses that have a movable twin are left out. */
-    fun visibleLenses(lenses: List<LensCapability>): List<LensCapability> = lenses.filter { twinOf(it, lenses) == null }
+    /**
+     * The lens bar's lenses: the fixed tele lenses that have a movable twin are left out, and the LOFIC lens unless
+     * Settings > Photo > Capture > LOFIC Lens is on.
+     */
+    fun visibleLenses(lenses: List<LensCapability>): List<LensCapability> = lenses.filter {
+        twinOf(it, lenses) == null &&
+            (com.rawr.camera.lofic.LoficLensSwitch.enabled || !com.rawr.camera.lofic.LoficLensSwitch.isLoficLens(it.id))
+    }
 
     /** "4.3x DCG" shown as "3.6x DCG" at 85 mm on a lens that moves the optics. */
     fun displayName(lens: LensCapability, mm: Int): String =

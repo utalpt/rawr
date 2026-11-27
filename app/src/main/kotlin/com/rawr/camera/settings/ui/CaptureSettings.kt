@@ -138,6 +138,17 @@ internal fun CaptureSettings(state: SettingsUiState, dispatch: SettingsDispatch)
                     }
                 )
                 SettingDivider()
+                // The "1x LOFIC" lens in the lens bar (viewfinder and photos from the LOFIC Long/Short pair).
+                var loficLens by remember { mutableStateOf(com.rawr.camera.lofic.LoficLensSwitch.enabled) }
+                SettingsSwitchRow(
+                    title = "LOFIC Lens (1x LOFIC)",
+                    checked = loficLens,
+                    testTag = SettingsTestTags.row("Capture", "lofic_lens")
+                ) {
+                    loficLens = it
+                    com.rawr.camera.lofic.LoficLensSwitch.set(context, it)
+                }
+                SettingDivider()
             }
             SettingsSwitchRow(
                 title = "Tele Zoom Always On",

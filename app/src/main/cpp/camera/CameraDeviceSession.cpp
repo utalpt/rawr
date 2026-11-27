@@ -3,7 +3,6 @@
 
 #include <android/hardware_buffer.h>
 #include <android/log.h>
-#include <sys/system_properties.h>
 #include <camera/NdkCameraMetadataTags.h>
 
 #include <algorithm>
@@ -146,9 +145,6 @@ void CameraDeviceSession::releaseLoficReaders(bool orphan) noexcept {
     }
     loficVideoWindow_ = loficShortWindow_ = nullptr;
     imaging::LoficGrab::instance().setActive(false);
-    CameraRequestPipeline::loficBareHold.store(false, std::memory_order_relaxed);
-    if (orphan) (void)loficBare_.release();
-    else loficBare_.reset();
 }
 ANativeWindow* CameraDeviceSession::addDrainedReader(uint32_t width, uint32_t height, int32_t format, uint64_t usage,
                                                      AImageReader*& reader, const char* label, const Diagnostic& diag) {
@@ -972,15 +968,7 @@ bool CameraDeviceSession::createSession(ANativeWindow* window, const std::option
         if (!ok(s)) return fail("add_lofic_target", "status=" + statusText(s));
     }
 
-    // LOFIC diagnostics (adb shell setprop debug.rawr.lofic N): bit 1 skips the app's request defaults,
-    // bit 2 holds a repeating request built like the LOFIC screen's.
-    int loficDebug = 0;
-    if (lofic) {
-        char value[PROP_VALUE_MAX] = {};
-        if (__system_property_get("debug.rawr.lofic", value) > 0) loficDebug = std::atoi(value);
-        diag("CAMERA_LOFIC_DEBUG bits=" + std::to_string(loficDebug));
-    }
-    if (!(loficDebug & 1)) applyPreviewRequestDefaults(request_.get(), *cameraContext_, minimalDefaults);
+    applyPreviewRequestDefaults(request_.get(), *cameraContext_, minimalDefaults);
     // Stills, multiframe bursts and video all come from this repeating RAW
     // request, so request-scope keys only need to be set here.
     if (selected) {
@@ -997,29 +985,6 @@ bool CameraDeviceSession::createSession(ANativeWindow* window, const std::option
     }
     if (!pipeline.submit(session_.get(), request_.get(), control, metering))
         return fail("initial_repeating", "status=control_or_submit_rejected");
-    if (lofic && (loficDebug & 2)) {
-        RequestStatus bs = ACAMERA_OK;
-        loficBare_ = device_->createRequest(RequestTemplate::Record, &bs);
-        if (ok(bs) && loficBare_) {
-            for (ANativeWindow* window : {companionTargeted_ ? companionWindow_ : nullptr, loficVideoWindow_,
-                                          loficShortWindow_, rawWindow_})
-                if (window) (void)loficBare_->addTarget(window);
-            const int32_t fps = selected->frameRate > 0 ? selected->frameRate : 30;
-            const int32_t range[2] = {fps, fps};
-            (void)loficBare_->setI32(ACAMERA_CONTROL_AE_TARGET_FPS_RANGE, 2, range);
-            const uint8_t mode = ACAMERA_CONTROL_MODE_AUTO, ae = ACAMERA_CONTROL_AE_MODE_ON;
-            (void)loficBare_->setU8(ACAMERA_CONTROL_MODE, 1, &mode);
-            (void)loficBare_->setU8(ACAMERA_CONTROL_AE_MODE, 1, &ae);
-            (void)applyCameraKeySettings(loficBare_.get(), characteristics_, keysForLens(*selected),
-                                         selected->cameraId.c_str(), CameraKeySetting::Scope::Request, "lofic_bare",
-                                         diag);
-            int sequence = 0;
-            bs = session_->setRepeating(*loficBare_, &sequence);
-            if (ok(bs)) CameraRequestPipeline::loficBareHold.store(true, std::memory_order_relaxed);
-            dumpCaptureRequest(loficBare_.get(), "lofic_bare", diag);
-        }
-        diag("CAMERA_LOFIC_BARE status=" + statusText(bs));
-    }
     diag(describeSessionRecipe(recipeFacts(selected, recipe, repeatingTemplate)));
     // Lenses that carry keys or recipe fields: what the HAL was actually sent, for comparing devices and builds.
     if (selected && carriesRecipe(*selected)) {

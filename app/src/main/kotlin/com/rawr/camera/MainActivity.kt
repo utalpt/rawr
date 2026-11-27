@@ -135,6 +135,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         com.rawr.camera.i18n.I18n.init(this) // Rawr 17U fork: UI language
+        com.rawr.camera.lofic.LoficLensSwitch.load(this)  // Rawr 17U fork: the "1x LOFIC" lens is opt-in
         lifecycleScope.launch {
             captureViewModel.voiceShutterEnabled.collect {
                 voiceShutterOn = it
