@@ -4,6 +4,17 @@ Fork of [Rawr](https://github.com/adityawarmanfw/rawr) for the Xiaomi 17 Ultra.
 Releases follow Ed's version: `0.5.1-17u.N`. Test work lands on `yuv-probe`
 first and moves to `xiaomi-17u` once verified.
 
+## Unreleased (on the `debug` build, not in a release yet)
+
+### Tele optical zoom
+
+- **Tape**, a fifth look for Tele Zoom Control: only the FOCAL tape above the exposure row, without the preset
+  chips (the TELE cell closes it).
+- The Dial's disc is see-through black like the Wheel and Rocker panels (it was a near-opaque navy), and the
+  ticks and labels of the edge controls are neutral white instead of blue-tinted.
+- The settings path in the 0.5.1-17u.15 notes and the README: Shutter Sound, Tele Zoom Control and Tele Zoom
+  Always On are in **Settings > Photo > Capture** (not "Settings > Capture").
+
 ## 0.5.1-17u.15
 
 The tele's optical zoom from 75 to 100 mm with one tele button and four controls to pick from, the tele's DCG and
@@ -21,12 +32,12 @@ with Ed's main in this release (still up to #165).
   at 75 mm. The 4.3x DCG gets the 3.2x DCG's ISO cap (320), missing from its profile.
 - A **TELE** cell in the exposure row on the tele: a tap opens the zoom control, the cell scrubs too, a double
   tap goes back to 100 mm. The focal length is kept between launches and across the tele's modes.
-- **Settings > Capture > Tele Zoom Control** picks the control: **Bar** (a sheet above the exposure row in the WB
+- **Settings > Photo > Capture > Tele Zoom Control** picks the control: **Bar** (a sheet above the exposure row in the WB
   strip's style, with 75 / 85 / 90 / 100 mm presets and a FOCAL tape that slides under a fixed mark), or
   **Wheel**, **Dial** or **Rocker**, vertical on the viewfinder's right edge. The bars are reused from the
   Telezoom module ([utalpt/x17u-telezoom](https://github.com/utalpt/x17u-telezoom), its Wheel, Arc and Rocker),
   redrawn for Rawr.
-- **Settings > Capture > Tele Zoom Always On** (off by default) keeps the control on screen while the tele is
+- **Settings > Photo > Capture > Tele Zoom Always On** (off by default) keeps the control on screen while the tele is
   selected: the Wheel / Dial / Rocker on the edge, or the Bar above the exposure row (it steps aside while
   another slider, the lens modes popup or the WB strip is up).
 - EXIF and DNG name the focal length the optics were at (the HAL reports the 75 mm end at every position).
@@ -49,7 +60,7 @@ with Ed's main in this release (still up to #165).
 
 ### Camera sounds
 
-- **Shutter Sound** (Settings > Capture, off by default): the system's camera sounds through Android's
+- **Shutter Sound** (Settings > Photo > Capture, off by default): the system's camera sounds through Android's
   MediaActionSound - the shutter click on a photo, and the start and stop tones of a video recording. The start
   tone plays before the microphone opens, so it is not recorded into the video. Where the law asks for the
   shutter sound (MediaActionSound.mustPlayShutterSound, for example Japan and Korea) it plays even when off.

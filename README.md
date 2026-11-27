@@ -68,7 +68,8 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   readouts `DCG`, `DSG`, `DAG` (14-bit, with a per-lens ISO cap).
 - **Tele optical zoom from 75 to 100 mm:** the periscope moves to any focal length in between (one tele
   button, named by the zoom the optics are at, 3.2x to 4.3x), from a **TELE** cell in the exposure row. Settings
-  > Capture > Tele Zoom Control picks the control: **Bar** (presets and a FOCAL tape above the exposure row) or
+  > Photo > Capture > Tele Zoom Control picks the control: **Bar** (presets and a FOCAL tape above the exposure row),
+  **Tape** (the FOCAL tape alone) or
   **Wheel**, **Dial** or **Rocker** on the viewfinder's edge, reused from the
   [Telezoom](https://github.com/utalpt/x17u-telezoom) module; **Tele Zoom Always On** keeps it on screen while
   the tele is selected. EXIF and DNG name the real focal length. The
