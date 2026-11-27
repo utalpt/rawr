@@ -90,6 +90,12 @@ internal fun CaptureSettings(state: SettingsUiState, dispatch: SettingsDispatch)
             )
             SettingDivider()
             SettingsSwitchRow(
+                title = "Tele Zoom Always On",
+                checked = state.values.teleZoomAlwaysOn,
+                testTag = SettingsTestTags.row("Capture", "tele_zoom_always_on")
+            ) { dispatch.invoke(SetTeleZoomAlwaysOn(it)) }
+            SettingDivider()
+            SettingsSwitchRow(
                 title = "Location Tagging",
                 checked = state.values.locationTagging && locationGranted,
                 testTag = SettingsTestTags.row("Capture", "location_tagging")

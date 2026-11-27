@@ -221,6 +221,7 @@ internal fun LensGroupSelector(
     if (!enabled && expandedGroup != null) expandedGroup = null
     // Rawr 17U fork: the modes popup opens where the TELE bar sits, so it closes that bar.
     LaunchedEffect(expandedGroup) {
+        TeleZoomSheetState.lensPopupOpen = expandedGroup != null
         if (expandedGroup != null) {
             SliderBar.close()
             TeleZoomSheetState.open = false

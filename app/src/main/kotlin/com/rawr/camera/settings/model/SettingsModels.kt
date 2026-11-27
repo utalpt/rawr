@@ -791,6 +791,8 @@ data class SettingsValues(
     val shutterSound: Boolean = false,
     /** Rawr 17U fork: how the TELE cell's optical zoom control looks - "bar", "wheel", "dial" or "rocker". */
     val teleZoomStyle: String = "bar",
+    /** Rawr 17U fork: the TELE control stays on screen while the tele (75-100 mm) is selected. Off by default. */
+    val teleZoomAlwaysOn: Boolean = false,
     // Ignore Camera2 shutter/ISO priority modes: locking SS or ISO always enters
     // full Manual. Off by default.
     val aePriorityDisabled: Boolean = false,

@@ -126,6 +126,8 @@ data class SetUltraHdrEnabled(val enabled: Boolean) : SettingsApplicationAction
 data class SetShutterSound(val enabled: Boolean) : SettingsApplicationAction
 /** Rawr 17U fork: the TELE control's look (TeleZoomStyle id). */
 data class SetTeleZoomStyle(val id: String) : SettingsApplicationAction
+/** Rawr 17U fork: the TELE control always on screen while a tele lens with the optical zoom is selected. */
+data class SetTeleZoomAlwaysOn(val enabled: Boolean) : SettingsApplicationAction
 
 data class SetAePriorityDisabled(val disabled: Boolean) : SettingsApplicationAction
 

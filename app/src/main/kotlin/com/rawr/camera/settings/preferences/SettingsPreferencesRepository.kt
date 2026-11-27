@@ -511,6 +511,7 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
             saveBaseDng = p[Keys.saveBaseDng] ?: true,
             shutterSound = p[Keys.shutterSound] ?: d.shutterSound,
             teleZoomStyle = p[Keys.teleZoomStyle] ?: d.teleZoomStyle,
+            teleZoomAlwaysOn = p[Keys.teleZoomAlwaysOn] ?: d.teleZoomAlwaysOn,
             gridMode = enumOrDefault(p[Keys.gridMode], d.gridMode),
             lensBarGrouping = enumOrDefault(p[Keys.lensBarGrouping], d.lensBarGrouping),
             lensBarSize = enumOrDefault(p[Keys.lensBarSize], d.lensBarSize),
@@ -733,6 +734,7 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         p[Keys.saveBaseDng] = v.saveBaseDng
         p[Keys.shutterSound] = v.shutterSound
         p[Keys.teleZoomStyle] = v.teleZoomStyle
+        p[Keys.teleZoomAlwaysOn] = v.teleZoomAlwaysOn
         p[Keys.gridMode] = v.gridMode.name
         p[Keys.lensBarGrouping] = v.lensBarGrouping.name
         p[Keys.lensBarSize] = v.lensBarSize.name
@@ -1110,6 +1112,7 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         val saveBaseDng = booleanPreferencesKey("capture_save_base_dng")
         val shutterSound = booleanPreferencesKey("capture_shutter_sound")
         val teleZoomStyle = stringPreferencesKey("capture_tele_zoom_style")  // Rawr 17U fork
+        val teleZoomAlwaysOn = booleanPreferencesKey("capture_tele_zoom_always_on")  // Rawr 17U fork
         val gridMode = stringPreferencesKey("capture_grid_mode")
         val lensBarGrouping = stringPreferencesKey("lens_bar_grouping")
         val lensBarSize = stringPreferencesKey("lens_bar_size")

@@ -86,7 +86,7 @@ internal fun CompactTeleZoomButton(state: CaptureUiState, dispatch: CaptureDispa
         icon = Icons.Outlined.Tune,
         title = "TELE",
         valueText = valueText,
-        locked = mm != TeleOpticalZoom.MAX_MM || TeleZoomSheetState.open,
+        locked = mm != TeleOpticalZoom.MAX_MM || TeleZoomSheetState.open || TeleZoomSheetState.alwaysOn,
         testTag = COMPACT_TELE_ZOOM,
         semanticsDescription = "Tele optical zoom $valueText. Tap for the zoom sheet, scrub to adjust, " +
             "double tap for ${TeleOpticalZoom.MAX_MM} mm.",
@@ -154,6 +154,18 @@ internal object TeleZoomSheetState {
 
     /** The TELE cell in root coordinates: a tap there while the WB strip (modal, with its scrim) is open opens this. */
     var cellBounds: androidx.compose.ui.geometry.Rect? = null
+
+    /** Settings > Capture > Tele Zoom Always On: the control stays up while the tele is selected. */
+    var alwaysOn by androidx.compose.runtime.mutableStateOf(false)
+
+    /** The lens modes popup is open (it sits where the bar does). */
+    var lensPopupOpen by androidx.compose.runtime.mutableStateOf(false)
+
+    /** The bar above the exposure row: opened, or always on while no other slider sits there. */
+    val barShown: Boolean get() = (open || (alwaysOn && SliderBar.spec == null)) && !lensPopupOpen
+
+    /** The edge control (Wheel / Dial / Rocker): opened, or always on. */
+    val edgeShown: Boolean get() = open || alwaysOn
 }
 
 /**
@@ -173,7 +185,7 @@ internal fun TeleZoomSheet(state: CaptureUiState, dispatch: CaptureDispatch, mod
     ) {
         // ✕ at the start, like the WB strip; the presets centred over the FOCAL rail, like its mark.
         Box(Modifier.fillMaxWidth()) {
-            Box(Modifier.align(Alignment.CenterStart)) {
+            if (!TeleZoomSheetState.alwaysOn) Box(Modifier.align(Alignment.CenterStart)) {
                 SheetTabChip("✕", active = false, tag = "tele_sheet_close") { TeleZoomSheetState.open = false }
             }
             Row(

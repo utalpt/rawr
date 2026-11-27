@@ -178,7 +178,7 @@ private fun CompactStripStack(
         }
         if (quick.showExposure) {
             // Rawr 17U fork: the TELE sheet (tele optical zoom), above the row like the WB strip.
-            if (TeleZoomSheetState.open && TeleZoomSheetState.style == com.rawr.camera.model.TeleZoomStyle.BAR &&
+            if (TeleZoomSheetState.barShown && TeleZoomSheetState.style == com.rawr.camera.model.TeleZoomStyle.BAR &&
                 state.teleZoomAvailable() && !state.whiteBalancePanelOpen && !LookSheetState.open
             ) {
                 TeleZoomSheet(

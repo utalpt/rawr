@@ -168,7 +168,7 @@ private fun TeleWheel(mm: Int, onSelect: (Int) -> Unit, modifier: Modifier) {
     val step = (PI / 2 * .92 / span).toFloat()
     val dragPx = with(LocalDensity.current) { 7.dp.toPx() }   // about 7 dp per mm, as in Telezoom
     Canvas(
-        modifier.size(64.dp, 230.dp)
+        modifier.size(48.dp, 230.dp)
             .testTag("tele_wheel")
             .semantics { contentDescription = "Tele focal length, $mm millimetres. Drag the wheel." }
             .focalDrag(scale, scope) { _, move -> move.y / dragPx }

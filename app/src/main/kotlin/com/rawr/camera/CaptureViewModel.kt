@@ -214,6 +214,11 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                     com.rawr.camera.ui.TeleZoomSheetState.style = com.rawr.camera.model.TeleZoomStyle.fromId(it)
                 }
             }
+            launch {
+                settingsEditor.values.map { it.teleZoomAlwaysOn }.distinctUntilChanged().collect {
+                    com.rawr.camera.ui.TeleZoomSheetState.alwaysOn = it
+                }
+            }
             settingsEditor.values.map { it.shutterSound }.distinctUntilChanged().collect {
                 com.rawr.camera.integration.CameraSounds.prepare(it)
             }
