@@ -324,7 +324,7 @@ internal fun CaptureViewfinder(
         }
         if (state.captureFlash) Box(Modifier.matchParentSize().background(Color.White.copy(alpha = .12f)))
         // Rawr 17U fork: the TELE control on the right edge (Wheel / Dial / Rocker, Settings > Tele Zoom Control).
-        if (TeleZoomSheetState.edgeShown && TeleZoomSheetState.style != com.rawr.camera.model.TeleZoomStyle.BAR &&
+        if (TeleZoomSheetState.edgeShown && !TeleZoomSheetState.style.aboveRow &&
             state.teleZoomAvailable() && !state.whiteBalancePanelOpen
         ) {
             Box(controlFrameModifier.zIndex(4f), contentAlignment = Alignment.CenterEnd) {

@@ -170,7 +170,8 @@ internal object TeleZoomSheetState {
 
 /**
  * Rawr 17U fork: the tele's optical zoom in the white balance strip's style (WhiteBalanceSheet): a row of chips
- * (✕ and the 75 / 85 / 90 / 100 mm presets) and a FOCAL tape (FocalRail).
+ * (✕ and the 75 / 85 / 90 / 100 mm presets) and a FOCAL tape (FocalRail). The Tape style keeps only the FOCAL tape
+ * (the TELE cell closes it).
  */
 @Composable
 internal fun TeleZoomSheet(state: CaptureUiState, dispatch: CaptureDispatch, modifier: Modifier = Modifier) {
@@ -184,7 +185,7 @@ internal fun TeleZoomSheet(state: CaptureUiState, dispatch: CaptureDispatch, mod
         verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         // ✕ at the start, like the WB strip; the presets centred over the FOCAL rail, like its mark.
-        Box(Modifier.fillMaxWidth()) {
+        if (TeleZoomSheetState.style != com.rawr.camera.model.TeleZoomStyle.TAPE) Box(Modifier.fillMaxWidth()) {
             if (!TeleZoomSheetState.alwaysOn) Box(Modifier.align(Alignment.CenterStart)) {
                 SheetTabChip("✕", active = false, tag = "tele_sheet_close") { TeleZoomSheetState.open = false }
             }

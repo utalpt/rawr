@@ -73,7 +73,7 @@ internal fun TeleEdgeControl(state: CaptureUiState, dispatch: CaptureDispatch, m
         TeleZoomStyle.WHEEL -> TeleWheel(mm, onSelect, modifier)
         TeleZoomStyle.DIAL -> TeleDial(mm, onSelect, modifier)
         TeleZoomStyle.ROCKER -> TeleRocker(mm, onSelect, modifier)
-        TeleZoomStyle.BAR -> Unit
+        TeleZoomStyle.BAR, TeleZoomStyle.TAPE -> Unit
     }
 }
 
