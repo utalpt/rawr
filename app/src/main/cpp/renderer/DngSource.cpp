@@ -190,6 +190,25 @@ DngSource::DngSource(const std::string& path, const CfaOverride& cfaOverride)
             }
         }
         whiteLevel = p.raw.white_level_present ? double(p.raw.white_level[0]) : 0.0;
+        // Rawr 17U fork: a float DNG (LOFIC) carries the standard NoiseProfile
+        // (S, O per colour plane, normalized to 0..WhiteLevel): as per-site pairs
+        // in the 0..65535 domain the float samples are read in.
+        if (floatSamples_ && noiseProfileCount == 0 &&
+            (p.raw.noise_profile_count == 6 || p.raw.noise_profile_count == 2)) {
+            const double floatWhite =
+                p.raw.white_level_present && p.raw.white_level[0] > 0 ? double(p.raw.white_level[0]) : 1.0;
+            const double scale = 65535.0 / floatWhite;
+            const uint8_t colours[4][4] = {{0, 1, 1, 2}, {1, 0, 2, 1}, {1, 2, 0, 1}, {2, 1, 1, 0}};
+            bool valid = true;
+            for (int site = 0; site < 4; ++site) {
+                const int plane = p.raw.noise_profile_count == 6 ? colours[cfa][site] : 0;
+                const double sv = p.raw.noise_profile[plane * 2], ov = p.raw.noise_profile[plane * 2 + 1];
+                valid &= std::isfinite(sv) && std::isfinite(ov) && sv >= 0.0;
+                noiseProfile[size_t(site) * 2] = sv * scale;
+                noiseProfile[size_t(site) * 2 + 1] = ov * scale * scale;
+            }
+            noiseProfileCount = valid ? 8 : 0;
+        }
         rawWhite_ = p.raw.white_level_present ? double(p.raw.white_level[0]) : double((1u << p.bits_per_sample) - 1);
         if (floatSamples_) {
             // Float samples: 0..WhiteLevel (1.0 when absent) is read as 0..65535.

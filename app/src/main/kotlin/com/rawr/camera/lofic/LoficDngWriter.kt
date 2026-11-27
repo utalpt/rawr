@@ -31,7 +31,9 @@ internal class LoficDngWriter(
     private val calibration2: Array<Rational>?,
     private val illuminant1: Int?,
     private val illuminant2: Int?,
-    private val asShotNeutral: Array<Rational>?
+    private val asShotNeutral: Array<Rational>?,
+    /** DNG NoiseProfile (S, O) in the normalized domain, the same for R, G, B; null = none. */
+    private val noiseProfile: DoubleArray? = null
 ) {
     private class Entry(val tag: Int, val type: Int, val count: Int, val data: ByteArray)
 
@@ -53,6 +55,12 @@ internal class LoficDngWriter(
 
     private fun bytes(tag: Int, vararg v: Int) {
         entries += Entry(tag, 1, v.size, ByteArray(v.size) { v[it].toByte() })
+    }
+
+    private fun doubles(tag: Int, v: DoubleArray) {
+        val b = le(8 * v.size)
+        v.forEach { b.putDouble(it) }
+        entries += Entry(tag, 12, v.size, b.array())
     }
 
     private fun ascii(tag: Int, s: String) {
@@ -108,6 +116,7 @@ internal class LoficDngWriter(
         calibration1?.let { rational(50723, true, it) }
         calibration2?.let { rational(50724, true, it) }
         asShotNeutral?.let { rational(50728, false, it) }
+        noiseProfile?.takeIf { it.size == 2 }?.let { (sv, ov) -> doubles(51041, doubleArrayOf(sv, ov, sv, ov, sv, ov)) }
         srational(50730, baselineExposure)
         illuminant1?.let { short(50778, it) }
         illuminant2?.let { short(50779, it) }

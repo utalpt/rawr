@@ -203,6 +203,8 @@ internal class RendererStore private constructor(private val context: Context) {
             if (floatDng != null && resolved?.optJSONObject("tonemap")?.optJSONObject("localTone") == null)
                 put("localTone", JSONObject().put("version", 2)
                     .put("shadowsEv", FLOAT_DNG_SHADOWS_EV).put("highlightsEv", FLOAT_DNG_HIGHLIGHTS_EV))
+            // Its NoiseProfile (LOFIC writes one) drives the profiled denoise: on by default.
+            if (floatDng != null) put("denoiseEnabled", true)
             resolved?.optJSONObject("tonemap")?.optJSONObject("adaptiveTone")?.let { put("adaptiveTone", it) }
             resolved?.optJSONObject("tonemap")?.optJSONObject("localTone")?.let { put("localTone", it) }
             put("timestampNs", frame?.optLong("timestampNs", 1_000_000_000) ?: 1_000_000_000)
@@ -212,7 +214,9 @@ internal class RendererStore private constructor(private val context: Context) {
         }.toString().let(assets::resolve)
         RendererRecipe.decode(frozen, library) // Validate before the editor is composed.
         val draft = assets.resolve(RendererRecipe.startingDraft(frozen, library,
-            captured = RendererRecipe.replaysRecipe(job.capture, embedded)))
+            captured = RendererRecipe.replaysRecipe(job.capture, embedded)).let { d ->
+                if (floatDng == null) d else JSONObject(d).put("denoiseEnabled", true).toString()
+            })
         return job.copy(original = frozen, draft = draft, width = w, height = h, rawr = rawr,
             orientation = data[2].toInt(), megapixels = RenderResolution.defaultMegapixels(w, h, rawr))
     }

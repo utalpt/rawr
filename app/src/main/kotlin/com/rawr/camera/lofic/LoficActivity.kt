@@ -766,7 +766,8 @@ class LoficActivity : Activity() {
                 calibration2 = matrix(c?.get(CameraCharacteristics.SENSOR_CALIBRATION_TRANSFORM2)),
                 illuminant1 = c?.get(CameraCharacteristics.SENSOR_REFERENCE_ILLUMINANT1),
                 illuminant2 = c?.get(CameraCharacteristics.SENSOR_REFERENCE_ILLUMINANT2)?.toInt(),
-                asShotNeutral = neutral
+                asShotNeutral = neutral,
+                noiseProfile = LoficMerge.noiseProfile(ratio.k, frameIso)
             )
             val name = "RAWR_" + SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.ROOT).format(Date()) + "_LOFIC.dng"
             val values = ContentValues().apply {

@@ -120,4 +120,17 @@ internal object LoficMerge {
             out[x] = (((1.0 - w) * lv + w * k * s[x]) * scale).toFloat()
         }
     }
+
+    /**
+     * DNG NoiseProfile (S, O) of the merged frame, normalized (1.0 = k x 959 Long DN),
+     * for its Long part: variance = (0.007 x ISO + 0.1) x L + 4 x (ISO / 100)^2 in Long DN,
+     * measured on flat areas of the 27 Nov test DNGs (ISO 51-631). The k x Short part is
+     * noisier than this (a model for it is still to come).
+     */
+    fun noiseProfile(k: Double, iso: Int): DoubleArray {
+        val scale = k * SHORT_RANGE
+        val shot = 0.007 * iso + 0.1
+        val read = 4.0 * (iso / 100.0) * (iso / 100.0)
+        return doubleArrayOf(shot / scale, read / (scale * scale))
+    }
 }
