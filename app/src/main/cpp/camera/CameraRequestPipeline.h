@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -13,6 +14,8 @@ class CameraRequestPipeline final {
     using Diagnostic = std::function<void(const std::string&)>;
     explicit CameraRequestPipeline(Diagnostic diagnostic) : diagnostic_(std::move(diagnostic)) {}
     bool submit(CameraSessionDriver*, CameraRequest*, const CameraControlState&, const CameraMeteringRequest&);
+    // LOFIC diagnostic: while set, submit() leaves the held repeating request running.
+    static inline std::atomic<bool> loficBareHold{false};
     RequestStatus applySessionCadence(CameraRequest*, const CameraControlState&);
     // One-off burst of AE-off copies of the repeating request (HDR+ bracket
     // dark frames), tagged with optimizedStillRequestId = tagId. The
