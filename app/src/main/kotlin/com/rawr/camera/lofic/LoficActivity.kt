@@ -60,6 +60,7 @@ import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.log2
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.first
 
 /**
  * Rawr 17U fork: LOFIC camera of the Xiaomi 17 Ultra main camera, a screen of its own (Camera2 on the Java API, like
@@ -123,6 +124,7 @@ class LoficActivity : Activity() {
     @Volatile private var exposureNs = 1_000_000L
     @Volatile private var iso = 100
     @Volatile private var autoFocus = true
+    @Volatile private var renderJpeg = true
     @Volatile private var focusDiopters = 0f
     @Volatile private var captureRequested = false
     @Volatile private var saving = false
@@ -290,6 +292,12 @@ class LoficActivity : Activity() {
             }
         }
         controls.addView(captureButton)
+        controls.addView(Switch(this).apply {
+            text = "JPEG via Renderer (current look)"
+            setTextColor(Color.WHITE)
+            isChecked = true
+            setOnCheckedChangeListener { _, checked -> renderJpeg = checked }
+        })
         rendererButton = Button(this).apply {
             text = "Open last DNG in Renderer"
             isEnabled = false
@@ -547,6 +555,24 @@ class LoficActivity : Activity() {
         )
     }
 
+    /** Hands the DNG to the Renderer's bulk render (import, current look, JPEG export). */
+    private fun queueJpeg(uri: android.net.Uri, name: String): String = try {
+        val store = com.rawr.camera.renderer.RendererStore.get(this)
+        if (store.bulk.value.running) {
+            "skipped (Renderer busy)"
+        } else {
+            val settings = com.rawr.camera.settings.preferences.SettingsPreferencesStore.editor(
+                application, com.rawr.camera.settings.model.SettingsCatalog.initialState().values
+            )
+            store.renderAll(listOf(uri to name)) { settings.values.first() }
+            "queued"
+        }
+    } catch (e: Exception) {
+        Log.w(TAG, "jpeg", e)
+        // No '%': this goes into a format string.
+        "failed (${e.message?.replace("%", " pct")})"
+    }
+
     private fun <T> readResult(result: CaptureResult, key: CaptureResult.Key<T>): T? =
         try { result.get(key) } catch (ignored: IllegalArgumentException) { null }
 
@@ -650,18 +676,14 @@ class LoficActivity : Activity() {
         }
         longBuf.duplicate().also { it.position(0) }.get(longBytes)
         shortBuf.duplicate().also { it.position(0) }.get(shortBytes)
-        // The RAW and result timestamps do not always match exactly: take the
-        // nearest result within half a frame, and log how far it was.
-        val nearest = synchronized(results) { results.entries.minByOrNull { kotlin.math.abs(it.key - a.timestamp) } }
-        val resultDeltaNs = nearest?.let { it.key - a.timestamp }
-        val result = if (nearest != null && resultDeltaNs != null && kotlin.math.abs(resultDeltaNs) <= s.minFrameNs / 2) nearest.value else null
+        val frameTimestamp = a.timestamp
         val frameMode = mode
         val work = processor
         if (work == null) {
             saving = false
             return
         }
-        work.execute { save(s, frameMode, longBytes, shortBytes, result, resultDeltaNs) }
+        work.execute { save(s, frameMode, longBytes, shortBytes, frameTimestamp) }
     }
 
     // ---- merge and DNG (processor thread) ----
@@ -676,8 +698,26 @@ class LoficActivity : Activity() {
         else -> 1
     }
 
-    private fun save(s: LoficSetup, frameMode: Int, longBytes: ByteArray, shortBytes: ByteArray, result: TotalCaptureResult?, resultDeltaNs: Long?) {
+    private fun save(s: LoficSetup, frameMode: Int, longBytes: ByteArray, shortBytes: ByteArray, frameTimestamp: Long) {
         try {
+            // The frame's own result arrives about a frame after its RAW buffers:
+            // wait for it (up to 500 ms), else take the nearest within half a frame.
+            var result: TotalCaptureResult? = synchronized(results) { results[frameTimestamp] }
+            var waited = 0
+            while (result == null && waited < 50) {
+                Thread.sleep(10)
+                waited++
+                result = synchronized(results) { results[frameTimestamp] }
+            }
+            var resultDeltaNs: Long? = if (result != null) 0L else null
+            if (result == null) {
+                val nearest = synchronized(results) { results.entries.minByOrNull { kotlin.math.abs(it.key - frameTimestamp) } }
+                if (nearest != null) {
+                    val delta = nearest.key - frameTimestamp
+                    resultDeltaNs = delta
+                    if (kotlin.math.abs(delta) <= s.minFrameNs / 2) result = nearest.value
+                }
+            }
             val frameIso = result?.get(CaptureResult.SENSOR_SENSITIVITY) ?: resultIso
             val frameExposure = result?.get(CaptureResult.SENSOR_EXPOSURE_TIME) ?: resultExposureNs
             val ratio = LoficMerge.estimateK(longBytes, shortBytes, s.rows, frameIso)
@@ -737,13 +777,14 @@ class LoficActivity : Activity() {
             contentResolver.update(uri, values, null, null)
             lastSaved = uri
             main.post { rendererButton.isEnabled = true }
+            val jpeg = if (renderJpeg) queueJpeg(uri, name) else "off"
             val headroom = log2(LoficMerge.SHORT_RANGE * ratio.k / LoficMerge.LONG_CLIP)
             val module = ratio.measured && ratio.k > 0.75 * model && ratio.k < 1.25 * model
-            Log.i(TAG, "LOFIC_SAVED name=$name setup=${s.name} mode=$frameMode rows=${s.rows} k=%.1f measured=${ratio.measured} samples=${ratio.samples} model=%.1f iso=$frameIso exposureNs=$frameExposure headroom=%.2f module=$module result=${if (result != null) "matched" else "missing"} resultDeltaNs=${resultDeltaNs ?: "-"} neutral=$neutralSource ${neutral?.joinToString(",") { "%.3f".format(Locale.ROOT, it.toDouble()) } ?: "-"}"
+            Log.i(TAG, "LOFIC_SAVED name=$name setup=${s.name} mode=$frameMode rows=${s.rows} k=%.1f measured=${ratio.measured} samples=${ratio.samples} model=%.1f iso=$frameIso exposureNs=$frameExposure headroom=%.2f module=$module result=${if (result != null) "matched" else "missing"} resultDeltaNs=${resultDeltaNs ?: "-"} jpeg=$jpeg neutral=$neutralSource ${neutral?.joinToString(",") { "%.3f".format(Locale.ROOT, it.toDouble()) } ?: "-"}"
                 .format(Locale.ROOT, ratio.k, model, headroom))
             message("Saved DCIM/Camera/$name\nk=%.0f (%s, model %.0f) · up to %.1f stops above the Long clip · module %s"
                 .format(Locale.ROOT, ratio.k, if (ratio.measured) "measured" else "model", model, headroom,
-                    if (module) "detected" else "not detected (k far from the model)"))
+                    if (module) "detected" else "not detected (k far from the model)") + "\nJPEG: $jpeg")
         } catch (e: Exception) {
             Log.w(TAG, "save", e)
             message("Save failed: ${e.message}")
