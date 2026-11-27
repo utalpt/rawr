@@ -55,6 +55,14 @@ two standard sensors many phones have, the barometer (`TYPE_PRESSURE`) and the r
 
 In the dark the CCT reads about 662000 ("no measurement"); Rawr drops CCT outside 1000–25000 K and below 2 lux.
 
+The SENSOR tile's white balance seed is this CCT with a per-device bias corrected in mired
+(`SensorWhiteBalanceCorrection`): on the 17 Ultra (`ro.product.device` = `nezha`) +9 mired, which
+takes 5900 K to 5600 K; every other device gets none, and `debug.rawr.wb_sensor_mired` (clamped to
++/-60) overrides it for one session. The bias moves the seed only: `rawr:AmbientColorTemperature` and
+the DNG `AsShotNeutral` keep what was measured and what the gains came to. The front camera's sensor
+shares the rear value until it is measured, and `docs/white-balance-quality.md` is the procedure that
+decides whether one constant is enough.
+
 Readings taken with the probe app, back of the phone towards the source:
 
 | Scene | lux | CCT | flicker [0] |

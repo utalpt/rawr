@@ -63,8 +63,12 @@ internal fun WhiteBalancePanel(state: CaptureUiState, dispatch: CaptureDispatch,
 
     val inManual = state.whiteBalanceMode == WhiteBalanceMode.ManualTempTint
     // The colour temperature the phone's light sensor measures, where it has one: one tap sets manual WB to it.
-    val sensorK = sensorWhiteBalanceK(LocalAuxSensors.current?.collectAsStateWithLifecycle()?.value?.cctK)
-        ?.takeIf { state.capabilities.manualWhiteBalanceSupported }
+    // The sensor's own bias is corrected in mired (SensorWhiteBalanceCorrection) on the device it was
+    // measured for, so the label and the reading written to manual WB are the same number.
+    val sensorK = sensorWhiteBalanceK(
+        LocalAuxSensors.current?.collectAsStateWithLifecycle()?.value?.cctK,
+        SensorWhiteBalanceCorrection.offsetMired
+    )?.takeIf { state.capabilities.manualWhiteBalanceSupported }
     // Live neutral readout on the header line while in Auto/preset. Mirrors
     // the rails' display state (the single live source fed by the snapshot
     // follow), so header, rails, compact strip and monitor can never drift
@@ -244,10 +248,19 @@ internal fun formatTint(tint: Int): String = if (tint >= 0) "+$tint" else "$tint
 /**
  * Manual WB temperature for the light sensor's colour temperature: on the TEMP rail's 25 K steps and
  * inside its range; null without a reading.
+ *
+ * [offsetMired] is the sensor's correction (SensorWhiteBalanceCorrection), applied in mired because a
+ * kelvin offset is not the same colour error along the rail: +9 mired is -300 K at 5900 K but -225 K
+ * at 5200 K and -85 K at 3325 K. A fixed kelvin offset would over-correct the warm end.
  */
-internal fun sensorWhiteBalanceK(cctK: Float?): Int? {
+internal fun sensorWhiteBalanceK(cctK: Float?, offsetMired: Float = 0f): Int? {
     if (cctK == null || !cctK.isFinite() || cctK <= 0f) return null
-    val stepped = (cctK / 25f).roundToInt() * 25
+    val mired = 1_000_000f / cctK + offsetMired
+    if (!mired.isFinite() || mired <= 0f) return null
+    val correctedK = 1_000_000f / mired
+    // Round to the rail's step after the correction: the label and the button must show the value the
+    // rails will hold, never the uncorrected one.
+    val stepped = (correctedK / 25f).roundToInt() * 25
     return stepped.coerceIn(WhiteBalanceMode.TEMP_MIN_K, WhiteBalanceMode.TEMP_MAX_K)
 }
 
