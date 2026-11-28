@@ -52,6 +52,8 @@ class RawFrameIngress final {
     uint64_t acquiredCount_ = 0, releasedCount_ = 0, slotLimitHits_ = 0;
     void logImageDescription(AImage* image);
     // Logs RAW_READER_STATS every 120 frames: reader starvation and sensor drops.
+    // Rawr 17U fork: hands the LOFIC Long of this frame to LoficGrab while a LOFIC photo waits.
+    void offerLoficLong(AImage* image, AHardwareBuffer* ahb, int fenceFd, int64_t timestampNs);
     void recordReaderStats(uint64_t timestampNs);
 
     struct ReaderStats {

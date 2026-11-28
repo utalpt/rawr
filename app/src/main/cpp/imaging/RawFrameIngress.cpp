@@ -9,6 +9,10 @@
 #include <utility>
 
 #include "imaging/FrameLimits.h"
+#ifdef __ANDROID__
+#include "imaging/LoficGrab.h"
+#include "imaging/RawPixelSource.h"
+#endif
 
 namespace rawrcam::imaging {
 namespace {
@@ -161,6 +165,12 @@ void RawFrameIngress::drainLocked(AImageReader* reader) {
         }
 
         recordReaderStats(static_cast<uint64_t>(timestamp));
+        // Rawr 17U fork: a LOFIC photo takes its Long here, from every frame in sensor order, not from the CPU
+        // upload, which drops frames under load (the debug build's unoptimised unpack kept ~1 Long in 18, so none
+        // met the Shorts' timestamps: LOFIC_NO_PAIR, video 49261). Only while a photo waits (LoficGrab::wanted).
+#ifdef __ANDROID__  // (the host reader test builds this file with stubs, without LoficGrab)
+        if (LoficGrab::instance().wanted()) offerLoficLong(image, ahb, fenceFd, timestamp);
+#endif
         if (frameCallback_) {
             frameCallback_(AcquiredRawFrame{image, ahb, fenceFd, static_cast<uint64_t>(timestamp), generation_});
         } else {
@@ -169,6 +179,24 @@ void RawFrameIngress::drainLocked(AImageReader* reader) {
         }
     }
 }
+
+#ifdef __ANDROID__
+void RawFrameIngress::offerLoficLong(AImage* image, AHardwareBuffer* ahb, int fenceFd, int64_t timestampNs) {
+    int32_t width = 0, height = 0;
+    if (AImage_getWidth(image, &width) != AMEDIA_OK || AImage_getHeight(image, &height) != AMEDIA_OK || width <= 0 ||
+        height <= 0)
+        return;
+    // The frame callback still owns the fence: lock with a copy of it (the lock waits for the camera's write).
+    const int fence = fenceFd >= 0 ? dup(fenceFd) : -1;
+    void* address = nullptr;
+    if (AHardwareBuffer_lock(ahb, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, fence, nullptr, &address) != 0 || !address) return;
+    // The Long is packed RAW14, its rows back to back (7 bytes per 4 pixels), whatever the plane's row stride.
+    const auto* base = static_cast<const uint8_t*>(address);
+    const size_t rowBytes = size_t(width) / 4u * 7u;
+    LoficGrab::instance().offerLong(timestampNs, base, uint32_t(width), filledRows(base, rowBytes, uint32_t(height)));
+    AHardwareBuffer_unlock(ahb, nullptr);
+}
+#endif
 
 void RawFrameIngress::recordReaderStats(uint64_t timestampNs) {
     auto& s = readerStats_;

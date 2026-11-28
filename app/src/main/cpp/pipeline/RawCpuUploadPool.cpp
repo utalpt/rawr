@@ -166,13 +166,7 @@ rawrcam::vulkan::ImportedRaw& RawCpuUploadPool::upload(uint32_t slotIndex, AImag
         throw std::runtime_error("RAW CPU upload: AHB lock failed status=" + std::to_string(lockResult));
     const rawrcam::imaging::RawPixelSource source{static_cast<const uint8_t*>(address), *format, width_, height_,
                                                   static_cast<size_t>(rowStride)};
-    if (packed14_ && rawrcam::imaging::LoficGrab::instance().wanted()) {
-        int64_t timestampNs = 0;
-        AImage_getTimestamp(image, &timestampNs);
-        const auto* base = static_cast<const uint8_t*>(address);
-        rawrcam::imaging::LoficGrab::instance().offerLong(
-            timestampNs, base, width_, rawrcam::imaging::filledRows(base, static_cast<size_t>(rowStride), height_));
-    }
+    // The LOFIC photo's Long is taken in RawFrameIngress, from every frame (this upload drops frames under load).
     if (packed14_ && (loficLogCounter_++ % 90u) == 0u) {
         const uint32_t filled = rawrcam::imaging::filledRows(static_cast<const uint8_t*>(address),
                                                              static_cast<size_t>(rowStride), height_);
