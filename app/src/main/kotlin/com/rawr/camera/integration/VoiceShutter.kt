@@ -83,6 +83,9 @@ internal class VoiceShutter(private val appContext: Context, private val onKeywo
                 val text = runCatching {
                     if (isFinal) JSONObject(recognizer.result).optString("text") else JSONObject(recognizer.partialResult).optString("partial")
                 }.getOrDefault("")
+                // What the recognizer settled on, when it is not a keyword: shows why a spoken word did not fire.
+                if (isFinal && text.isNotBlank() && text.trim().lowercase() !in VoiceKeywordGate.DEFAULT_KEYWORDS)
+                    Log.i(TAG, "final \"$text\" (not a keyword)")
                 val word = gate.onHypothesis(text, isFinal, SystemClock.elapsedRealtime())
                 if (word != null && active(mine)) {
                     Log.i(TAG, "heard \"$word\"")
