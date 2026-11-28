@@ -12,6 +12,11 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_rawr_camera_lofic_LoficNative_act
     return LoficGrab::instance().active() ? JNI_TRUE : JNI_FALSE;
 }
 
+// Rows the Long fills in the viewfinder (0 until known): 3072 with the root module, 2304 without it.
+extern "C" JNIEXPORT jint JNICALL Java_com_rawr_camera_lofic_LoficNative_viewfinderRows(JNIEnv*, jobject) {
+    return jint(LoficGrab::instance().lastRows());
+}
+
 extern "C" JNIEXPORT void JNICALL Java_com_rawr_camera_lofic_LoficNative_request(JNIEnv*, jobject) {
     LoficGrab::instance().request();
 }

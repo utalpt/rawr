@@ -12,6 +12,9 @@ internal object LoficNative {
 
     external fun request()
 
+    /** Rows the Long fills in the viewfinder, 0 until known: 3072 with the root module, 2304 without it (16:9). */
+    external fun viewfinderRows(): Int
+
     /** [ByteArray long, ByteArray short, IntArray{width, rows, iso, matched}, LongArray{timestampNs, exposureNs},
      *  FloatArray neutral], or null when no pair came in time. */
     external fun waitPair(timeoutMs: Int): Array<Any>?

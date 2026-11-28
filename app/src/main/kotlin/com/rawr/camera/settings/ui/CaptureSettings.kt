@@ -153,6 +153,15 @@ internal fun CaptureSettings(state: SettingsUiState, dispatch: SettingsDispatch)
                     ) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
                 SettingDivider()
+                // Anton's own LOFIC RAW app (comes with the module); the module's post when it is not installed.
+                SettingsRow(
+                    title = "LOFIC RAW app",
+                    value = if (com.rawr.camera.lofic.LoficModule.appInstalled(context)) "Open Anton Tretiakov's app"
+                    else "Not installed - get it with the X17U LOFIC RAW module",
+                    testTag = SettingsTestTags.row("Capture", "lofic_raw_app"),
+                    onClick = { com.rawr.camera.lofic.LoficModule.openApp(context) }
+                )
+                SettingDivider()
             }
             SettingsSwitchRow(
                 title = "Tele Zoom Always On",

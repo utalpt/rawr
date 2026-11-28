@@ -176,6 +176,7 @@ rawrcam::vulkan::ImportedRaw& RawCpuUploadPool::upload(uint32_t slotIndex, AImag
     if (packed14_ && (loficLogCounter_++ % 90u) == 0u) {
         const uint32_t filled = rawrcam::imaging::filledRows(static_cast<const uint8_t*>(address),
                                                              static_cast<size_t>(rowStride), height_);
+        rawrcam::imaging::LoficGrab::instance().noteRows(filled);
         const uint32_t filledAtPlaneStride =
             rawrcam::imaging::filledRows(static_cast<const uint8_t*>(address), size_t(width_) * 2u, height_);
         __android_log_print(ANDROID_LOG_INFO, "RawrCamNative",

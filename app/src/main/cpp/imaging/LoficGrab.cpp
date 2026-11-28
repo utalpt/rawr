@@ -25,6 +25,7 @@ std::mutex mutex;
 std::condition_variable changed;
 bool wanting = false;
 bool sessionActive = false;
+uint32_t viewfinderRows = 0;
 std::deque<Frame> longs, shorts;  // a few recent frames of each while a grab is wanted
 std::deque<Result> results;       // recent results, always (they arrive about a frame after the RAWs)
 
@@ -59,7 +60,18 @@ void LoficGrab::request() {
 void LoficGrab::setActive(bool active) {
     std::lock_guard<std::mutex> lock(mutex);
     sessionActive = active;
+    viewfinderRows = 0;
     if (!active) wanting = false;
+}
+
+void LoficGrab::noteRows(uint32_t rows) {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (sessionActive) viewfinderRows = rows;
+}
+
+uint32_t LoficGrab::lastRows() const {
+    std::lock_guard<std::mutex> lock(mutex);
+    return viewfinderRows;
 }
 
 bool LoficGrab::active() const {

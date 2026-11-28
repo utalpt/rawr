@@ -33,6 +33,10 @@ class LoficGrab {
     void setActive(bool active);
     bool active() const;
     bool wanted() const;
+    // Rows the Long fills in the viewfinder's frames (sampled), 0 until known: 3072 with the root module, 2304
+    // (the HAL's 16:9 LOFIC readout, no real Short gain) without it.
+    void noteRows(uint32_t rows);
+    uint32_t lastRows() const;
     void offerLong(int64_t timestampNs, const uint8_t* data, uint32_t width, uint32_t rows);
     void offerShort(int64_t timestampNs, const uint8_t* data, uint32_t width, uint32_t rows);
     void offerResult(int64_t timestampNs, int32_t iso, int64_t exposureNs, const std::array<float, 3>& neutral);

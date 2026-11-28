@@ -24,6 +24,8 @@
             <action android:name="android.intent.action.GET_CONTENT" />
             <data android:mimeType="*/*" />
         </intent>
+        <!-- Rawr 17U fork: Anton Tretiakov's LOFIC RAW app (Settings > Photo > Capture > LOFIC RAW app). -->
+        <package android:name="app.loficraw" />
     </queries>
 
     <application

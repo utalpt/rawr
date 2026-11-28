@@ -154,6 +154,8 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             videoLocked = { videoSelectionLocked() },
             onRawCpuIngress = {
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    // Rawr 17U fork: the "1x LOFIC" lens always reads its packed RAW14 Long on the CPU (by design).
+                    if (com.rawr.camera.lofic.LoficNative.active()) return@post
                     android.widget.Toast.makeText(
                         application,
                         "Camera frames use the CPU copy path on this device (slower, more battery)",

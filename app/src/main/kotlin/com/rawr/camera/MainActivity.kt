@@ -17,6 +17,7 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.rawr.camera.architecture.VIDEO_FPS_CHOICES
 import com.rawr.camera.architecture.TriggerCapture
 import com.rawr.camera.integration.NativeCameraUiSnapshot
@@ -136,6 +137,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         com.rawr.camera.i18n.I18n.init(this) // Rawr 17U fork: UI language
         com.rawr.camera.lofic.LoficLensSwitch.load(this)  // Rawr 17U fork: the "1x LOFIC" lens is opt-in
+        // Rawr 17U fork: the "1x LOFIC" lens says when the X17U LOFIC RAW module is not active.
+        lifecycleScope.launch {
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                com.rawr.camera.lofic.LoficModule.watch(this@MainActivity)
+            }
+        }
         lifecycleScope.launch {
             captureViewModel.voiceShutterEnabled.collect {
                 voiceShutterOn = it

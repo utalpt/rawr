@@ -24,6 +24,10 @@ real LOFIC gain: the lens refuses the shot and says so.
   tone mapping, the brightest part kept at most 2 EV over white. LOFIC JPEGs are queued one after the other.
 - After a LOFIC shot the message says the JPEG follows in about 10-15 s; turning the lens on (or opening the LOFIC
   screen) asks for notifications on Android 13+, for the "JPEG saved" notice.
+- Without the module the lens now says so when it opens (Long rows below 3072, the 16:9 readout), not only at the
+  shutter, and no longer shows the "CPU copy path" notice (its packed RAW14 Long is always read on the CPU).
+- **Settings > Photo > Capture > LOFIC RAW app** opens Anton's own LOFIC RAW app, or the module's post when it is
+  not installed.
 - Checked on the 17U (daylight window, Long + Short): the lens and the screen give the same results; measured k 94-98% of
   the model, 4.5 to 5.8 stops above the Long clip, the Long always on the same reader, no crash. Video LOFIC: not yet.
 
