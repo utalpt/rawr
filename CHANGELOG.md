@@ -32,8 +32,7 @@ Steve) and the tele opening at 75 mm. Checked on the Xiaomi 17 Ultra. No sync wi
 
 ### Tele lenses
 
-- The tele opens at **75 mm (3.2x)**, where the stock camera and other apps open it, and a double tap on the TELE
-  cell goes back there (it went to 100 mm).
+- The tele opens at **75 mm (3.2x)** instead of 100 mm, and a double tap on the TELE cell goes back there.
 - **Settings > Lenses** lists 7 tele lenses instead of 14: the seven "3.2x ..." lenses were the "4.3x ..." ones
   without the zoom keys (the periscope at its 75 mm rest), so they are gone, and the rest are named **"Tele Normal",
   "Tele DCG", "Tele 50MP", "Tele 200>50", "Tele 200>25", "Tele 200 SF", "Tele ISZ"**. The lens buttons keep
