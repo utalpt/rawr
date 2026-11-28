@@ -4,15 +4,20 @@ Fork of [Rawr](https://github.com/adityawarmanfw/rawr) for the Xiaomi 17 Ultra.
 Releases follow Ed's version: `0.5.1-17u.N`. Test work lands on `yuv-probe`
 first and moves to `xiaomi-17u` once verified.
 
-## Unreleased
+## 0.5.1-17u.18
 
-### S/I Toggle (asked for by iG0Lka)
+HDR+ Bracketed (Steve's merge, kept apart from Ed's) and the S/I Toggle. Checked on the Xiaomi 17 Ultra. No sync with
+Ed's main (still up to #165).
+
+### S/I Toggle (asked for by @iG0Lka_ru)
 
 - **Settings > Photo > Capture > S/I Toggle** (Off by default): one tap switches between ISO priority (static scenes)
   and shutter priority (motion), each entered with its own value: **ISO Priority Value** (ISO 50 by default) and
   **Shutter Priority Value** (1/1000 s by default), the nearest the lens offers. Shown as a button in the top bar (long
   press: back to Auto) or as an S / I tab on the fixed exposure cell (the cell's own tap, double tap and long press stay
   as they were). Photo mode only. The mode itself is kept across app restarts, as before.
+- Checked on the 17U: the switch enters the saved value of each side; a value set by hand on that side is not kept
+  (as asked).
 
 ### HDR+ Bracketed (from Steve's v26 patch)
 
@@ -29,6 +34,10 @@ first and moves to `xiaomi-17u` once verified.
   main breaks it before Steve can update it.
 - Left out of the same patch: the HDR+ (spatial) merge, the multiframe resolution presets, the local tone changes
   (Shadow detail, wider ranges, visible controls) and the UI rotation for both landscape postures.
+- Checked on the 17U at 1x (12.5 MP), same scene: HDR+ Quality gives the same result, memory (504 MB) and merge time
+  in 17u.17 and here; HDR+ Bracketed took its 3 post-shutter frames (1 at -2 EV, 2 at +1 EV), applied the highlight
+  layer, used 541 MB (+37 MB), and matched Steve's own build (same merge figures, same look); back on HDR+ Quality the
+  memory returns to 504 MB. The 200 MP modes work and take longer.
 
 ## 0.5.1-17u.17
 
@@ -60,7 +69,7 @@ Steve) and the tele opening at 75 mm. Checked on the Xiaomi 17 Ultra. No sync wi
 
 - The tele opens at **75 mm (3.2x)** instead of 100 mm, and a double tap on the TELE cell goes back there.
 - **Settings > Lenses** lists 7 tele lenses instead of 14: the seven "3.2x ..." lenses were the "4.3x ..." ones
-  without the zoom keys (the periscope at its 75 mm rest), so they are gone, and the rest are named **"Tele Normal",
+  without the zoom keys (the periscope at its 75 mm rest; spotted by @rifandaadam), so they are gone, and the rest are named **"Tele Normal",
   "Tele DCG", "Tele 50MP", "Tele 200>50", "Tele 200>25", "Tele 200 SF", "Tele ISZ"**. The lens buttons keep
   showing the zoom the optics are at (3.2x to 4.3x).
 - A saved or restored "3.2x ..." or "4.3x ..." lens, and the per-lens look and multiframe tuning stored under it,

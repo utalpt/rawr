@@ -67,6 +67,11 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   ignoreLostCompanion workaround.)*
 - **Focus after a 1x 50 MP single frame:** the lens is held at its distance for a few frames after the
   still, so the viewfinder no longer jumps. *(Already in Rawr: Ed's #141.)*
+- **HDR+ Bracketed** (Settings > Photo > Multiframe > Merge Algorithm, off by default): HDR+ Quality on a burst
+  exposed darker so bright areas do not clip, brightened back, plus frames right after the shutter (brighter ones for
+  the shadows, a darker one for the highlights; hold still until the tick). Written by Steve (his v26 patch); it runs
+  on its own copy of the merge code and shaders, so Ed's HDR+ Quality and Rexture are unchanged, and
+  `-Prawr.hdrb=false` builds without it. Ed's main had removed its own HDR+ Bracketed.
 - **Photo aspect ratios:** 3:2 (35 mm), 5:4, 1:1, 16:9, 2.39:1 Scope and XPan 65:24, from the picker in
   the top bar. The JPEG and its gain map are cropped, the DNG stays full; 3:2 and 16:9 fill the screen width
   in the viewfinder, like 16:9 video.
@@ -84,7 +89,7 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   **Wheel**, **Dial** or **Rocker** on the viewfinder's edge, reused from the
   [Telezoom](https://github.com/utalpt/x17u-telezoom) module; **Tele Zoom Always On** keeps it on screen while
   the tele is selected. The tele opens at 75 mm (3.2x); Settings > Lenses lists its modes as
-  "Tele Normal", "Tele DCG"... EXIF and DNG name the real focal length. The
+  "Tele Normal", "Tele DCG"... (7 instead of 14: the 3.2x ones were the 4.3x ones at rest, spotted by @rifandaadam). EXIF and DNG name the real focal length. The
   vendor tags were found by Anton Tretiakov (@designation_zero).
 
   <img src="docs/assets/screens/tele-zoom-controls.jpg" alt="Tele Zoom Control: Bar, Tape, Wheel, Dial, Rocker" width="540">
@@ -92,6 +97,9 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
 - Lens bar grouping (Auto / Grouped / All) and button size (Compact / Normal / Large), from the eye panel.
 - **Exposure memory** (Settings > Viewfinder & controls > Control Style): **Per camera**, each lens keeps its own exposure mode,
   ISO, shutter, EV and WB, or **Shared**, one set for every lens (focus stays per lens).
+- **S/I Toggle** (Settings > Photo > Capture, off by default): one tap switches between ISO priority and shutter
+  priority, each entered with its saved value (ISO 50 and 1/1000 s by default), from a top-bar button (long press:
+  Auto) or an S / I tab on the fixed exposure cell. Asked for by @iG0Lka_ru.
 - Each lens can keep its own frame count, look, tone and film.
 - Manual ISO shows the standard numbers on the third stops (80, 160, 320, 640, 1250 instead of 79, 159,
   317, 635, 1270).
