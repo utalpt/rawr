@@ -150,14 +150,16 @@ jobs:
           VARIANT: ${{ github.event.inputs.variant || 'debug' }}
         run: |
           # Kept checkout: drop APKs from earlier builds so only this build's APK is published.
-          rm -rf app/build/outputs/apk
+          rm -rf app/build/outputs/apk wear/build/outputs/apk
           if [ "$VARIANT" = "benchmark" ]; then
             # Test build: skips lint (about a minute); the debug builds and releases still run it.
             ./gradlew :app:assembleBenchmark -x lintVitalAnalyzeBenchmark -x lintVitalReportBenchmark -x lintVitalBenchmark
           elif [ "$SKIP_TESTS" = "true" ]; then
-            ./gradlew :app:assembleDebug
+            ./gradlew :app:assembleDebug :wear:assembleDebug
           else
-            ./gradlew :app:testDebugUnitTest :app:assembleDebug
+            # Rawr 17U fork: also the debug watch app (Rawr Remote, same x17u.rawr.camera.debug id and debug key), the
+            # one that pairs with Rawr Debug; the release watch app only pairs with the release phone app.
+            ./gradlew :app:testDebugUnitTest :app:assembleDebug :wear:assembleDebug
           fi
 
       # A failed unit test: its report (which test, which assertion, the values) as an artifact.
@@ -176,7 +178,9 @@ jobs:
         if: ${{ !cancelled() && !github.event.repository.private }}
         with:
           name: rawr-debug-${{ github.sha }}
-          path: app/build/outputs/apk/*/*.apk
+          path: |
+            app/build/outputs/apk/*/*.apk
+            wear/build/outputs/apk/*/*.apk
           retention-days: 14
 
       - name: Test build prerelease (private repository)
@@ -215,10 +219,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk rawr-debug.apk
+          cp "$(ls wear/build/outputs/apk/debug/*.apk | head -1)" rawr-remote-wear-debug.apk
           gh release delete debug --cleanup-tag --yes || true
-          gh release create debug rawr-debug.apk --prerelease --target "$GITHUB_SHA" \
+          gh release create debug rawr-debug.apk rawr-remote-wear-debug.apk --prerelease --target "$GITHUB_SHA" \
             --title "Debug build" \
-            --notes "Debug build of ${GITHUB_SHA::8}. Installs alongside release as Rawr Debug."
+            --notes "Debug build of ${GITHUB_SHA::8}. Installs alongside release as Rawr Debug. rawr-remote-wear-debug.apk is its Watch Remote app (Wear OS), the one that pairs with Rawr Debug."
 
       - uses: actions/upload-artifact@v4
         if: ${{ failure() && !github.event.repository.private }}

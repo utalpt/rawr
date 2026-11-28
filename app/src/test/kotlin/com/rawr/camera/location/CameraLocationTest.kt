@@ -259,7 +259,7 @@ class CameraLocationTest {
             assertTrue(noRequests())
             assertEquals("Protected system broadcasts need an exported receiver", Context.RECEIVER_EXPORTED, app.receiverFlags)
             ShadowSystemClock.advanceBy(Duration.ofSeconds(5))
-            appOps.setMode(AppOpsManager.OPSTR_FINE_LOCATION, app.applicationInfo.uid, app.packageName, AppOpsManager.MODE_FOREGROUND)
+            appOps.setMode(AppOpsManager.OPSTR_FINE_LOCATION, android.os.Process.myUid(), app.packageName, AppOpsManager.MODE_FOREGROUND)
             idle()
             tasks.drain()
             permission.onResult(true)
@@ -300,7 +300,7 @@ class CameraLocationTest {
         val prepared = requireNotNull(collector.snapshot())
         collector.setForeground(false)
         tasks.drain()
-        appOps.setMode(AppOpsManager.OPSTR_COARSE_LOCATION, app.applicationInfo.uid, app.packageName, AppOpsManager.MODE_DEFAULT)
+        appOps.setMode(AppOpsManager.OPSTR_COARSE_LOCATION, android.os.Process.myUid(), app.packageName, AppOpsManager.MODE_DEFAULT)
         idle()
         collector.setForeground(true)
         val checks = app.permissionChecks
@@ -331,9 +331,9 @@ class CameraLocationTest {
                 }
                 "approximate" -> {
                     shadowOf(app).denyPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
-                    appOps.setMode(AppOpsManager.OPSTR_FINE_LOCATION, app.applicationInfo.uid, app.packageName, AppOpsManager.MODE_IGNORED)
+                    appOps.setMode(AppOpsManager.OPSTR_FINE_LOCATION, android.os.Process.myUid(), app.packageName, AppOpsManager.MODE_IGNORED)
                 }
-                "coarseIgnored" -> appOps.setMode(AppOpsManager.OPSTR_COARSE_LOCATION, app.applicationInfo.uid, app.packageName,
+                "coarseIgnored" -> appOps.setMode(AppOpsManager.OPSTR_COARSE_LOCATION, android.os.Process.myUid(), app.packageName,
                     AppOpsManager.MODE_IGNORED)
                 "system" -> {
                     platform.setLocationEnabled(false)
@@ -363,7 +363,7 @@ class CameraLocationTest {
                 listener(FUSED_PROVIDER).onLocationChanged(fix(accuracy = 2000f))
                 assertNotNull("Fresh coarse observations are usable", collector.snapshot())
             } else if (loss != "provider" && loss != "foregroundIgnored") {
-                appOps.setMode(AppOpsManager.OPSTR_COARSE_LOCATION, app.applicationInfo.uid, app.packageName, AppOpsManager.MODE_ALLOWED)
+                appOps.setMode(AppOpsManager.OPSTR_COARSE_LOCATION, android.os.Process.myUid(), app.packageName, AppOpsManager.MODE_ALLOWED)
                 platform.setLocationEnabled(true)
                 collector.setForeground(false)
                 collector.setForeground(true)
