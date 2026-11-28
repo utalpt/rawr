@@ -6,8 +6,8 @@ first and moves to `xiaomi-17u` once verified.
 
 ## 0.5.1-17u.18
 
-HDR+ Bracketed (Steve's merge, kept apart from Ed's), the S/I Toggle and Ed's main up to #169. Checked on the Xiaomi
-17 Ultra.
+Ed's main up to #169, HDR+ Bracketed back (Ed's merge, brought back and reworked by Steve, kept apart from Ed's code)
+and the S/I Toggle. Checked on the Xiaomi 17 Ultra.
 
 ### From Ed's main (#166, #168, #169)
 
@@ -16,7 +16,7 @@ HDR+ Bracketed (Steve's merge, kept apart from Ed's), the S/I Toggle and Ed's ma
   per-position response") loses its blocky soft edges, lattice, patches and thin-line artifacts. The 17U's 200 MP
   tele (4x4 blocks) keeps the fork's fast remosaic, so this does not change its photos.
 
-### S/I Toggle (asked for by @iG0Lka_ru)
+### S/I Toggle (asked for by iG0Lka_ru on Telegram)
 
 - **Settings > Photo > Capture > S/I Toggle** (Off by default): one tap switches between ISO priority (static scenes)
   and shutter priority (motion), each entered with its own value: **ISO Priority Value** (ISO 50 by default) and
@@ -26,12 +26,13 @@ HDR+ Bracketed (Steve's merge, kept apart from Ed's), the S/I Toggle and Ed's ma
 - Checked on the 17U: the switch enters the saved value of each side; a value set by hand on that side is not kept
   (as asked).
 
-### HDR+ Bracketed (from Steve's v26 patch)
+### HDR+ Bracketed (Ed's merge, brought back and reworked by Steve in his v26 patch)
 
 - **Settings > Photo > Multiframe > Merge Algorithm > HDR+ Bracketed** (off by default: the default merge stays
   Rexture). HDR+ Quality on a ZSL burst metered darker so bright areas (sky, lamps) do not clip, brightened back, plus
   frames taken right after the shutter: brighter ones for cleaner shadows and darker ones as a highlight layer (hold
-  still until the tick). Written by Steve; Ed's main removed its own HDR+ Bracketed earlier.
+  still until the tick). HDR+ Bracketed was Ed's: he removed it from his main earlier, and Steve brought it back
+  on top of Ed's HDR+ Quality.
 - Kept apart from Ed's code so HDR+ Quality and Rexture stay as upstream: the bracket merge runs its own recorder
   (`HdrBracketRecorder.cpp`, a copy of Ed's `HdrPlusRecorder.cpp` with Steve's changes), its own burst run
   (`AndroidBurstCoordinatorBracket.cpp`) and its own shaders (`hdrb_*.comp`, including copies of the three alignment

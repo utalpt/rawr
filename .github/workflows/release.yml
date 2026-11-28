@@ -1,7 +1,8 @@
 name: Release build
 
 # Push an annotated tag v<Ed's version>-17u.<N> on xiaomi-17u (for example v0.5.1-17u.1) to publish a signed
-# release; the tag message becomes the release notes, followed by .github/release-footer.md.
+# release; the notes are the tag message's first line, the CHANGELOG.md section "## <version>" and
+# .github/release-footer.md (.github/scripts/release_notes.py).
 # versionName <version>-17u.<N>, versionCode <Ed's code> * 100 + N (see app/build.gradle.kts).
 on:
   push:
@@ -95,12 +96,12 @@ jobs:
           # Rawr Remote, the Wear OS companion (Watch Remote): installed on the watch, signed with the same key.
           WEAR=$(ls wear/build/outputs/apk/release/*.apk | head -1)
           cp "$WEAR" "rawr17u-remote-wear-$NAME.apk"
-          {
-            if [ "$(git cat-file -t "$GITHUB_REF_NAME")" = "tag" ]; then
-              git for-each-ref --format='%(contents)' "refs/tags/$GITHUB_REF_NAME" | sed '/-----BEGIN PGP SIGNATURE-----/,$d'
-              echo
-            fi
-            cat .github/release-footer.md
-          } > notes.md
+          # Notes: the tag message's first line, the CHANGELOG.md section of this version ("## $NAME"), the footer,
+          # so a release page always shows what changed.
+          : > tagmsg.txt
+          if [ "$(git cat-file -t "$GITHUB_REF_NAME")" = "tag" ]; then
+            git for-each-ref --format='%(contents)' "refs/tags/$GITHUB_REF_NAME" | sed '/-----BEGIN PGP SIGNATURE-----/,$d' > tagmsg.txt
+          fi
+          python3 .github/scripts/release_notes.py "$NAME" tagmsg.txt > notes.md
           gh release create "$GITHUB_REF_NAME" "rawr17u-$NAME.apk" "rawr17u-remote-wear-$NAME.apk" --latest \
             --title "Rawr 17U $NAME" --notes-file notes.md

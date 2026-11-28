@@ -67,11 +67,11 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   ignoreLostCompanion workaround.)*
 - **Focus after a 1x 50 MP single frame:** the lens is held at its distance for a few frames after the
   still, so the viewfinder no longer jumps. *(Already in Rawr: Ed's #141.)*
-- **HDR+ Bracketed** (Settings > Photo > Multiframe > Merge Algorithm, off by default): HDR+ Quality on a burst
+- **HDR+ Bracketed** (Settings > Photo > Multiframe > Merge Algorithm, off by default): Ed's merge, which he removed
+  from his main earlier, brought back and reworked by Steve (his v26 patch) on top of Ed's HDR+ Quality: a burst
   exposed darker so bright areas do not clip, brightened back, plus frames right after the shutter (brighter ones for
-  the shadows, a darker one for the highlights; hold still until the tick). Written by Steve (his v26 patch); it runs
-  on its own copy of the merge code and shaders, so Ed's HDR+ Quality and Rexture are unchanged, and
-  `-Prawr.hdrb=false` builds without it. Ed's main had removed its own HDR+ Bracketed.
+  the shadows, a darker one for the highlights; hold still until the tick). It runs on its own copy of the merge code
+  and shaders, so Ed's HDR+ Quality and Rexture are unchanged, and `-Prawr.hdrb=false` builds without it.
 - **Photo aspect ratios:** 3:2 (35 mm), 5:4, 1:1, 16:9, 2.39:1 Scope and XPan 65:24, from the picker in
   the top bar. The JPEG and its gain map are cropped, the DNG stays full; 3:2 and 16:9 fill the screen width
   in the viewfinder, like 16:9 video.
