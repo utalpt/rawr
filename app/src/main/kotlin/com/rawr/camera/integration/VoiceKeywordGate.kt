@@ -50,7 +50,9 @@ internal class VoiceKeywordGate(
     }
 
     companion object {
-        val DEFAULT_KEYWORDS = setOf("cheese", "capture")
+        // "captured": how the small English model hears "capture" from a non-native speaker (a Portuguese speaker on the
+        // 17 Ultra: "captured" three times out of three); it is the same word, so it cannot come from a look-alike.
+        val DEFAULT_KEYWORDS = setOf("cheese", "capture", "captured")
         const val DEFAULT_STABLE_MS = 300L
         const val DEFAULT_COOLDOWN_MS = 2500L
     }
