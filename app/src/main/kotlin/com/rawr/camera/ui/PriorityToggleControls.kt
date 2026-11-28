@@ -7,6 +7,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -115,12 +116,12 @@ internal fun PriorityToggleBadge(
         else -> return
     }
     val haptics = LocalCaptureHaptics.current
-    // A 26 dp touch area in the cell's top-left corner (inside the cell, so nothing clips it); the rest of the cell keeps
+    // A touch area of at least 26 dp in the cell's top-left corner ("S⇄I" on one line, so it may be wider) (inside the cell, so nothing clips it); the rest of the cell keeps
     // its own gestures.
     Box(
         modifier
             .offset(x = 1.dp, y = 1.dp)
-            .size(26.dp)
+            .defaultMinSize(minWidth = 26.dp, minHeight = 26.dp)
             .combinedClickableTap {
                 haptics.selection()
                 dispatch(TogglePriority())
@@ -137,13 +138,14 @@ internal fun PriorityToggleBadge(
     ) {
         Box(
             Modifier
-                .background(if (letter.length == 1) CaptureColors.Accent else Color.Black.copy(alpha = .7f), RoundedCornerShape(5.dp))
+                .background(if (letter.length == 1) CaptureColors.Accent else Color.Black, RoundedCornerShape(5.dp))
                 .border(1.dp, Color.Black.copy(alpha = .6f), RoundedCornerShape(5.dp))
                 .padding(horizontal = 5.dp, vertical = 1.dp)
                 .uprightInLandscape(state.orientation)
         ) {
             Text(letter, color = if (letter.length == 1) Color.White else CaptureColors.Accent, fontFamily = CaptureMono,
-                fontSize = if (letter.length == 1) 11.sp else 9.sp, lineHeight = 12.sp, fontWeight = FontWeight.Bold)
+                fontSize = if (letter.length == 1) 11.sp else 9.sp, lineHeight = 12.sp, fontWeight = FontWeight.Bold,
+                maxLines = 1, softWrap = false)
         }
     }
 }
