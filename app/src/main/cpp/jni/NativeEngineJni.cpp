@@ -42,7 +42,7 @@ std::string jString(JNIEnv* env, jstring value) {
 }
 bool multiframeChromaDenoise(JNIEnv* env, jfloatArray values) {
     const jsize count = values ? env->GetArrayLength(values) : 0;
-    if (count != 23 && count != 25 && count != 26 && count != 28 && count != 29 && count != 30) return false;
+    if (count != 23 && count != 25 && count != 26 && count != 28 && count != 29 && count != 30 && count != 32) return false;
     jfloat flag = 0.0f;
     env->GetFloatArrayRegion(values, 22, 1, &flag);
     return flag > 0.5f;
@@ -57,7 +57,8 @@ rawrcam::capture::multiframe::MultiframeTuning multiframeTuning(JNIEnv* env, jfl
     // the bracket EV (headroom limit), long-frame count and (optionally) the
     // long-frame EV, then (optionally) the Rexture detail-restoration flag (index 29).
     // A length not listed here falls back to every default, so each appended value needs its own entry.
-    if (count != 22 && count != 23 && count != 25 && count != 26 && count != 28 && count != 29 && count != 30) return out;
+    if (count != 22 && count != 23 && count != 25 && count != 26 && count != 28 && count != 29 && count != 30 && count != 32)
+        return out;
     std::array<jfloat, 22> v{};
     env->GetFloatArrayRegion(values, 0, 22, v.data());
     out.outputScale = v[0];
@@ -103,9 +104,9 @@ rawrcam::capture::multiframe::MultiframeTuning multiframeTuning(JNIEnv* env, jfl
     if (count >= 25) {
         std::array<jfloat, 6> merge{4.0f, 13.0f, 32.0f, -2.0f, 2.0f, 0.0f};
         env->GetFloatArrayRegion(values, 23, std::min<jsize>(count - 23, jsize(merge.size())), merge.data());
-        if (!(merge[0] == 2.0f || merge[0] == 4.0f) ||
+        if (!(merge[0] == 2.0f || merge[0] == 3.0f || merge[0] == 4.0f) ||
             !inRange(merge[1], 1.0f, 22.0f) || !(merge[2] == 16.0f || merge[2] == 32.0f) ||
-            !inRange(merge[3], -4.0f, -1.0f) || !inRange(merge[4], 0.0f, 16.0f) || !inRange(merge[5], 0.0f, 3.0f))
+            !inRange(merge[3], -4.0f, 0.0f) || !inRange(merge[4], 0.0f, 16.0f) || !inRange(merge[5], 0.0f, 3.0f))
             return {};
         out.longFrameEv = merge[5];
         out.mergeAlgorithm = static_cast<std::uint32_t>(merge[0]);
@@ -119,6 +120,13 @@ rawrcam::capture::multiframe::MultiframeTuning multiframeTuning(JNIEnv* env, jfl
         env->GetFloatArrayRegion(values, 29, 1, &detail);
         if (!(detail == 0.0f || detail == 1.0f)) return {};
         out.rextureDetailRestore = detail > 0.5f ? 1u : 0u;
+    }
+    if (count >= 32) {
+        std::array<jfloat, 2> under{0.0f, -3.0f};
+        env->GetFloatArrayRegion(values, 30, 2, under.data());
+        if (!inRange(under[0], 0.0f, 2.0f) || !inRange(under[1], -4.0f, -1.0f)) return {};
+        out.underFrames = static_cast<std::uint32_t>(std::lround(under[0]));
+        out.underEv = under[1];
     }
     return out;
 }
@@ -457,9 +465,9 @@ Java_com_rawr_camera_integration_NativePreviewEngine_setPersistZslRingEnabled(JN
     rawrcam::session::setPersistZslRingEnabled(handle(h), v == JNI_TRUE);
 }
 extern "C" JNIEXPORT jint JNICALL Java_com_rawr_camera_integration_NativePreviewEngine_prepareExperimentalMultiframe(
-    JNIEnv*, jobject, jlong h, jint maxFrames) {
+    JNIEnv*, jobject, jlong h, jint maxFrames, jint longFrames) {
     return static_cast<jint>(rawrcam::session::prepareExperimentalMultiframe(
-        handle(h), static_cast<uint32_t>(std::clamp(maxFrames, 2, 30))));
+        handle(h), static_cast<uint32_t>(std::clamp(maxFrames, 2, 30)), static_cast<uint32_t>(std::clamp(longFrames, 0, 28))));
 }
 extern "C" JNIEXPORT void JNICALL
 Java_com_rawr_camera_integration_NativePreviewEngine_cancelPreparedMultiframeCapture(JNIEnv*, jobject, jlong h) {
@@ -519,6 +527,10 @@ Java_com_rawr_camera_integration_NativePreviewEngine_setExperimentalZeroCopy(JNI
 extern "C" JNIEXPORT void JNICALL Java_com_rawr_camera_integration_NativePreviewEngine_setExperimentalMultiframeEnabled(
     JNIEnv*, jobject, jlong h, jboolean v) {
     rawrcam::session::setExperimentalMultiframeEnabled(handle(h), v == JNI_TRUE);
+}
+extern "C" JNIEXPORT void JNICALL Java_com_rawr_camera_integration_NativePreviewEngine_setHdrPlusHeadroomMaxEv(
+    JNIEnv*, jobject, jlong h, jfloat v) {
+    rawrcam::session::setHdrPlusHeadroomMaxEv(handle(h), v);
 }
 extern "C" JNIEXPORT void JNICALL
 Java_com_rawr_camera_integration_NativePreviewEngine_setPersistentEngineEnabled(JNIEnv*, jobject, jlong h, jboolean v) {

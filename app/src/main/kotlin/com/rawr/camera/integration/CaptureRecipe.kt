@@ -245,6 +245,13 @@ internal object CaptureRecipe {
         put("multiframe", JSONObject().apply {
             val value = v.activeMultiframeTuning.sanitized()
             put("mergeAlgorithm", value.mergeAlgorithm.name)
+            if (value.mergeAlgorithm == MultiframeMergeAlgorithm.HdrPlusBracketed) {
+                put("bracketEv", value.bracketEv)
+                put("bracketFrames", value.bracketFrames)
+                put("longFrameEv", value.longFrameEv)
+                put("underFrames", value.underFrames)
+                put("underEv", value.underEv)
+            }
             put("maxFrames", value.maxFrames)
             put("rextureDetailRestore",
                 v.multiframeRextureDetailRestore && value.mergeAlgorithm == MultiframeMergeAlgorithm.Rexture)

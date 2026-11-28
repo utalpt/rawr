@@ -4,6 +4,24 @@ Fork of [Rawr](https://github.com/adityawarmanfw/rawr) for the Xiaomi 17 Ultra.
 Releases follow Ed's version: `0.5.1-17u.N`. Test work lands on `yuv-probe`
 first and moves to `xiaomi-17u` once verified.
 
+## Unreleased
+
+### HDR+ Bracketed (from Steve's v26 patch) - not tested on the 17U yet
+
+- **Settings > Photo > Multiframe > Merge Algorithm > HDR+ Bracketed** (off by default: the default merge stays
+  Rexture). HDR+ Quality on a ZSL burst metered darker so bright areas (sky, lamps) do not clip, brightened back, plus
+  frames taken right after the shutter: brighter ones for cleaner shadows and darker ones as a highlight layer (hold
+  still until the tick). Written by Steve; Ed's main removed its own HDR+ Bracketed earlier.
+- Kept apart from Ed's code so HDR+ Quality and Rexture stay as upstream: the bracket merge runs its own recorder
+  (`HdrBracketRecorder.cpp`, a copy of Ed's `HdrPlusRecorder.cpp` with Steve's changes), its own burst run
+  (`AndroidBurstCoordinatorBracket.cpp`) and its own shaders (`hdrb_*.comp`, including copies of the three alignment
+  shaders Steve changed); its extra GPU memory (highlight layer, per-bin weights) is only reserved for a bracketed
+  burst. The capture side (headroom metering, post-shutter frames, the DNG lift) only runs with HDR+ Bracketed selected.
+- `-Prawr.hdrb=false` builds without it (native code left out, merge hidden in Settings), for when a sync with Ed's
+  main breaks it before Steve can update it.
+- Left out of the same patch: the HDR+ (spatial) merge, the multiframe resolution presets, the local tone changes
+  (Shadow detail, wider ranges, visible controls) and the UI rotation for both landscape postures.
+
 ## 0.5.1-17u.17
 
 A fix for the Shutter Sound switch, two new ways to take a photo (Voice Shutter and Watch Remote, both by

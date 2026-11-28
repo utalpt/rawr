@@ -83,7 +83,7 @@ layout(binding = 1, rgb10_a2) uniform writeonly image2D outputImage;
 layout(binding = 1, rgba8) uniform writeonly image2D outputImage;
 #endif
 
-// exposureSaturation.x/.w, renderConfig.x and reserved0-2 are unused; the
+// exposureSaturation.x/.w, renderConfig.x and reserved0.yzw, reserved1-2 are unused; the
 // layout is kept to match TonemapEngine's GpuParameters.
 layout(std140, binding = 2) uniform TonemapGpuParams {
     mat4 cameraToWorking;         // upper-left mat3; mat4 avoids mat3 packing ambiguity
@@ -93,7 +93,7 @@ layout(std140, binding = 2) uniform TonemapGpuParams {
     vec4 renderConfig;            // unused, aePostGainEV, ShadowsUI, MidtonesUI
     vec4 toneControls;            // ContrastUI, HighlightsUI, BlacksUI, WhitesUI
     vec4 gradeLuma;               // user LUT input gamut luma weights
-    vec4 reserved0;
+    vec4 reserved0;               // x: HDR+ Bracketed highlight shoulder (the output scale in EV; 0 = off)
     vec4 reserved1;
     vec4 reserved2;
     uvec4 extent;                // output width/height, input width/height
@@ -428,6 +428,28 @@ void main() {
 #endif
 #endif
     vec3 work = mat3(P.cameraToWorking) * camera;
+
+    // HDR+ Bracketed highlight layer. The merged output was scaled down by H = reserved0.x EV to hold the range the under
+    // frames add above the reference's clip point, which therefore sits at 2^-H in `work`. The tone curve below is steep up to
+    // about 1.25 EV above that point (30-35 output levels per EV) and then reaches display white, so the layer's top 1.5 EV
+    // would collapse into the last few levels: the glass of a light fixture, with its texture, comes out white. Luminance above
+    // the clip point is compressed so the whole layer range ends about 1.15 EV above it, with a CONSTANT reduced slope (a tanh
+    // flattens the top and leaves a +-0.2 EV texture under one output level): e' = s e + (1 - s) e / sqrt(1 + (e / c)^2), c = 0.5,
+    // slope 1 at the clip point so nothing below it changes, s set so that e = H lands on 1.15. All channels by the same factor,
+    // so hue is kept. SDR render only: the gain map's HDR tap does not go through this, so the compressed range comes back as
+    // highlight headroom there. Not on the scene-referred LOG path.
+    if (P.directRender.x != 3u && P.reserved0.x > 0.0) {
+        float lumaAp1 = dot(vec3(0.2722287168, 0.6740817658, 0.0536895174), work);
+        float eAbove = log2(max(lumaAp1, 1.0e-6)) + P.reserved0.x;  // EV above the reference's clip point
+        if (eAbove > 0.0) {
+            const float kC = 0.5, kTop = 1.15;
+            float H = P.reserved0.x;
+            float gH = H * inversesqrt(1.0 + (H / kC) * (H / kC));
+            float sSlope = clamp((kTop - gH) / max(H - gH, 1.0e-4), 0.0, 1.0);  // 1 = no compression (a small layer)
+            float ePrime = sSlope * eAbove + (1.0 - sSlope) * eAbove * inversesqrt(1.0 + (eAbove / kC) * (eAbove / kC));
+            work *= exp2(ePrime - eAbove);
+        }
+    }
 
     if (P.directRender.x != 3u && P.adaptiveTone.x > 0.0) {
         float baselineY = dot(vec3(0.2722287168, 0.6740817658, 0.0536895174), work) * exp2(P.renderConfig.y);

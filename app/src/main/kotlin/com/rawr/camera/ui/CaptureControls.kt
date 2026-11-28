@@ -231,6 +231,7 @@ private fun PhotoLookToggles(
             icon = Icons.Outlined.BurstMode,
             label = when (state.multiframeAlgorithm) {
                 com.rawr.camera.settings.model.MultiframeMergeAlgorithm.HdrPlusQuality -> "HDR+ Q"
+                com.rawr.camera.settings.model.MultiframeMergeAlgorithm.HdrPlusBracketed -> "HDR+ B"
                 com.rawr.camera.settings.model.MultiframeMergeAlgorithm.Rexture -> "REXTURE"
             },
             active = state.experimentalMultiframeEnabled,

@@ -1,0 +1,19 @@
+#version 450
+// Rawr 17U fork: HDR+ Bracketed - Steve's v26 patch (rawr-17u16-bracketed-v26), his code.
+// HDR+ Bracketed highlight layer: running mean of the aligned, brightness-matched under frames. The frames are stored the way
+// hdrb_warp_rgba.comp leaves them (black-subtracted, scaled to the reference exposure, times the fp16 storage scale); the mean
+// is kept in the same form for hdrb_finalize.comp.
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(set = 0, binding = 0, rgba16f) readonly uniform image2D aligned;
+layout(set = 0, binding = 1, rgba16f) uniform image2D under;
+layout(push_constant) uniform P {
+    ivec2 size;
+    float count;  // frames already in the mean (0: this is the first)
+} p;
+
+void main() {
+    ivec2 q = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(q, p.size))) return;
+    vec4 a = imageLoad(aligned, q);
+    imageStore(under, q, p.count < 0.5 ? a : mix(imageLoad(under, q), a, 1.0 / (p.count + 1.0)));
+}

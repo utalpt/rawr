@@ -97,6 +97,7 @@ bool validParams(const TonemapParams& params) noexcept {
            finite(params.shadowLiftEV) && finite(params.midtoneLiftEV) && finite(params.contrast) &&
            finite(params.whitePointEV) && finite(params.highlightBiasEV) &&
            finite(params.saturation) && finite(params.vibrance) && finite(params.aePostGain) &&
+           finite(params.highlightShoulderEv) && params.highlightShoulderEv >= 0.0f && params.highlightShoulderEv <= 8.0f &&
            params.blackPointEV >= -100.0f && params.blackPointEV <= 100.0f && params.shadowLiftEV >= -100.0f &&
            params.shadowLiftEV <= 100.0f && params.midtoneLiftEV >= -100.0f && params.midtoneLiftEV <= 100.0f &&
            params.contrast >= -100.0f && params.contrast <= 100.0f && params.whitePointEV >= -100.0f &&
@@ -138,6 +139,7 @@ GpuParameters buildGpuParameters(const TonemapParams& params, const float* matri
                                  uint32_t inputWidth, uint32_t inputHeight, const TonemapConfig& config,
                                  const lut::LutGpuPayload& lutPayload, const detail::GamutConversions& conversions) {
     GpuParameters gpu{};
+    gpu.reserved[0][0] = params.highlightShoulderEv;
     gpu.adaptiveTone[0] = params.adaptiveTone.liftEv;
     gpu.adaptiveTone[1] = params.adaptiveTone.keyEv;
     gpu.adaptiveTone[2] = params.adaptiveTone.highlightEv;

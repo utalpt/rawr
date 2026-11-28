@@ -1,0 +1,37 @@
+#version 450
+// HDR+ Bracketed copy of hdrp_best_tile.comp (Steve's v26 patch): the bracket merge's under-frame alignment changes live
+// here, so Ed's hdrp_best_tile.comp, which HDR+ Quality uses, stays as it is. Used only by HdrBracketRecorder.cpp.
+// Port of hdr-plus-swift find_best_tile_alignment: lowest-cost displacement
+// (first minimum in scan order) added to the upscaled previous alignment.
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(std430, set = 0, binding = 0) readonly buffer Diff { float v[]; } diffs;
+layout(std430, set = 0, binding = 1) readonly buffer Prev { ivec2 v[]; } prev;
+layout(std430, set = 0, binding = 2) writeonly buffer Cur { ivec2 v[]; } cur;
+layout(push_constant) uniform P {
+    ivec2 tiles;
+    int downscale;
+    int preferPrior;  // 1 (under frames): ties and gains under 3% keep the prior (the centre candidate)
+} p;
+
+void main() {
+    ivec2 g = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(g, p.tiles))) return;
+    int t = g.y * p.tiles.x + g.x;
+    float best = 1e20;
+    int bestIndex = 0;
+    // First minimum wins, so on equal costs (a flat or fully matched tile) candidate 0, offset (-2, -2), was taken at every
+    // level and doubled on the way up. An under frame in a region where the reference is clipped has nothing to decide by
+    // there: it keeps the displacement inherited from the coarser levels, and moves off it only for a real gain.
+    if (p.preferPrior != 0) {
+        bestIndex = 12;
+        best = diffs.v[t * 25 + 12] * 0.97;
+    }
+    for (int i = 0; i < 25; ++i) {
+        float d = diffs.v[t * 25 + i];
+        if (d < best) {
+            best = d;
+            bestIndex = i;
+        }
+    }
+    cur.v[t] = p.downscale * prev.v[t] + ivec2(bestIndex % 5 - 2, bestIndex / 5 - 2);
+}

@@ -1,0 +1,27 @@
+#version 450
+// Rawr 17U fork: HDR+ Bracketed - Steve's v26 patch (rawr-17u16-bracketed-v26), his code.
+// HDR+ Bracketed: per-bin weight normalization of the running merge, before the finish passes.
+// The running merge holds D = sum of w_k (1 - wt_k)(X_k - ref) per bin (hdrb_merge.comp); the finish rebuilds total * ref + D
+// and divides by total. Scaling D by total / W_bin, where W_bin = 1 + sum of w_k (1 - gateReject_k) is the weight that really
+// reached this bin, makes the result ref + D / W_bin: frames rejected in a bin (or with nothing there) drop out of it. It is
+// per bin and not per tile because a gated frame still merges the bins where it agrees with the reference within the noise.
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(set = 0, binding = 0, rgba16f) uniform image2D outFt;
+layout(set = 0, binding = 1, r32f) readonly uniform image2D wbin;
+layout(push_constant) uniform Params {
+    int tilesX;
+    int tilesY;
+    float total;  // the weight total the finish passes divide by
+} p;
+
+void main() {
+    ivec2 t = ivec2(gl_WorkGroupID.xy);
+    if (t.x >= p.tilesX || t.y >= p.tilesY) return;
+    int dm = int(gl_LocalInvocationID.x), dn = int(gl_LocalInvocationID.y);
+    const int ts = 8;
+    ivec2 t0 = t * ts;
+    float k = p.total / max(imageLoad(wbin, t0 + ivec2(dm, dn)).x, 1.0);
+    ivec2 o = ivec2(2 * (t0.x + dm), t0.y + dn);
+    imageStore(outFt, o, imageLoad(outFt, o) * k);
+    imageStore(outFt, o + ivec2(1, 0), imageLoad(outFt, o + ivec2(1, 0)) * k);
+}

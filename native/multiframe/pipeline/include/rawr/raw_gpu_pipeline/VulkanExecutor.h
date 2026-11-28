@@ -32,6 +32,9 @@ enum class ShaderId : std::uint32_t {
     HdrqAccumulate,
     HdrqShiftTable,
     HdrqSeedDft,
+#ifdef RAWR_HDRB  // Rawr 17U fork: HDR+ Bracketed (Steve's v26 patch)
+#include <rawr/raw_gpu_pipeline/HdrBracketShaderIds.inc>
+#endif
     RxFramePrep,
     RxPyramid,
     RxKernelBlur,

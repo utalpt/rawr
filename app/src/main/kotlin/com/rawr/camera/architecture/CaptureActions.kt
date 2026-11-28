@@ -14,6 +14,8 @@ data class RestoreCapturePreferences(
     val waveformMode: WaveformMode,
     val filmSimEnabled: Boolean,
     val experimentalMultiframeEnabled: Boolean = false,
+    /** Multiframe merge is HDR+ Bracketed (active when multiframe is on in Photo). */
+    val hdrPlusBracketedSelected: Boolean = false,
     val multiframeAlgorithm: com.rawr.camera.settings.model.MultiframeMergeAlgorithm = com.rawr.camera.settings.model.MultiframeMergeAlgorithm.Rexture,
     /** Frames the next merged photo on the lens in use takes (setting capped by the lens profile). */
     val multiframeFrames: Int = 17,

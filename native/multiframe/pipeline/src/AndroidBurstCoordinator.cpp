@@ -178,6 +178,9 @@ void AndroidBurstCoordinator::ensureExecutionInfra(VkPhysicalDevice physical, Vk
 bool AndroidBurstCoordinator::arenaMatchesSelection() const noexcept {
     if (arenaAlgorithm_ != algorithm_) return false;
     if (algorithm_ == MergeAlgorithm::Rexture) return arenaRextureDebug_ == rextureDebug_ && arenaRextureDetail_ == rextureDetailRestore_;
+#ifdef RAWR_HDRB  // Rawr 17U fork: HDR+ Bracketed has its own arena layout (Steve's v26)
+    if (arenaHdrPlus_.bracketed != hdrplus_.bracketed) return false;
+#endif
     return arenaHdrPlus_.tileSize == hdrplus_.tileSize && arenaHdrPlus_.searchDistance == hdrplus_.searchDistance;
 }
 void AndroidBurstCoordinator::initializeArenaLocked(VkPhysicalDevice physical, VkDevice device) {
@@ -187,6 +190,9 @@ void AndroidBurstCoordinator::initializeArenaLocked(VkPhysicalDevice physical, V
         arenaRextureDebug_ = rextureDebug_;
         arenaRextureDetail_ = rextureDetailRestore_;
     } else {
+#ifdef RAWR_HDRB  // Rawr 17U fork: HDR+ Bracketed (Steve's v26): + its highlight layer and per-bin weights
+        if (hdrplus_.bracketed) arena_.initialize(physical, device, bracketScratchLayout(width_, height_, hdrplus_)); else
+#endif
         arena_.initialize(physical, device,
                           makeHdrPlusFrequencyScratchLayout(
                               rawr::raw_merge_hdrplus_gpu::makeFrequencyGeometry(width_, height_, hdrplus_), width_, height_));
@@ -365,7 +371,10 @@ bool AndroidBurstCoordinator::estimateNoiseFromBurst(const std::vector<BurstFram
     const auto timestamp = [&](std::uint32_t query) { recordTimestamp(query); };
     bool noiseEstimated = false;
     if (merge_.estimateNoiseFromBurst && frames.size() >= 2) {
-        const std::uint32_t neighbour = ref + 1u < frames.size() ? ref + 1u : ref - 1u;
+        std::uint32_t neighbour = ref + 1u < frames.size() ? ref + 1u : ref - 1u;
+#ifdef RAWR_HDRB  // Rawr 17U fork: HDR+ Bracketed (Steve's v26)
+        if (hdrplus_.bracketed) neighbour = bracketNoiseNeighbour(frames, ref, neighbour);
+#endif
         if (frameLoad) frameLoad(neighbour);
         const std::uint32_t blocksX = (width_ + kNoiseBlockSize - 1u) / kNoiseBlockSize;
         const std::uint32_t blocksY = (height_ + kNoiseBlockSize - 1u) / kNoiseBlockSize;
@@ -422,6 +431,9 @@ BurstRunResult AndroidBurstCoordinator::run(const std::vector<BurstFrame>& frame
     // 13=robustness, 14=accumulate, 20=finalize.
     chunkStats_ = {};
     if (algorithm_ == MergeAlgorithm::Rexture) return runRexture(frames, ref, frameConsumed, frameLoad);
+#ifdef RAWR_HDRB  // Rawr 17U fork: HDR+ Bracketed, its own run (AndroidBurstCoordinatorBracket.cpp, Steve's v26)
+    if (hdrplus_.bracketed) return runHdrPlusBracketed(frames, ref, frameConsumed, frameLoad);
+#endif
     return runHdrPlusFrequency(frames, ref, frameConsumed, frameLoad);
 }
 BurstRunResult AndroidBurstCoordinator::runRexture(const std::vector<BurstFrame>& frames, std::uint32_t ref,

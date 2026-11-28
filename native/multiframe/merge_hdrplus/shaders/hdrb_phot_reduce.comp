@@ -1,0 +1,47 @@
+#version 450
+// Rawr 17U fork: HDR+ Bracketed - Steve's v26 patch (rawr-17u16-bracketed-v26), his code.
+// HDR+ Bracketed, photometric matching, step 2: sum the groups' partials and solve  reference = a * frame + b  for this
+// frame's slot. Too few samples, or a degenerate or implausible fit, leaves the frame as it is (a = 1, b = 0).
+layout(local_size_x = 256) in;
+layout(std430, set = 0, binding = 0) readonly buffer Parts { float v[]; } parts;
+layout(std430, set = 0, binding = 1) buffer Coef { vec2 c[]; } coef;
+layout(push_constant) uniform Params {
+    int count;       // groups
+    int slot;
+    float minCount;  // samples needed
+    float aMin;
+    float aMax;
+    float bLimit;    // largest offset applied (reference raw units)
+} p;
+shared float sh[5][256];
+
+void main() {
+    uint lid = gl_LocalInvocationIndex;
+    float acc[5] = float[5](0.0, 0.0, 0.0, 0.0, 0.0);
+    for (int i = int(lid); i < p.count; i += 256) {
+        for (int k = 0; k < 5; ++k) acc[k] += parts.v[i * 5 + k];
+    }
+    for (int k = 0; k < 5; ++k) sh[k][lid] = acc[k];
+    barrier();
+    for (uint s = 128u; s > 0u; s >>= 1) {
+        if (lid < s) {
+            for (int k = 0; k < 5; ++k) sh[k][lid] += sh[k][lid + s];
+        }
+        barrier();
+    }
+    if (lid == 0u) {
+        float n = sh[0][0];
+        vec2 ab = vec2(1.0, 0.0);
+        if (n >= p.minCount) {
+            float mx = sh[1][0] / n, my = sh[2][0] / n;
+            float var = sh[3][0] / n - mx * mx;
+            float cov = sh[4][0] / n - mx * my;
+            if (var > 1.0) {
+                float a = clamp(cov / var, p.aMin, p.aMax);
+                float b = clamp(my - a * mx, -p.bLimit, p.bLimit);
+                ab = vec2(a, b);
+            }
+        }
+        coef.c[p.slot] = ab;
+    }
+}

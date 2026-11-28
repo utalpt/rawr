@@ -42,6 +42,31 @@ std::string buildParametersBlock(const MultiframeTuningView& tuning, const Multi
     }
     if (tuning.mergeAlgorithm == 4u) {
         out << "- Merge: Rexture (kernel-regression merge of the whole burst; base = best of the last 0.25 s)\n";
+    } else if (tuning.mergeAlgorithm == 3u) {
+        const auto f3 = [](float v) {
+            std::ostringstream s;
+            s << std::fixed << std::setprecision(3) << v;
+            return s.str();
+        };
+        out << "- Merge: HDR+ bracketed (frequency merge, darkest-frame reference)\n"
+            << "- HDR+ strength: " << f3(tuning.hdrplusStrength) << '\n'
+            << "- HDR+ tile size: " << tuning.hdrplusTileSize << '\n';
+        if (tuning.bracketCapture == 1u) {
+            out << "- Highlight headroom: up to " << f3(tuning.bracketEv) << " EV, lifted "
+                << (tuning.bracketLiftEv > 0.0f ? f3(tuning.bracketLiftEv) + " EV" : std::string("none")) << '\n'
+                << "- Long frames: " << tuning.bracketFrames << " x "
+                << (tuning.longFrameEv > 0.0f ? "AE +" + f3(tuning.longFrameEv) + " EV" : std::string("AE")) << '\n';
+            if (tuning.underFrames > 0u)
+                out << "- Under frames: " << tuning.underFrames
+                    << " (highlight layer: blended in where the merge reaches the burst's clip point; output scaled down "
+                    << f3(tuning.underOutputEv) << " EV)\n";
+            if (!tuning.bracketAchieved.empty()) out << "- Exposures received: " << tuning.bracketAchieved << '\n';
+        } else {
+            out << "- Bracket: " << tuning.bracketFrames << " x " << f3(tuning.bracketEv) << " EV\n"
+                << "- Bracket lift: "
+                << (tuning.bracketLiftEv > 0.0f ? f3(tuning.bracketLiftEv) + " EV" : std::string("none (no dark frames)"))
+                << '\n';
+        }
     } else {
         out << "- Merge: HDR+ frequency (tile alignment + per-frequency Wiener merge; frames that moved are gated out per tile; "
                "base = best of the last 0.25 s)\n";

@@ -597,7 +597,13 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
             multiframeRextureDetailRestore = p[Keys.multiframeRextureDetailRestore] ?: d.multiframeRextureDetailRestore,
             multiframeTuning =
                 MultiframeTuning(
-                    mergeAlgorithm = enumOrDefault(p[Keys.multiframeMergeAlgorithm], d.multiframeTuning.mergeAlgorithm),
+                    mergeAlgorithm = enumOrDefault(p[Keys.multiframeMergeAlgorithm], d.multiframeTuning.mergeAlgorithm)
+                        .takeIf { it.available } ?: d.multiframeTuning.mergeAlgorithm,
+                    bracketEv = p[Keys.multiframeBracketEv] ?: d.multiframeTuning.bracketEv,
+                    bracketFrames = p[Keys.multiframeBracketFrames] ?: d.multiframeTuning.bracketFrames,
+                    longFrameEv = p[Keys.multiframeLongFrameEv] ?: d.multiframeTuning.longFrameEv,
+                    underFrames = p[Keys.multiframeUnderFrames] ?: d.multiframeTuning.underFrames,
+                    underEv = p[Keys.multiframeUnderEv] ?: d.multiframeTuning.underEv,
                     maxFrames = p[Keys.multiframeMaxFrames] ?: d.multiframeTuning.maxFrames
                 ).sanitized(d.multiframeTuning),
             multiframeTuningByLens = decodeMultiframeByLens(p[Keys.multiframeTuningByLens], d.multiframeTuning),
@@ -840,6 +846,11 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         p.remove(Keys.multiframeNoiseProfile)
         p.remove(Keys.camera2NoiseModelEnabled)
         p[Keys.multiframeMergeAlgorithm] = v.multiframeTuning.mergeAlgorithm.name
+        p[Keys.multiframeBracketEv] = v.multiframeTuning.bracketEv
+        p[Keys.multiframeBracketFrames] = v.multiframeTuning.bracketFrames
+        p[Keys.multiframeLongFrameEv] = v.multiframeTuning.longFrameEv
+        p[Keys.multiframeUnderFrames] = v.multiframeTuning.underFrames
+        p[Keys.multiframeUnderEv] = v.multiframeTuning.underEv
         p[Keys.multiframeMaxFrames] = v.multiframeTuning.maxFrames
         if (v.multiframeTuningByLens.isEmpty()) p.remove(Keys.multiframeTuningByLens)
         else p[Keys.multiframeTuningByLens] = encodeMultiframeByLens(v.multiframeTuningByLens)
@@ -1053,7 +1064,12 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
             values.toSortedMap().forEach { (lens, t) ->
                 put(lens, org.json.JSONObject()
                     .put("mergeAlgorithm", t.mergeAlgorithm.name)
-                    .put("maxFrames", t.maxFrames))
+                    .put("maxFrames", t.maxFrames)
+                    .put("bracketEv", t.bracketEv.toDouble())
+                    .put("bracketFrames", t.bracketFrames)
+                    .put("longFrameEv", t.longFrameEv.toDouble())
+                    .put("underFrames", t.underFrames)
+                    .put("underEv", t.underEv.toDouble()))
             }
         }.toString()
 
@@ -1063,8 +1079,14 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         return json.keys().asSequence().filter { it.isNotBlank() }.mapNotNull { lens ->
             val o = json.optJSONObject(lens) ?: return@mapNotNull null
             lens to MultiframeTuning(
-                mergeAlgorithm = enumOrDefault(o.optString("mergeAlgorithm"), defaults.mergeAlgorithm),
-                maxFrames = o.optInt("maxFrames", defaults.maxFrames)
+                mergeAlgorithm = enumOrDefault(o.optString("mergeAlgorithm"), defaults.mergeAlgorithm)
+                    .takeIf { it.available } ?: defaults.mergeAlgorithm,
+                maxFrames = o.optInt("maxFrames", defaults.maxFrames),
+                bracketEv = o.optDouble("bracketEv", defaults.bracketEv.toDouble()).toFloat(),
+                bracketFrames = o.optInt("bracketFrames", defaults.bracketFrames),
+                longFrameEv = o.optDouble("longFrameEv", defaults.longFrameEv.toDouble()).toFloat(),
+                underFrames = o.optInt("underFrames", defaults.underFrames),
+                underEv = o.optDouble("underEv", defaults.underEv.toDouble()).toFloat()
             ).sanitized(defaults)
         }.toMap()
     }
@@ -1208,6 +1230,11 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         val camera2NoiseModelEnabled = booleanPreferencesKey("camera2_noise_model_enabled")
         val multiframeNoiseProfile = stringPreferencesKey("multiframe_noise_profile")
         val multiframeMergeAlgorithm = stringPreferencesKey("multiframe_merge_algorithm")
+        val multiframeBracketEv = floatPreferencesKey("multiframe_bracket_ev")
+        val multiframeBracketFrames = intPreferencesKey("multiframe_bracket_frames")
+        val multiframeLongFrameEv = floatPreferencesKey("multiframe_long_frame_ev")
+        val multiframeUnderFrames = intPreferencesKey("multiframe_under_frames")
+        val multiframeUnderEv = floatPreferencesKey("multiframe_under_ev")
         val multiframeMaxFrames = intPreferencesKey("multiframe_max_frames")
         val multiframeTuningByLens = stringPreferencesKey("multiframe_tuning_by_lens")
         val lookByLens = stringPreferencesKey("look_by_lens")

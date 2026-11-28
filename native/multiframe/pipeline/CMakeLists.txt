@@ -5,6 +5,9 @@ project(raw_gpu_pipeline LANGUAGES CXX)
 # Rexture (../merge_rexture) shaders it dispatches, in production
 # and scalar-trace variants, and embeds them as mf_<name>_{prod,trace}.h.
 option(RAW_GPU_PIPELINE_BUILD_TESTS "Build host unit tests" OFF)
+# Rawr 17U fork: HDR+ Bracketed (Steve's v26 patch): its recorder, merge and shaders live in their own files (HdrBracket*,
+# hdrb_*.comp); OFF builds without them (the merge falls back to HDR+ Quality and the app hides it).
+option(RAWR_HDRB "Build the HDR+ Bracketed merge" ON)
 
 if(ANDROID)
   find_library(VULKAN_LIB vulkan REQUIRED)
@@ -48,6 +51,13 @@ set(RAWR_MF_SHADER_SOURCES
   ${RAWR_MF_DIR}/merge_hdrplus/shaders/hdrq_border.comp
   ${RAWR_MF_DIR}/merge_hdrplus/shaders/hdrq_accumulate.comp
   ${RAWR_MF_DIR}/merge_hdrplus/shaders/hdrq_shift_table.comp
+)
+if(RAWR_HDRB)
+  foreach(RAWR_HDRB_SHADER avg_pool best_tile correct_upsampling warp_rgba mismatch merge wnorm phot_partial phot_reduce phot_apply finalize under_store)
+    list(APPEND RAWR_MF_SHADER_SOURCES ${RAWR_MF_DIR}/merge_hdrplus/shaders/hdrb_${RAWR_HDRB_SHADER}.comp)
+  endforeach()
+endif()
+list(APPEND RAWR_MF_SHADER_SOURCES
   ${RAWR_MF_DIR}/merge_rexture/shaders/rx_frame_prep.comp
   ${RAWR_MF_DIR}/merge_rexture/shaders/rx_pyramid.comp
   ${RAWR_MF_DIR}/merge_rexture/shaders/rx_kernel_blur.comp
@@ -142,6 +152,10 @@ add_library(raw_gpu_pipeline STATIC
   src/RextureFrameScorer.cpp
   src/AndroidBurstCoordinator.cpp
   src/BurstNoiseEstimate.cpp)
+if(RAWR_HDRB)
+  target_sources(raw_gpu_pipeline PRIVATE src/HdrBracketRecorder.cpp src/AndroidBurstCoordinatorBracket.cpp)
+  target_compile_definitions(raw_gpu_pipeline PUBLIC RAWR_HDRB=1)
+endif()
 add_dependencies(raw_gpu_pipeline raw_multiframe_gpu_shaders)
 target_include_directories(raw_gpu_pipeline
   PUBLIC include

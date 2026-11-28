@@ -39,6 +39,9 @@
 #include "mf_hdrq_mismatch_norm_trace.h"
 #include "mf_hdrq_seed_dft_prod.h"
 #include "mf_hdrq_seed_dft_trace.h"
+#ifdef RAWR_HDRB  // Rawr 17U fork: HDR+ Bracketed (Steve's v26 patch)
+#include "HdrBracketShaderIncludes.inc"
+#endif
 #include "mf_hdrq_forward_dft_prod.h"
 #include "mf_hdrq_forward_dft_trace.h"
 #include "mf_hdrq_merge_prod.h"
@@ -243,6 +246,9 @@ const std::array<Spec, static_cast<size_t>(ShaderId::Count)> specs{{{"noise_esti
                                    mf_hdrq_seed_dft_trace_spv,
                                    mf_hdrq_seed_dft_trace_spv_size,
                                    {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}, {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}, {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}},
+#ifdef RAWR_HDRB
+#include "HdrBracketShaderSpecs.inc"
+#endif
                                   {"rx_frame_prep", mf_rx_frame_prep_prod_spv, mf_rx_frame_prep_prod_spv_size, mf_rx_frame_prep_prod_spv, mf_rx_frame_prep_prod_spv_size,
                                    {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}, {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}, {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}, {3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}, {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}, {5, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE}}},
                                   {"rx_pyramid", mf_rx_pyramid_prod_spv, mf_rx_pyramid_prod_spv_size, mf_rx_pyramid_prod_spv, mf_rx_pyramid_prod_spv_size,
@@ -325,6 +331,9 @@ void VulkanExecutor::initialize(VkDevice d, bool wantTrace) {
         "noise_estimate",     "hdrp_prepare", "hdrp_hot_pixel", "hdrp_avg_pool", "hdrp_blur", "hdrp_upsample_align", "hdrp_correct_upsampling", "hdrp_tile_diff", "hdrp_best_tile", "hdrp_finalize",
         "hdrq_to_rgba", "hdrq_warp_rgba", "hdrq_rms", "hdrq_mismatch", "hdrq_region_mean", "hdrq_mismatch_norm", "hdrq_forward_dft", "hdrq_merge", "hdrq_deconvolute", "hdrq_backward_dft", "hdrq_border", "hdrq_accumulate", "hdrq_shift_table",
         "hdrq_seed_dft",
+#ifdef RAWR_HDRB
+#include "HdrBracketShaderNames.inc"
+#endif
         "rx_frame_prep",
         "rx_pyramid",
         "rx_kernel_blur",

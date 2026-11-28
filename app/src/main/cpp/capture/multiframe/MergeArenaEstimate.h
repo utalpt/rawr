@@ -8,6 +8,9 @@
 #include <cstdint>
 
 #include "rawr/raw_gpu_pipeline/HdrPlusRecorder.h"
+#ifdef RAWR_HDRB
+#include "rawr/raw_gpu_pipeline/HdrBracketRecorder.h"
+#endif
 #include "rawr/raw_gpu_pipeline/RextureRecorder.h"
 #include "rawr/raw_gpu_pipeline/ResourceGeometry.h"
 #include "rawr/raw_gpu_pipeline/ScratchLayout.h"
@@ -34,6 +37,15 @@ inline std::uint64_t estimateMergeArenaBytes(std::uint32_t width, std::uint32_t 
         };
         if (algorithm == 4u) return rexture();
         if (algorithm == 2u) return quality();
+#ifdef RAWR_HDRB
+        // Rawr 17U fork: HDR+ Bracketed (Steve's v26) adds its highlight layer and per-bin weights to the HDR+ Quality layout.
+        if (algorithm == 3u) {
+            const auto layout = rawr::raw_gpu_pipeline::hdrb::makeHdrPlusFrequencyScratchLayout(
+                rawr::raw_merge_hdrplus_gpu::makeFrequencyGeometry(width, height, rawr::raw_merge_hdrplus_gpu::Config{}),
+                width, height);
+            return rawr::raw_gpu_pipeline::aliasedImageBytes(layout) + layout.logicalBufferBytes;
+        }
+#endif
         return std::max(rexture(), quality());
     } catch (...) {
         return 0;

@@ -42,6 +42,9 @@ struct SensorClipParams {
     std::array<float, 4> blackByPhase{{0.0f, 0.0f, 0.0f, 0.0f}};
     float whiteLevel = 1.0f;
     float clipThreshold = 0.995f;
+    // Rawr 17U fork, HDR+ Bracketed with a highlight layer (Steve's v26): the CFA is passed with no reference view (Ed's
+    // adapter uses it only with one). false everywhere else.
+    bool cfaWithoutClip = false;
 };
 
 // Native-RGB colour rebuild (prepareRgb only). A per-pixel merge (Rexture) fills red and blue at every pixel by

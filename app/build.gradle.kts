@@ -506,6 +506,11 @@ android {
         targetSdk = 36
         versionCode = 28
         versionName = "0.5.1"
+        // Rawr 17U fork: HDR+ Bracketed (Steve's v26 patch) in or out of the build. -Prawr.hdrb=false leaves out its native
+        // code (bracket recorder, merge and shaders) and hides the merge in Settings, e.g. when a sync with Ed's main breaks it.
+        val hdrBracketed = providers.gradleProperty("rawr.hdrb").orNull != "false"
+        buildConfigField("boolean", "HDR_PLUS_BRACKETED", hdrBracketed.toString())
+        externalNativeBuild { cmake { arguments += "-DRAWR_HDRB=${if (hdrBracketed) "ON" else "OFF"}" } }
     }
 
     ndkVersion = "29.0.14206865"

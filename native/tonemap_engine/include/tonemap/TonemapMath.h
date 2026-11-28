@@ -43,8 +43,12 @@ struct TonemapParams {
     float shadowLiftEV;     // Shadows UI
     float midtoneLiftEV;    // Midtones UI
     float contrast;         // Contrast UI
-    // Unused; keeps the byte layout CaptureJob persists for pending jobs.
-    float persistedLayoutSlot;
+    // HDR+ Bracketed highlight layer, render time only (the persisted value is always 0, which keeps the byte layout
+    // CaptureJob persists for pending jobs): the merged output was scaled down by this many EV to hold the layer, so the
+    // reference's clip point sits this far below 1. The SDR render compresses the scene luminance above that clip point into
+    // half this range (tone/tonemap.comp), so the layer's extra highlight range lands under display white instead of on it.
+    // 0 = off.
+    float highlightShoulderEv;
     float whitePointEV;     // Whites UI
     // Independent tone-shaping control. It never enables, tunes, or re-runs RAW
     // channel reconstruction; negative values compress scene-linear highlights.
@@ -93,7 +97,7 @@ constexpr TonemapPreset NeutralBaseline() noexcept {
          0.0f,   // Shadows UI
          0.0f,   // Midtones UI
          0.0f,   // Contrast UI
-         0.0f,   // persistedLayoutSlot
+         0.0f,   // highlightShoulderEv
          0.0f,   // Whites UI
          0.0f,   // Highlights UI
          0.0f,   // saturation UI

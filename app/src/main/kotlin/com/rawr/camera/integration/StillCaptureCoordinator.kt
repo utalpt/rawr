@@ -185,7 +185,9 @@ class StillCaptureCoordinator(
         if (BuildConfig.DEBUG) Log.i(TAG, "CAPTURE_TIMING stage=acquire event=begin token=${input.requestedAtNs} monoMs=${System.nanoTime() / 1e6}")
         val multiframeFrames =
             if (current.experimentalMultiframeEnabled) {
-                preview.prepareExperimentalMultiframe(current.activeMultiframeTuning.maxFrames).also { frames ->
+                preview.prepareExperimentalMultiframe(
+                    current.activeMultiframeTuning.zslFrames(), current.activeMultiframeTuning.allPostShutterFrames()
+                ).also { frames ->
                     check(frames >= 0) { "Full-resolution acquisition failed; no replacement capture was submitted" }
                 }.coerceAtMost(30)
             } else {
@@ -194,7 +196,11 @@ class StillCaptureCoordinator(
         if (BuildConfig.DEBUG) Log.i(TAG, "CAPTURE_TIMING stage=acquire event=end token=${input.requestedAtNs} frames=$multiframeFrames " +
             "wallMs=${(android.os.SystemClock.elapsedRealtimeNanos() - acquireStartedNs) / 1e6}")
         val multiframe = multiframeFrames >= 2
-        val namedFrames = multiframeFrames
+        // File names count every merged frame, including HDR+ Bracketed's post-shutter dark frames.
+        // A burst longer than requested already holds the long frames' slots (skipped).
+        val postShutterFrames =
+            if (multiframeFrames > current.activeMultiframeTuning.zslFrames()) 0 else current.activeMultiframeTuning.allPostShutterFrames()
+        val namedFrames = multiframeFrames + postShutterFrames
         if (current.experimentalMultiframeEnabled && !multiframe) {
             Log.i(TAG, "Multiframe ring unavailable; capturing a fresh single frame")
         }

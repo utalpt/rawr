@@ -30,9 +30,11 @@ struct MultiframeTuning {
     // Support-aware cleanup of fallback (motion/rejected) areas at finalize.
     float fallbackChromaGain = 0.0f;
     float fallbackLumaGain = 0.0f;
-    // Appended (journal prefix-compatible): 2 = HDR+ Quality (frequency merge), 4 = Rexture. Journals written by older
-    // builds can hold 0 (super-resolution), 1 (HDR+) or 3 (HDR+ Bracketed): those merges no longer exist and the
-    // capture is not merged. Only the hdrplus* fields are read now; the other fields below are unused (journal layout).
+    // Appended (journal prefix-compatible): 2 = HDR+ Quality (frequency merge), 3 = HDR+ Bracketed (Rawr 17U fork, Steve's
+    // v26 patch: the frequency merge on an underexposed burst plus post-shutter frames; uses the hdrplus*, bracket* and
+    // under* fields), 4 = Rexture. Journals written by older builds can hold 0 (super-resolution) or 1 (HDR+): those merges
+    // no longer exist and the capture is not merged. Only the hdrplus* fields are read for HDR+ Quality; the other fields
+    // below are unused there (journal layout).
     std::uint32_t mergeAlgorithm = 4;
     float hdrplusStrength = 13.0f;
     std::uint32_t hdrplusTileSize = 32;  // 16 tracks small motion better, 32 steadier in heavy noise
@@ -58,6 +60,11 @@ struct MultiframeTuning {
     // Appended (journal prefix-compatible): Rexturation, Rexture's detail fit (1 = on; off by default). Journals without it
     // read the default (off: older builds had no such pass).
     std::uint32_t rextureDetailRestore = 0;
+    // Appended (journal prefix-compatible), mergeAlgorithm 3 only: post-shutter frames taken darker than the ZSL burst to
+    // recover the highlights (the merge keeps them as a highlight layer rather than merging them), and their exposure in EV
+    // relative to Camera2 AE (< 0). Older journals carry none.
+    std::uint32_t underFrames = 0;
+    float underEv = -3.0f;
 };
 
 }  // namespace rawrcam::capture::multiframe

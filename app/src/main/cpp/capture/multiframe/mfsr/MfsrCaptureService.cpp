@@ -11,7 +11,7 @@
 
 #include "capture/CaptureRequest.h"
 #include "capture/multiframe/BracketCollector.h"
-#include "capture/multiframe/MergeExposure.h"
+#include "capture/multiframe/BracketExposure.h"
 #include "capture/multiframe/MergeArenaEstimate.h"
 #include "capture/multiframe/mfsr/MfsrCaptureJob.h"
 #include "capture/persistence/AcquiredRawJournal.h"
@@ -372,6 +372,8 @@ void MfsrCaptureService::spoolLoop() {
             // HDR+ bracketed: append the post-shutter long frames (whatever
             // arrived by the deadline; none = a uniform merge of the
             // underexposed burst, still lifted back).
+            const std::size_t zslCount = burst.frames.size();  // the burst frozen at the press
+            std::vector<float> pressValue;  // press-time base score per frame (0 = not a candidate)
             if (auto collector = std::move(burst.pendingBracket)) {
                 const auto begin = std::chrono::steady_clock::now();
                 auto taken = collector->take(begin + kBracketWait);
@@ -393,6 +395,18 @@ void MfsrCaptureService::spoolLoop() {
                      static_cast<unsigned long long>(collector->requestId()), collector->expected(), appended,
                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count());
             }
+            const std::size_t longAppended = burst.frames.size() - zslCount;
+            // The tuning (journaled, and written into the JPEG description) records the long frames that arrived, not
+            // the ones requested. Only a burst that holds them merges as a bracket; headroom alone, with the ring's
+            // exposure drifting under Rawr AE, merges like HDR+ Quality.
+            if (pending->work->tuning.mergeAlgorithm == kMergeAlgorithmHdrPlusBracketed) {
+                // The frames that arrived after the press are told apart by exposure: darker than the ZSL burst = under
+                // frames (the highlight layer), the rest = long frames.
+                const std::uint32_t underAppended = std::min<std::uint32_t>(
+                    countUnderFrames(burst.metadata, static_cast<std::uint32_t>(zslCount)), static_cast<std::uint32_t>(longAppended));
+                pending->work->tuning.underFrames = underAppended;
+                pending->work->tuning.bracketFrames = static_cast<std::uint32_t>(longAppended) - underAppended;
+            }
             // Both merges: the base is chosen at the press, from the frames of the last quarter second: one batched scoring
             // dispatch (sharpness above the noise expectation, clipped share), then the best score penalised for clipping and
             // age. Rexture merges around it; in HDR+ Quality it is also what stands alone where a frame is gated out of a
@@ -407,7 +421,7 @@ void MfsrCaptureService::spoolLoop() {
                     // The burst is frozen at the press: the newest frame is the press time.
                     std::vector<double> times;
                     for (const auto& m : burst.metadata) times.push_back(double(m.timestampNs) * 1.0e-9);
-                    const double press = *std::max_element(times.begin(), times.end());
+                    const double press = *std::max_element(times.begin(), times.begin() + std::ptrdiff_t(zslCount));
                     std::vector<std::size_t> windowIndex;
                     {
                         std::lock_guard<std::mutex> scoreLock(sharpnessMutex_);
@@ -438,7 +452,7 @@ void MfsrCaptureService::spoolLoop() {
                         std::vector<rawr::raw_gpu_pipeline::BurstFrame> windowFrames;
                         windowIndex.clear();
                         for (std::size_t i = 0; i < burst.frames.size(); ++i)
-                            if (press - times[i] <= rawr::raw_merge_rexture_gpu::kBaseWindowSeconds) {
+                            if (i < zslCount && press - times[i] <= rawr::raw_merge_rexture_gpu::kBaseWindowSeconds) {
                                 windowIndex.push_back(i);
                                 windowFrames.push_back(burst.frames[i]);
                             }
@@ -446,6 +460,7 @@ void MfsrCaptureService::spoolLoop() {
                             rextureScorer_.score(windowFrames, burst.frames.front().raw.ref.width,
                                                  burst.frames.front().raw.ref.height, cfa <= 3u ? cfa : 0u, alpha, beta);
                         scores.assign(burst.frames.size(), {});
+                        pressValue.assign(burst.frames.size(), 0.0f);
                         for (std::size_t k = 0; k < windowIndex.size(); ++k) scores[windowIndex[k]] = windowScores[k];
                     }
                     std::vector<rawr::raw_merge_rexture_gpu::FrameScore> frameScores;
@@ -458,6 +473,7 @@ void MfsrCaptureService::spoolLoop() {
                                              std::max(1.0 - rawr::raw_merge_rexture_gpu::kBaseSaturationPenalty * scores[i].sat, 0.0) *
                                              std::max(1.0 - rawr::raw_merge_rexture_gpu::kBaseTimePenalty * age /
                                                                  rawr::raw_merge_rexture_gpu::kBaseWindowSeconds, 0.0);
+                        pressValue[i] = float(value);
                         LOGI("MULTIFRAME_REXTURE_SCORE frame=%zu sharp=%.6g sat=%.5f ageMs=%.1f inWindow=%d value=%.6g%s", i,
                              scores[i].sharp, scores[i].sat, age * 1000.0, inWindow ? 1 : 0, value,
                              i == best ? " <- base" : "");
@@ -476,6 +492,18 @@ void MfsrCaptureService::spoolLoop() {
                 } catch (...) {
                     LOGE("MULTIFRAME_REXTURE_SCORE_FALLBACK unknown");
                 }
+            }
+            // Bracketed bursts that hold long frames merge onto a pre-shutter frame that is dark (within 0.4 EV of the
+            // darkest) and sharp: the underexposed ZSL burst, not the long frames.
+            if (pending->work->tuning.mergeAlgorithm == kMergeAlgorithmHdrPlusBracketed &&
+                burst.metadata.size() == burst.frames.size() && burst.colors.size() == burst.frames.size() &&
+                longAppended > 0u && isExposureBracketed(burst.metadata)) {
+                const auto reference =
+                    bracketReference(burst.metadata, pressValue, static_cast<std::uint32_t>(zslCount), burst.referenceIndex);
+                burst.referenceIndex = reference;
+                burst.referenceMetadata = burst.metadata[reference];
+                burst.referenceColor = burst.colors[reference];
+                LOGI("MULTIFRAME_BASEFRAME mode=bracket-reference selected=%u/%zu zsl=%zu", reference, burst.frames.size(), zslCount);
             }
             const auto requestId = pending->work->requestId;
             const bool live = burst.snapshot && !burst.cpuFrame && !burst.acquiredJournal && !burst.pendingBracket &&

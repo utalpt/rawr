@@ -648,7 +648,8 @@ class SettingsModelTest {
         var persisted: SettingsValues? = null
         val controller = PersistentSettingsController(onValuesChanged = { persisted = it })
         assertEquals(MultiframeMergeAlgorithm.Rexture, controller.state.value.values.multiframeTuning.mergeAlgorithm)
-        assertEquals(listOf(MultiframeMergeAlgorithm.HdrPlusQuality, MultiframeMergeAlgorithm.Rexture), MultiframeMergeAlgorithm.entries)
+        // Rawr 17U fork: HDR+ Bracketed (Steve's v26 patch) sits between Ed's two merges.
+        assertEquals(listOf(MultiframeMergeAlgorithm.HdrPlusQuality, MultiframeMergeAlgorithm.HdrPlusBracketed, MultiframeMergeAlgorithm.Rexture), MultiframeMergeAlgorithm.entries)
 
         controller.dispatch(SetMultiframeMergeAlgorithm(MultiframeMergeAlgorithm.HdrPlusQuality))
 
@@ -724,7 +725,11 @@ class SettingsModelTest {
         val defaults = MultiframeTuning()
         assertEquals(MultiframeMergeAlgorithm.Rexture, defaults.mergeAlgorithm)
         assertEquals(17, defaults.maxFrames)
-        assertEquals(listOf(MultiframeNumericParameter.MaxFrames), MultiframeSpecs.all.map { it.parameter })
+        // Rawr 17U fork: + HDR+ Bracketed's settings (Steve's v26 patch), shown only for that merge.
+        assertEquals(
+            listOf(MultiframeNumericParameter.MaxFrames, MultiframeNumericParameter.BracketEv, MultiframeNumericParameter.BracketFrames,
+                MultiframeNumericParameter.LongFrameEv, MultiframeNumericParameter.UnderFrames, MultiframeNumericParameter.UnderEv),
+            MultiframeSpecs.all.map { it.parameter })
         assertEquals(17f, MultiframeSpecs.forParameter(MultiframeNumericParameter.MaxFrames).defaultValue)
     }
 

@@ -1,6 +1,9 @@
 #pragma once
 #include <rawr/raw_gpu_pipeline/FrameParameters.h>
 #include <rawr/raw_merge_hdrplus_gpu/RawMergeHdrPlusGpu.h>
+#ifdef RAWR_HDRB
+#include <rawr/raw_gpu_pipeline/ScratchLayout.h>
+#endif
 #include <rawr/zsl_ring/RawImageRing.h>
 #include <vulkan/vulkan.h>
 
@@ -71,6 +74,9 @@ struct BurstRunResult {
     // HDR+ Quality: frames' worth of averaging the merged image actually got (harmonic mean over tiles of 1 + frames that
     // merged). Frames gated out of moving tiles do not count, so it is below frameCount when the scene moved; 0 = not reported.
     float effectiveFrames = 0.0f;
+    // Rawr 17U fork, HDR+ Bracketed (Steve's v26) with a highlight layer: the output was scaled down by this many EV to hold
+    // the range the layer adds (the DNG and the render lift it back); 0 = not scaled (every other merge).
+    float outputScaleEv = 0.0f;
 };
 // Synchronous correctness executor. The app runs it on a background worker while
 // borrowing pinned RAW16 images from RawImageRing. It uses the app's existing Vulkan queue via Submit.
@@ -197,6 +203,13 @@ class AndroidBurstCoordinator final {
                               const FrameConsumed& frameConsumed, const FrameLoad& frameLoad);
     BurstRunResult runHdrPlusFrequency(const std::vector<BurstFrame>& frames, std::uint32_t referenceIndex,
                                        const FrameConsumed& frameConsumed, const FrameLoad& frameLoad);
+#ifdef RAWR_HDRB  // Rawr 17U fork: HDR+ Bracketed (Steve's v26), in AndroidBurstCoordinatorBracket.cpp
+    BurstRunResult runHdrPlusBracketed(const std::vector<BurstFrame>& frames, std::uint32_t referenceIndex,
+                                       const FrameConsumed& frameConsumed, const FrameLoad& frameLoad);
+    static std::uint32_t bracketNoiseNeighbour(const std::vector<BurstFrame>& frames, std::uint32_t ref, std::uint32_t fallback);
+    static ScratchLayout bracketScratchLayout(std::uint32_t width, std::uint32_t height,
+                                              const rawr::raw_merge_hdrplus_gpu::Config& hdrplus);
+#endif
     bool arenaReady_ = false;
     bool layoutsInitialized_ = false;
     bool submissionInFlight_ = false;

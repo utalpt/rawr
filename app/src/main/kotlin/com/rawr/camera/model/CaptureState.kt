@@ -218,6 +218,8 @@ data class CaptureUiState(
     val selfTimerRunId: Long = 0L,
     /** Mirrors settings experimentalMultiframeEnabled for the V2 shutter-row toggle. */
     val experimentalMultiframeEnabled: Boolean = false,
+    /** Settings multiframe merge is HDR+ Bracketed. */
+    val hdrPlusBracketedSelected: Boolean = false,
     /** Active multiframe merge algorithm; names the shutter-row pill. */
     val multiframeAlgorithm: com.rawr.camera.settings.model.MultiframeMergeAlgorithm = com.rawr.camera.settings.model.MultiframeMergeAlgorithm.Rexture,
     /** Frames the next merged photo on the lens in use takes; shown briefly on a lens switch. */
@@ -243,6 +245,9 @@ data class CaptureUiState(
         get() = (bracketHoldPresses > 0 && (!fullSizeCapture || fullSizeCaptureSerial == fullSizePressSerial)) ||
             bracketHoldOpened != bracketHoldDone || fullSizeExposurePending
 
+    /** HDR+ Bracketed runs: multiframe on, Photo mode. */
+    val hdrPlusBracketedActive: Boolean
+        get() = hdrPlusBracketedSelected && experimentalMultiframeEnabled && captureMode == CaptureMode.Photo
 }
 
 /** Shutter past the viewfinder cap: captured as its own one-shot exposure, one frame. */

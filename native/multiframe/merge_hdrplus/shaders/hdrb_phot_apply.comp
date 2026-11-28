@@ -1,0 +1,25 @@
+#version 450
+// Rawr 17U fork: HDR+ Bracketed - Steve's v26 patch (rawr-17u16-bracketed-v26), his code.
+// HDR+ Bracketed, photometric matching, step 3: bring the aligned frame onto the reference's brightness scale. Texels at or
+// above `limit` are near the frame's clip point, where hdrb_warp_rgba already blended in the reference, and stay as they are.
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(set = 0, binding = 0, rgba16f) uniform image2D aligned;
+layout(std430, set = 0, binding = 1) readonly buffer Coef { vec2 c[]; } coef;
+layout(push_constant) uniform Params {
+    ivec2 size;
+    int slot;
+    float scale;
+    float black;
+    float limit;  // frame level above black (reference raw units) from which texels are left alone
+} p;
+
+void main() {
+    ivec2 q = ivec2(gl_GlobalInvocationID.xy);
+    if (q.x >= p.size.x || q.y >= p.size.y) return;
+    vec2 ab = coef.c[p.slot];
+    if (ab.x == 1.0 && ab.y == 0.0) return;
+    vec4 v = imageLoad(aligned, q) / p.scale;  // stored black-subtracted
+    vec4 w = ab.x * v + vec4(ab.y);
+    w = mix(v, w, lessThan(v, vec4(p.limit)));
+    imageStore(aligned, q, w * p.scale);
+}

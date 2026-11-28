@@ -1,0 +1,201 @@
+#version 450
+// Rawr 17U fork: HDR+ Bracketed - Steve's v26 patch (rawr-17u16-bracketed-v26), his code.
+// HDR+ Bracketed copy of hdrq_merge.comp: each companion adds its difference from the reference weighted by frameWeight (its
+// exposure ratio, the optimal weight for shot-noise-limited frames); the finish passes divide by the weight total.
+// Differences from hdrq_merge.comp: the noise power of the difference of the reference and a normalised brighter frame is
+// 9 sigma^2 (1 + 1/exposureFactor) per bin (2 x 9 sigma^2 only for equal exposures), so both the Wiener term and the gated-tile
+// test use that; and the weight a companion really adds is kept per bin (wbin) instead of per tile, because a gated frame
+// still merges the bins where it agrees with the reference within the noise (see below).
+// Port of hdr-plus-swift merge_frequency_domain: per tile,
+// pick the best of 7x7 sub-pixel Fourier shifts of the aligned tile, then
+// merge each frequency bin with a Wiener-shrinkage weight (Hasinoff 2016,
+// Liba 2019 motion norm, Delbracio 2015 magnitude norm). One 8x8 workgroup
+// per tile, then every lane merges its own bin.
+// Shift search: upstream minimizes sum_k |ref_k - e^{i theta}·al_k|^2 over
+// channels. Rotation preserves |al_k|, so this equals a shift-independent
+// constant minus 2 * sum_k (cos·A_k + sin·B_k) with per-bin cross terms
+// A_k = sum_ch(refRe·alRe + refIm·alIm), B_k = sum_ch(refIm·alRe - refRe·alIm):
+// the same argmin from 2 floats per bin instead of 16 (shared-memory bound on
+// mobile GPUs); first maximum wins like upstream's first minimum.
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(set = 0, binding = 0, rgba16f) readonly uniform image2D refFt;
+layout(set = 0, binding = 1, rgba16f) readonly uniform image2D alignedRgba;  // transformed here: no aligned spectrum is stored
+layout(set = 0, binding = 2, rgba16f) uniform image2D outFt;
+layout(set = 0, binding = 3, rgba32f) readonly uniform image2D rms;
+layout(set = 0, binding = 4, r32f) readonly uniform image2D mismatch;
+// (cos, sin) per shift and bin, index shift * 64 + n * 8 + m (hdrq_shift_table).
+layout(set = 0, binding = 6, r32f) readonly uniform image2D zmap;
+layout(set = 0, binding = 7, r32f) uniform image2D wbin;  // per-bin weight of the running merge, one texel per bin (hdrb_wnorm.comp)
+layout(std430, set = 0, binding = 5) readonly buffer ShiftTable { vec2 v[]; } shiftTable;
+layout(push_constant) uniform P {
+    ivec2 tiles;
+    float wienerNoise;  // Wiener noise term, in times the bin's noise power of the difference (u.13: HdrPlusRecorder.cpp kWienerNoise)
+    float maxMotionNorm;
+    float gateLo;  // displacement statistic where the frame starts to be rejected
+    float gateHi;  // ... and where it is rejected outright
+    float noiseSlope;   // per-channel noise variance in raw units: slope * (signal - black) + offset
+    float noiseOffset;
+    float black;
+    float frameInv;       // 1 / fp16 storage scale of the frames
+    float spectrumScale;  // storage scale of the fp16 spectra
+    float binNoise;     // gated tiles: a bin merges while its difference stays within this many times its noise power (0 = hard gate)
+    float frameWeight;  // this companion's weight in the mean (reference = 1)
+    float exposureFactor;  // this companion's exposure over the reference's: its normalised noise is 1 / exposureFactor of the reference's
+} p;
+
+shared vec4 sRefRe[64], sRefIm[64], sAlRe[64], sAlIm[64];  // index dn*8 + dm
+shared float sDiff[49];
+shared float sA[64], sB[64];
+shared vec4 tmpRe[8][8], tmpIm[8][8];  // DFT of the aligned tile, [dn][dm]
+shared int sBest;
+shared vec2 sPhase[56];  // (cos, sin) of theta * k * shiftOffset(j), index j * 8 + k
+shared vec2 sT[56];      // partial phase sums per (sy, m)
+
+// cos / sin of 2*pi*k/8 and the raised-cosine window, as in hdrq_forward_dft.glsl.
+const float C8[8] = float[8](1.0, 0.70710678118, 0.0, -0.70710678118, -1.0, -0.70710678118, 0.0, 0.70710678118);
+const float S8[8] = float[8](0.0, 0.70710678118, 1.0, 0.70710678118, 0.0, -0.70710678118, -1.0, -0.70710678118);
+const float HANN8[8] = float[8](0.03806023374, 0.30865828381, 0.69134171619, 0.96193976626, 0.96193976626, 0.69134171619, 0.30865828381, 0.03806023374);
+
+void main() {
+    ivec2 t = ivec2(gl_WorkGroupID.xy);
+    if (any(greaterThanEqual(t, p.tiles))) return;
+    int dm = int(gl_LocalInvocationID.x), dn = int(gl_LocalInvocationID.y);
+    int lane = dn * 8 + dm;
+    const int ts = 8;
+    ivec2 t0 = t * ts;
+    ivec2 o = ivec2(2 * (t0.x + dm), t0.y + dn);
+    sRefRe[lane] = imageLoad(refFt, o) / p.spectrumScale;
+    sRefIm[lane] = imageLoad(refFt, o + ivec2(1, 0)) / p.spectrumScale;
+    {
+        // Forward DFT of the aligned tile (windowed 8x8, each channel): bin (dm, dn) per lane, as hdrq_forward_dft.
+        vec4 re = vec4(0.0), im = vec4(0.0);
+        for (int dy = 0; dy < 8; ++dy) {
+            // the aligned frame is stored black-subtracted (hdrb_warp_rgba.comp); the reference spectrum keeps its black
+            vec4 v = (HANN8[dm] * HANN8[dy]) * (p.frameInv * imageLoad(alignedRgba, t0 + ivec2(dm, dy)) + vec4(p.black));
+            re += C8[(dn * dy) & 7] * v;
+            im -= S8[(dn * dy) & 7] * v;
+        }
+        tmpRe[dn][dm] = re;
+        tmpIm[dn][dm] = im;
+        barrier();
+        re = vec4(0.0);
+        im = vec4(0.0);
+        for (int dx = 0; dx < 8; ++dx) {
+            float c = C8[(dm * dx) & 7], sn = -S8[(dm * dx) & 7];
+            vec4 dRe = tmpRe[dn][dx], dIm = tmpIm[dn][dx];
+            re += c * dRe - sn * dIm;
+            im += sn * dRe + c * dIm;
+        }
+        sAlRe[lane] = re;
+        sAlIm[lane] = im;
+    }
+    {
+        vec4 a = sRefRe[lane] * sAlRe[lane] + sRefIm[lane] * sAlIm[lane];
+        vec4 b = sRefIm[lane] * sAlRe[lane] - sRefRe[lane] * sAlIm[lane];
+        sA[lane] = a.x + a.y + a.z + a.w;
+        sB[lane] = b.x + b.y + b.z + b.w;
+    }
+    // Gate first: a tile where the frame is rejected outright takes the reference at every frequency, so the sub-pixel
+    // shift is never used.
+    float gate = smoothstep(p.gateLo, p.gateHi, imageLoad(zmap, t).x);
+    if (gate < 1.0) {
+        // The shift cost is Re sum_k C_k e^{i theta (m sx + n sy)} with C_k = A_k - i B_k and theta = -2 pi / 8: the phase
+        // is separable, so it is summed over n for each sy first (56 sums of 8), then over m for each (sx, sy) (49 sums of
+        // 8), instead of 49 sums of 64. The candidate offsets are the same grid on both axes.
+        if (lane < 56) {
+            int j = int(lane) / 8, k = int(lane) % 8;  // table entry: shift step j (0..6) times index k (0..7)
+            float a = -2.0 * 3.14159265358979323846 / 8.0 * float(k) * (-0.5 + float(j) / 6.0);
+            sPhase[lane] = vec2(cos(a), sin(a));
+        }
+        barrier();
+        if (lane < 56) {
+            int sy = int(lane) / 8, m = int(lane) % 8;
+            vec2 acc = vec2(0.0);
+            for (int n = 0; n < 8; ++n) {
+                vec2 c = vec2(sA[n * 8 + m], -sB[n * 8 + m]);
+                vec2 ph = sPhase[sy * 8 + n];
+                acc += vec2(c.x * ph.x - c.y * ph.y, c.x * ph.y + c.y * ph.x);
+            }
+            sT[lane] = acc;
+        }
+        barrier();
+        if (lane < 49) {
+            int sy = int(lane) / 7, sx = int(lane) % 7;
+            float total = 0.0;
+            for (int m = 0; m < 8; ++m) {
+                vec2 t2 = sT[sy * 8 + m];
+                vec2 ph = sPhase[sx * 8 + m];
+                total += t2.x * ph.x - t2.y * ph.y;
+            }
+            sDiff[lane] = total;
+        }
+        barrier();
+        if (lane == 0) {
+            float best = -1e30;
+            int bi = 0;
+            for (int i = 0; i < 49; ++i)
+                if (sDiff[i] > best) {
+                    best = sDiff[i];
+                    bi = i;
+                }
+            sBest = bi;
+        }
+    } else if (lane == 0) {
+        sBest = 0;
+    }
+    barrier();
+    // Noise variance per channel at the tile's level (4 x rms = the tile's signal level), from the burst noise model. A bin of
+    // the difference of two windowed 8x8 frames has noise power 9 sigma^2 (1 + 1 / exposureFactor) per channel: the reference's
+    // plus the normalised companion's, which has 1 / exposureFactor of it (2 x 9 sigma^2 for equal exposures, as upstream).
+    const vec4 sigma2 = p.noiseSlope * max(4.0 * imageLoad(rms, t) - p.black, vec4(0.0)) + p.noiseOffset;
+    const float diffNoise = 9.0 * (1.0 + 1.0 / max(p.exposureFactor, 1.0e-3));
+    vec4 noiseNorm = p.wienerNoise * diffNoise * sigma2;
+    float mm = imageLoad(mismatch, t).x;
+    float mismatchWeight = clamp(1.0 - 10.0 * (mm - 0.2), 0.0, 1.0);
+    float motionNorm = clamp(p.maxMotionNorm - (mm - 0.02) * (p.maxMotionNorm - 1.0) / 0.15, 1.0, p.maxMotionNorm);
+    vec2 cs = shiftTable.v[sBest * 64 + lane];
+    float c = cs.x, s = cs.y;
+    const vec4 refRe = sRefRe[lane], refIm = sRefIm[lane];
+    vec4 alRe = c * sAlRe[lane] - s * sAlIm[lane];
+    vec4 alIm = s * sAlRe[lane] + c * sAlIm[lane];
+    float magnitudeNorm = 1.0;
+    if (dm + dn > 0 && mm < 0.3) {
+        vec4 refMag = sqrt(refRe * refRe + refIm * refIm);
+        vec4 alMag = sqrt(alRe * alRe + alIm * alIm);
+        float ratio = (alMag.x + alMag.y + alMag.z + alMag.w) / (refMag.x + refMag.y + refMag.z + refMag.w);
+        magnitudeNorm = mismatchWeight * clamp(ratio * ratio * ratio * ratio, 0.5, 3.0);
+    }
+    const vec4 d2 = (refRe - alRe) * (refRe - alRe) + (refIm - alIm) * (refIm - alIm);
+    vec4 w4 = d2 / (d2 + magnitudeNorm * motionNorm * noiseNorm);
+    float lo = min(w4.x, min(w4.y, min(w4.z, w4.w))), hi = max(w4.x, max(w4.y, max(w4.z, w4.w)));
+    // Mean of the two central channel weights (upstream's robust variant of Liba's max).
+    float weight = clamp(0.5 * (w4.x + w4.y + w4.z + w4.w - lo - hi), 0.0, 1.0);
+    // Gated tile (the frame moved or blurred here beyond the noise). The lenient weight above would blend the moved content in
+    // (ghosts), so there each bin is tested against the noise alone: a bin whose difference stays within binNoise times its noise
+    // power (flat or low-frequency parts, where both frames hold the same thing up to the noise) still merges, a bin that really
+    // differs keeps the reference (Ed's u.12 change to hdrq_merge.comp). With binNoise = 0 the gate is hard: nothing merges.
+    // gateReject is the part of this frame's weight the gate takes out of the bin; wbin counts the rest.
+    float gateReject = gate;
+    if (gate > 0.0 && p.binNoise > 0.0) {
+        // u = the difference power over binNoise times the noise power. Ed's weight u / (u + 1) has a tail that decays only as
+        // 1 / d, so a frame rejected here still leaks w (1 - weight) d into the bin; with frame weights up to 16, and rejected
+        // frames dropped from the divisor, that was a ghost (Monte Carlo: 5x the reference's own error where content had
+        // moved). This one has no tail: a bin is fully accepted below u = 0.4 and fully rejected above u = 2.
+        vec4 u4 = d2 / (p.binNoise * diffNoise * sigma2 + 1.0e-12);
+        vec4 s4 = smoothstep(vec4(0.4), vec4(2.0), u4);
+        float slo = min(s4.x, min(s4.y, min(s4.z, s4.w))), shi = max(s4.x, max(s4.y, max(s4.z, s4.w)));
+        float strict = clamp(0.5 * (s4.x + s4.y + s4.z + s4.w - slo - shi), 0.0, 1.0);
+        weight = mix(weight, max(weight, strict), gate);
+        gateReject = gate * strict;
+    } else {
+        weight = max(weight, gate);
+    }
+    // The weight this companion really adds to the bin: a frame rejected here adds nothing, instead of standing in as a copy
+    // of the reference at its full weight (hdrb_wnorm.comp divides by the total). One lane per bin, one workgroup per tile.
+    imageStore(wbin, t0 + ivec2(dm, dn), imageLoad(wbin, t0 + ivec2(dm, dn)) + vec4(p.frameWeight * (1.0 - gateReject), 0.0, 0.0, 0.0));
+    // The sum over the burst is N x reference + sum of (contribution - reference). Only the second term is stored: it has
+    // no black-level offset, so fp16 keeps it precise where the sum itself (dominated by the offset) would round away the
+    // few levels of shadow signal and band smooth dark gradients.
+    imageStore(outFt, o, imageLoad(outFt, o) + p.spectrumScale * p.frameWeight * (1.0 - weight) * (alRe - refRe));
+    imageStore(outFt, o + ivec2(1, 0), imageLoad(outFt, o + ivec2(1, 0)) + p.spectrumScale * p.frameWeight * (1.0 - weight) * (alIm - refIm));
+}

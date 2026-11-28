@@ -1,0 +1,217 @@
+#version 450
+// Rawr 17U fork: HDR+ Bracketed - Steve's v26 patch (rawr-17u16-bracketed-v26), his code.
+// HDR+ Bracketed copy of hdrp_finalize.comp with two additions.
+//
+// 1. Edge denoise. Within `band` px of the sensor edge a long frame may have no data (the hand moved it), so the merge there
+//    leans on the dark frames and the reference and is several times noisier than the interior (a ring 6-16 px wide, wider
+//    on the edges the hand moved away from). Pixels there are replaced by a bilateral average of their same-colour
+//    neighbours, with a strength set by how noisy the neighbourhood actually is (a Laplacian estimate against the
+//    single-frame noise model), so a ring that is already merged is left alone and real edges (values far from the pixel's)
+//    do not blur. Beyond the band nothing changes.
+// 2. Black lift (`lift`, raw levels). The merge's output sits a little below its reference (measured 0.3 raw levels in the
+//    deep shadows after the aligned frames were stored black-subtracted, falling with brightness). At the bracket's 4 EV
+//    lift that is the size of the deep shadows themselves, and the white-balance and lens-shading gains multiply it per
+//    channel (red most), so shadows go cyan-green, in the JPEG more than in the DNG: the JPEG developer also clips
+//    each channel at zero after black subtraction. The lift is applied fully in the shadows and fades out above a few
+//    raw levels, following the measured offset.
+// 3. Highlight layer. Where the merged result reaches the reference's clip point (the ZSL frames and the long frames all clip
+//    there) it is blended toward the aligned under frames (hdrb_under_store.comp), which hold the highlight unclipped, and
+//    the whole output is scaled by `outScale` (< 1) so the range they add fits the file. Per 2x2 cell, so the blend does not
+//    shift hue. In a clipped cell the layer's own per-channel values are used (real colour and, where the layer is registered
+//    to better than a pixel, real detail), gated by how well the layer agrees with the merged result around the cell; where
+//    it does not, the neutral reconstruction below stands (see the comment at the highlights).
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(set = 0, binding = 0, r32f) readonly uniform image2D accum;
+layout(set = 0, binding = 1, rgba16f) writeonly uniform image2D outputImage;
+layout(set = 0, binding = 2, r32f) writeonly uniform image2D cfaImage;
+layout(set = 0, binding = 3, rgba16f) readonly uniform image2D underLayer;  // aligned under frames, black-subtracted x scale
+layout(push_constant) uniform P {
+    vec4 black;  // reference black per (y&1)*2+(x&1) phase
+    float white;
+    ivec2 size;
+    int band;           // px from the sensor edge
+    float lift;         // raw levels (14-bit scale) added back in the shadows
+    float noiseSlope;   // single-frame noise variance, raw units: slope * (level - black) + offset
+    float noiseOffset;
+    float rangeScale;   // (white - black) / 15359: converts the 14-bit-scale constants to this sensor's raw units
+    int underOn;        // 1: blend the highlight layer in
+    ivec2 origin;       // output pixel + origin = the layer's texel * 2 (pass-0 padding minus the merge crop)
+    float underScale;   // 1 / fp16 storage scale of the layer
+    float outScale;     // output scale, <= 1
+    float hlLo;         // blend starts where the merged level reaches this fraction of the range ...
+    float hlHi;         // ... and is complete at this one
+    vec4 neutral;       // raw channel ratios of a neutral light under the as-shot white balance, green = 1, per CFA phase (0 = unknown)
+    float underDetail;  // 0..1: how far the layer's own per-channel values may replace the neutral reconstruction (0 = not at all)
+} p;
+
+// Offsets (in layer texels, 2 output px each) at which the layer is compared with the merged result around a clipped cell:
+// dense near the cell and sparse out to +-48 texels, so the comparison reaches the unclipped ring of a large saturated area.
+const int kEvOffsets[11] = int[11](-48, -24, -12, -6, -3, 0, 3, 6, 12, 24, 48);
+
+// Same-Bayer-phase sample with a mirrored border (a reflection by 2*(n-1) keeps the parity of the coordinate).
+float X(ivec2 s) {
+    if (s.x < 0) s.x = -s.x;
+    if (s.y < 0) s.y = -s.y;
+    if (s.x >= p.size.x) s.x = 2 * (p.size.x - 1) - s.x;
+    if (s.y >= p.size.y) s.y = 2 * (p.size.y - 1) - s.y;
+    s = clamp(s, ivec2(0), p.size - ivec2(1));
+    return imageLoad(accum, s).x;
+}
+
+void main() {
+    ivec2 q = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(q, p.size))) return;
+    float raw = imageLoad(accum, q).x;
+    float b = p.black[(q.y & 1) * 2 + (q.x & 1)];
+    int d = min(min(q.x, q.y), min(p.size.x - 1 - q.x, p.size.y - 1 - q.y));
+    if (d < p.band) {
+        float lapSum = 0.0, mean = 0.0;
+        for (int j = -1; j <= 1; ++j) {
+            for (int i = -1; i <= 1; ++i) {
+                ivec2 s = q + 2 * ivec2(i, j);
+                float c = X(s);
+                float lap = 4.0 * c - X(s + ivec2(2, 0)) - X(s - ivec2(2, 0)) - X(s + ivec2(0, 2)) - X(s - ivec2(0, 2));
+                lapSum += lap * lap;
+                mean += c;
+            }
+        }
+        mean /= 9.0;
+        float noise2 = lapSum / (9.0 * 20.0);  // white noise: var(laplacian) = 20 * var
+        float var1 = max(p.noiseSlope * max(mean - b, 0.0) + p.noiseOffset, 1e-3);
+        float strength = smoothstep(0.07, 0.18, noise2 / var1);
+        float w = strength * (1.0 - smoothstep(0.6 * float(p.band), float(p.band), float(d)));
+        if (w > 0.0) {
+            float inv = 1.0 / (2.0 * sqrt(var1));
+            float acc = 0.0, wsum = 0.0;
+            for (int dy = -4; dy <= 4; ++dy) {
+                for (int dx = -4; dx <= 4; ++dx) {
+                    float x = X(q + 2 * ivec2(dx, dy));
+                    float u = (x - raw) * inv;
+                    float k = exp(-0.5 * u * u);
+                    acc += k * x;
+                    wsum += k;
+                }
+            }
+            raw = mix(raw, acc / wsum, w);
+        }
+    }
+    bool haveN = p.neutral.x > 0.0 && p.neutral.y > 0.0 && p.neutral.z > 0.0 && p.neutral.w > 0.0;
+    if (p.underOn != 0 || haveN) {
+        // Highlights. The reference is the authority: its cells are taken whole (a cell's four channels always leave the same
+        // way, because a clipped highlight is neutral only while they agree) and the highlight layer can only add to them.
+        //  - A cell at the reference's clip point has only lower bounds on its channels. A light that is neutral under the
+        //    as-shot white balance has raw channels in the ratio p.neutral (green = 1), so clipped channels are raised to what
+        //    the unclipped ones imply, or, with every channel clipped, to the lowest level that meets all the bounds. A
+        //    cell that would not fit under the output's white goes neutral at that white.
+        //  - The under frames may add to a cell whose channels are ALL clipped, and only as far as they read, smoothed, more
+        //    than 10% above that bound. The layer is not trustworthy inside a saturated region: its alignment is estimated
+        //    against a clipped reference there, which is arbitrary (a lattice at the tile spacing, a level 20% low and noisy
+        //    on a flat light), and a cell-by-cell choice between the layer and the bound made a patchwork. Smoothed and
+        //    thresholded, it takes effect only where it is coherently and clearly brighter, e.g. a bare bulb.
+        float range = max(1.0, p.white - b);
+        float container = range / max(p.outScale, 1.0e-3);  // the output's white, in reference units (= range without a layer)
+        ivec2 q0 = q - (q & 1);                               // the 2x2 cell that holds q
+        vec4 a;
+        for (int k = 0; k < 4; ++k) {
+            ivec2 s = min(q0 + ivec2(k & 1, k >> 1), p.size - ivec2(1));
+            a[k] = imageLoad(accum, s).x - p.black[k];
+        }
+        float mx = max(max(a.x, a.y), max(a.z, a.w));
+        float tR = smoothstep(p.hlLo, p.hlHi, mx / range);  // how much the cell is at the reference's clip point
+        if (tR >= 0.98) {
+            vec4 cell = a;
+            if (haveN) {
+                bvec4 cl = greaterThanEqual(cell, vec4(0.85 * range));
+                if (any(cl)) {
+                    float Tu = 0.0, Tc = 0.0;  // neutral level implied by the unclipped / the clipped channels
+                    for (int k = 0; k < 4; ++k) {
+                        float tk = cell[k] / p.neutral[k];
+                        if (cl[k]) Tc = max(Tc, tk); else Tu = max(Tu, tk);
+                    }
+                    float T = max(Tu, Tc);
+                    if (p.underOn != 0 && all(cl)) {
+                        // The layer's neutral level around this cell: a 7x7 box of texels, each the mean of its channels'
+                        // neutral levels (reference units, above black).
+                        ivec2 tc = (q0 + p.origin) >> 1;
+                        ivec2 ts = imageSize(underLayer);
+                        float sum = 0.0;
+                        for (int j = -3; j <= 3; ++j) {
+                            for (int i = -3; i <= 3; ++i) {
+                                vec4 u = imageLoad(underLayer, clamp(tc + ivec2(i, j), ivec2(0), ts - ivec2(1))) * p.underScale;
+                                sum += 0.25 * (u.x / p.neutral.x + u.y / p.neutral.y + u.z / p.neutral.z + u.w / p.neutral.w);
+                            }
+                        }
+                        T += max(0.0, sum / 49.0 - 1.10 * T);
+                    }
+                    if (T >= 0.98 * container) {
+                        cell = p.neutral * container;
+                    } else {
+                        for (int k = 0; k < 4; ++k)
+                            if (cl[k]) cell[k] = max(cell[k], p.neutral[k] * T);
+                    }
+                    // The layer's own values. Everything above only has the reference's lower bounds and a smoothed level, so a
+                    // clipped light comes out neutral and flat (and, in a warm light, a hue jump from the true orange to lime to
+                    // white where the channels clip in turn). The under frames hold the real per-channel values. They are used
+                    // where the layer agrees with the merged result in the unclipped, still bright cells around (a measure of
+                    // its photometric match and registration, which cannot be seen inside the clipped area itself):
+                    //  - level and hue (the layer smoothed over 5x5 texels) when the match is good;
+                    //  - fine detail (the layer's own texel against that smoothing) only when it is registered to well under a
+                    //    pixel, because a texture pasted in a few pixels off is worse than none;
+                    //  - never inside a region the under frames clip too (a lower bound only), and never below the reference.
+                    // Where there is no evidence (no unclipped ring in reach, or a layer that disagrees) the neutral
+                    // reconstruction above is left as it was.
+                    if (p.underOn != 0 && p.underDetail > 0.0) {
+                        ivec2 tc = (q0 + p.origin) >> 1;
+                        ivec2 ts = imageSize(underLayer);
+                        float n = 0.0, sumLn = 0.0, sumAbs = 0.0;
+                        for (int j = 0; j < 11; ++j) {
+                            for (int i = 0; i < 11; ++i) {
+                                ivec2 d = ivec2(kEvOffsets[i], kEvOffsets[j]);
+                                ivec2 qc = q0 + 2 * d;
+                                if (qc.x < 0 || qc.y < 0 || qc.x + 1 >= p.size.x || qc.y + 1 >= p.size.y) continue;
+                                vec4 r;
+                                for (int k = 0; k < 4; ++k) r[k] = imageLoad(accum, qc + ivec2(k & 1, k >> 1)).x - p.black[k];
+                                float rm = max(max(r.x, r.y), max(r.z, r.w)) / range;
+                                if (rm < 0.15 || rm > 0.85) continue;  // bright but not clipped
+                                vec4 un = imageLoad(underLayer, clamp(tc + d, ivec2(0), ts - ivec2(1))) * p.underScale;
+                                float lu = 0.25 * (un.x / p.neutral.x + un.y / p.neutral.y + un.z / p.neutral.z + un.w / p.neutral.w);
+                                float lr = 0.25 * (r.x / p.neutral.x + r.y / p.neutral.y + r.z / p.neutral.z + r.w / p.neutral.w);
+                                if (lu >= 0.9 * container || lu <= 1.0e-4 || lr <= 1.0e-4) continue;
+                                float ln = log(lu / lr);
+                                n += 1.0;
+                                sumLn += ln;
+                                sumAbs += abs(ln);
+                            }
+                        }
+                        float score = n > 0.5 ? 0.5 * (abs(sumLn / n) + sumAbs / n) : 1.0;  // bias and scatter of the log ratio
+                        float underClip = 0.0;
+                        vec4 uc = vec4(0.0), usum = vec4(0.0);
+                        for (int j = -3; j <= 3; ++j) {
+                            for (int i = -3; i <= 3; ++i) {
+                                vec4 un = imageLoad(underLayer, clamp(tc + ivec2(i, j), ivec2(0), ts - ivec2(1))) * p.underScale;
+                                if (max(max(un.x, un.y), max(un.z, un.w)) >= 0.96 * container) underClip += 1.0;
+                                if (abs(i) <= 2 && abs(j) <= 2) usum += un;
+                                if (i == 0 && j == 0) uc = un;
+                            }
+                        }
+                        vec4 us = usum / 25.0;
+                        float gate = smoothstep(2.0, 6.0, n) * (1.0 - smoothstep(0.05, 0.35, underClip / 49.0)) * p.underDetail;
+                        float tLevel = (1.0 - smoothstep(0.12, 0.30, score)) * gate;
+                        float tDetail = (1.0 - smoothstep(0.03, 0.09, score)) * gate;
+                        vec4 meas = us + tDetail * (uc - us);
+                        for (int k = 0; k < 4; ++k)
+                            if (cl[k]) cell[k] = mix(cell[k], max(meas[k], a[k]), tLevel);
+                    }
+                }
+            } else if (p.underOn != 0) {
+                cell = vec4(container);  // no white balance known: saturate, so the develop sees a clipped highlight
+            }
+            raw = cell[(q.y & 1) * 2 + (q.x & 1)] + b;
+        }
+    }
+    float level = raw - b;
+    raw += p.lift * (1.0 - 0.75 * smoothstep(3.0 * p.rangeScale, 30.0 * p.rangeScale, level));
+    float v = (raw - b) / max(1.0, p.white - b) * p.outScale;
+    imageStore(outputImage, q, vec4(v, v, v, 1.0));
+    imageStore(cfaImage, q, vec4(v));
+}

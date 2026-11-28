@@ -1,5 +1,6 @@
 #pragma once
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
@@ -30,6 +31,13 @@ struct Config {
     // bilinear weights, which removes the seams. false = upstream-exact
     // per-pass alignment (parity reference, ~2x slower overall).
     bool frequencyAlignOnce = true;
+    // HDR+ Bracketed (frequency merge only): bursts whose frames differ in exposure use the bracket shaders (highlight
+    // substitution from the reference, exposure-weighted mean). Uniform bursts merge as HDR+ Quality either way.
+    bool bracketed = false;
+    // HDR+ Bracketed: raw channel ratios of a light that is neutral under the as-shot white balance (green = 1), per CFA phase
+    // ((y & 1) * 2 + (x & 1)); 0 = unknown. The finalize makes clipped highlights neutral with them: channels stopped at the
+    // same raw level turn purple under white balance (red and blue x ~1.9).
+    std::array<float, 4> highlightNeutralByPhase{{0.0f, 0.0f, 0.0f, 0.0f}};
 };
 
 inline bool valid(const Config& c) {

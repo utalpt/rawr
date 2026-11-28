@@ -13,6 +13,8 @@
 namespace rawrcam::capture::multiframe {
 
 inline constexpr std::uint32_t kMergeAlgorithmHdrPlusQuality = 2u;
+// HDR+ Bracketed: HDR+ Quality on a burst metered darker for highlight headroom (see BracketExposure.h).
+inline constexpr std::uint32_t kMergeAlgorithmHdrPlusBracketed = 3u;
 // Rexture (native/multiframe/merge_rexture): equal-exposure bursts at native resolution. One merge window holds up
 // to kRextureMaxPixels (~72 bytes of arena per pixel: ~0.91 GiB at 13 MP, ~3.45 GiB at 50 MP on the device, between
 // HDR+ Quality). Larger frames merge in strips of that size (MfsrCaptureJob, DNG only), like the other
@@ -39,8 +41,10 @@ inline double linearExposure(const metadata::FrameMetadataSnapshot& m) noexcept 
 //   shot = sum(ef_i g_i) / sum(ef_i)^2,  read = sum(g_i^2) / sum(ef_i)^2.
 // A uniform burst of N frames gives {1/N, 1/N}. This is the static-scene
 // ideal; rejected (moving) regions keep more noise.
+// skipUnder (Rawr 17U fork, HDR+ Bracketed - Steve's v26): its under frames (more than 1/8 EV darker) are the highlight
+// layer, not part of the merge. false for every other merge.
 inline std::array<double, 2> mergedNoiseVarianceScale(const std::vector<metadata::FrameMetadataSnapshot>& metadata,
-                                                      std::uint32_t referenceIndex) noexcept {
+                                                      std::uint32_t referenceIndex, bool skipUnder = false) noexcept {
     if (referenceIndex >= metadata.size()) return {1.0, 1.0};
     const auto& refMeta = metadata[referenceIndex];
     const double ref = linearExposure(refMeta);
@@ -52,6 +56,7 @@ inline std::array<double, 2> mergedNoiseVarianceScale(const std::vector<metadata
         const std::int32_t iso = m.sensitivity > 0 ? m.sensitivity : m.requestedSensitivity.value_or(0);
         if (e <= 0.0 || iso <= 0) continue;
         const double ef = e / ref;
+        if (skipUnder && ef < 0.917) continue;  // an under frame (the highlight layer) is not part of the merge
         const double g = double(iso) / double(refIso);
         sumEf += ef;
         sumShot += ef * g;

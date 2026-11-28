@@ -83,7 +83,7 @@ internal class CaptureSettingsSync(
         // on the local tone lift matches the still's.
         syncSetting({
             if (!it.isVideo && it.experimentalMultiframeEnabled)
-                it.activeMultiframeTuning.maxFrames.coerceIn(1, 30)
+                (it.activeMultiframeTuning.zslFrames() + it.activeMultiframeTuning.allPostShutterFrames()).coerceIn(1, 30)
             else 1
         }) { previewCoordinator.setExpectedMergeFrames(it) }
         syncSetting({ it.maxPostGainId }) {
@@ -114,6 +114,11 @@ internal class CaptureSettingsSync(
         syncSetting({ it.effectiveVideoBitDepth() }) { prewarmVideo() }
         syncSetting({ it.experimentalZeroCopyEnabled }) { previewCoordinator.setExperimentalZeroCopy(it) }
         syncSetting({ it.experimentalMultiframeEnabled }) { previewCoordinator.setExperimentalMultiframeEnabled(it) }
+        syncSetting({
+            if (!it.isVideo && it.experimentalMultiframeEnabled &&
+                it.activeMultiframeTuning.mergeAlgorithm == MultiframeMergeAlgorithm.HdrPlusBracketed
+            ) it.activeMultiframeTuning.bracketEv else 0f
+        }) { previewCoordinator.setHdrPlusHeadroomMaxEv(it) }
         syncSetting({ it.persistentEngineEnabled }) { previewCoordinator.setPersistentEngineEnabled(it) }
         // Keyed on profile identity + LUT structure (tone normalized out):
         // native profile switches rebuild the tonemap engine, so tone-only

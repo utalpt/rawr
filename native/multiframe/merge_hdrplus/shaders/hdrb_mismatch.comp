@@ -1,0 +1,134 @@
+#version 450
+// Rawr 17U fork: HDR+ Bracketed - Steve's v26 patch (rawr-17u16-bracketed-v26), his code.
+// HDR+ Bracketed copy of hdrq_mismatch.comp: the noise of the difference counts the companion at its own (exposure-scaled)
+// noise, 1 / exposureFactor of the reference variance, instead of two equal frames.
+// Port of hdr-plus-swift calculate_abs_diff_rgba + calculate_mismatch_rgba
+// raised-cosine-weighted mean |ref - aligned| over twice
+// the tile support, relative to the tile's shot noise (Liba 2019 "spatially
+// varying temporal merging"). One 16x16 workgroup per tile, one lane per
+// window pixel, tree reduction (upstream sums sequentially in one thread).
+layout(local_size_x = 16, local_size_y = 4) in;  // each thread handles four vertically adjacent window pixels (one 4x4 block row)
+layout(set = 0, binding = 0, rgba16f) readonly uniform image2D refRgba;
+layout(set = 0, binding = 1, rgba16f) readonly uniform image2D alignedRgba;
+layout(set = 0, binding = 2, rgba32f) readonly uniform image2D rms;
+layout(set = 0, binding = 3, r32f) writeonly uniform image2D mismatch;
+layout(set = 0, binding = 4, r32f) writeonly uniform image2D zmap;
+layout(push_constant) uniform P {
+    ivec2 tiles;
+    ivec2 rgbaSize;
+    float noiseSlope;   // raw-unit shot-noise variance per signal unit (per RGBA channel)
+    float noiseOffset;  // raw-unit read-noise variance
+    float black;        // the frames keep their black level: signal = value - black
+    float frameInv;     // 1 / fp16 storage scale of the frames
+    float energyGain;   // weight of the energy test in the displacement statistic (0 = off)
+    float energyDead;   // excess energy (above the noise expectation) ignored before the test responds
+    float energyScale;  // excess energy that counts as one unit of the statistic
+    float exposureFactor;  // companion exposure / reference exposure (1 = equal)
+    float readFloor;       // raw-unit variance floor for frames much brighter than the reference (see the host comment)
+    float meanSlack;       // raw-unit systematic offset between reference and such a frame that is not motion
+} p;
+
+const float WIN16[16] = float[16](0.342940479, 0.434943816, 0.565056184, 0.657059521, 0.657059521, 0.565056184, 0.434943816, 0.342940479, 0.342940479, 0.434943816, 0.565056184, 0.657059521, 0.657059521, 0.565056184, 0.434943816, 0.342940479);
+shared vec4 sDiff[64];
+shared float sWeight[64];
+shared float sWeight2[64];
+shared vec4 sSig[64];       // weight * reference signal
+shared vec4 sSigned[64];    // weight * (ref - aligned)
+shared vec4 sSq[64];        // weight * (ref - aligned)^2
+shared float sBlockZ[16];
+
+void main() {
+    ivec2 g = ivec2(gl_WorkGroupID.xy);
+    if (any(greaterThanEqual(g, p.tiles))) return;
+    const int ts = 8;
+    ivec2 l = ivec2(gl_LocalInvocationID.xy);
+    uint lane = gl_LocalInvocationIndex;
+    ivec2 t0 = g * ts;
+    // Upstream clamps the end to size-1 (exclusive), dropping the last row/column.
+    ivec2 start = max(ivec2(0), t0 - ts / 2);
+    ivec2 end = min(p.rgbaSize - 1, t0 + ts * 3 / 2);
+    vec4 d = vec4(0.0), sig = vec4(0.0), sd = vec4(0.0), sq = vec4(0.0);
+    float w2 = 0.0, w = 0.0;
+    for (int k = 0; k < 4; ++k) {
+        ivec2 wl = ivec2(l.x, 4 * l.y + k);  // offset inside the 16x16 window
+        ivec2 q = t0 - ts / 2 + wl;
+        if (all(greaterThanEqual(q, start)) && all(lessThan(q, end))) {
+            float wk = WIN16[wl.x] * WIN16[wl.y];
+            vec4 r = imageLoad(refRgba, q) * p.frameInv, a = imageLoad(alignedRgba, q) * p.frameInv + vec4(p.black);  // the aligned frame is stored black-subtracted
+            d += wk * abs(r - a);
+            sig += wk * r;
+            sd += wk * (r - a);
+            sq += wk * (r - a) * (r - a);
+            w += wk;
+            w2 += wk * wk;
+        }
+    }
+    // Stored block-contiguous (4 consecutive entries per 4x4 block, one block row per thread) so every sum is a short tree.
+    uint bi = uint((l.y * 4 + l.x / 4) * 4 + (l.x % 4));
+    sDiff[bi] = d;
+    sWeight[bi] = w;
+    sWeight2[bi] = w2;
+    sSig[bi] = sig;
+    sSigned[bi] = sd;
+    sSq[bi] = sq;
+    barrier();
+    for (uint stride = 2u; stride > 0u; stride >>= 1u) {
+        if ((bi & 3u) < stride) {
+            sDiff[bi] += sDiff[bi + stride];
+            sWeight[bi] += sWeight[bi + stride];
+            sWeight2[bi] += sWeight2[bi + stride];
+            sSig[bi] += sSig[bi + stride];
+            sSigned[bi] += sSigned[bi + stride];
+            sSq[bi] += sSq[bi + stride];
+        }
+        barrier();
+    }
+    // Noise-calibrated displacement statistic: per 4x4 block, |mean signed difference| against the noise of that
+    // weighted mean. Sub-pixel misalignment of fine texture averages out inside a block; an object that moved
+    // does not. Pure noise reads ~1 (E|N| = 0.798 sigma) at any brightness.
+    if ((bi & 3u) == 0u) {
+        vec4 sumD = sSigned[bi], sumS = sSig[bi];
+        float sumW = sWeight[bi], sumW2 = sWeight2[bi];
+        float z = 0.0;
+        if (sumW > 1.0e-3) {
+            float neff = sumW * sumW / max(sumW2, 1.0e-12);
+            // A frame much brighter than the reference is compared with a reference whose near-black values are coarsely
+            // quantized (steps of about 3 raw levels on the dry-run sensor): its deviation from the clean frame is far larger
+            // than the temporal noise the burst fit measures, and the same in every pixel of a dark tile. Without a floor the
+            // mean test reads that as motion and rejects the clean frame exactly where it helps most.
+            const bool bright = p.exposureFactor > 1.5;
+            float off = bright ? max(p.noiseOffset, p.readFloor) : p.noiseOffset;
+            float slack2 = bright ? p.meanSlack * p.meanSlack : 0.0;
+            vec4 sigma = sqrt((1.0 + 1.0 / p.exposureFactor) * (p.noiseSlope * max(sumS / sumW - p.black, vec4(0.0)) + off) / neff + slack2);
+            vec4 zc = abs(sumD / sumW) / max(sigma, vec4(1.0e-6));
+            z = 0.25 * (zc.x + zc.y + zc.z + zc.w) / 0.7979;
+            // Energy test: the weighted mean square difference against what noise alone gives (two independent frames: twice
+            // the variance). A displaced fine pattern (ripples, foliage) has a block mean difference near zero but a large
+            // energy, which the mean test above cannot see. Noise-only reads ~1; the response starts after a dead zone.
+            if (p.energyGain > 0.0) {
+                vec4 var2 = (1.0 + 1.0 / p.exposureFactor) * (p.noiseSlope * max(sumS / sumW - p.black, vec4(0.0)) + off);
+                vec4 qc = (sSq[bi] / sumW) / max(var2, vec4(1.0e-6));
+                float q = 0.25 * (qc.x + qc.y + qc.z + qc.w);
+                float excess = q - 1.0 - p.energyDead;
+                // Below the dead zone the energy test says nothing: a noise-only block keeps exactly its mean-test value.
+                if (excess > 0.0) z = max(z, 1.0 + p.energyGain * excess / p.energyScale);
+            }
+        }
+        sBlockZ[bi >> 2] = z;
+    }
+    barrier();
+    if (lane != 0u) return;
+    float acc = 0.0;
+    vec4 dsum = vec4(0.0);
+    float wsum = 0.0;
+    for (uint b = 0u; b < 16u; ++b) {
+        acc += sBlockZ[b];
+        dsum += sDiff[b * 4u];
+        wsum += sWeight[b * 4u];
+    }
+    imageStore(zmap, g, vec4(acc / 16.0));
+    vec4 noise = imageLoad(rms, g);
+    vec4 diff = dsum / wsum;
+    vec4 m4 = diff / sqrt(noise + 1.0);
+    imageStore(mismatch, g, vec4(0.25 * (m4.x + m4.y + m4.z + m4.w)));
+}

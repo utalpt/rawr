@@ -65,6 +65,14 @@ class NativeCameraController {
     void resetCameraControls(bool allCameras);
     // One exposure/WB/focus set for every camera (true) or one per camera (false, default).
     void setSharedCameraControls(bool shared);
+    // HDR+ bracketed: submits one AE-off frame per evOffsets entry (> 0: a
+    // long frame, shutter first up to 1/15 s; <= 0: a dark frame, gain
+    // first) relative to a delivered frame's CaptureResult exposure/sensitivity,
+    // tagged with requestId. The repeating request is untouched. False when
+    // nothing was submitted (no session, no manual exposure support, unknown
+    // sensitivity coordinate).
+    bool captureExposureBracket(uint64_t requestId, int64_t baseExposureTimeNs, int32_t baseReportedSensitivity,
+                                const std::vector<float>& evOffsets);
     // Long exposure: the (shutter, ISO) a capture needs when M or rawr S asks
     // for a shutter past the viewfinder cap (ViewfinderExposure.h); nullopt
     // when the viewfinder frames are the capture.
@@ -90,12 +98,28 @@ class NativeCameraController {
     // Most a positive-EV long frame can gain over the current repeating
     // exposure (EV); nullopt when unknown.
     std::optional<double> longFrameRoomEv() const;
-    // The reported/requested ISO ratio is measured during startup when lens session keys change the sensor mode (rawr AE
-    // needs it), never during video. File keeping measured calibrations across launches (once per camera).
+    // False when the shutter/gain limits would leave long frames under
+    // 0.5 EV brighter (they are skipped); true when unknown.
+    bool longFramesWorthwhile() const;
+    // Measures the reported/requested ISO ratio during startup when lens
+    // session keys change the sensor mode (a ratio of 1 is a valid result;
+    // keys do not imply DCG), before exposing the viewfinder.
+    // Enabling it on an uncalibrated live session restarts that session.
+    // Off unless HDR+ Bracketed is selected; never probes during video.
+    void setSensitivityCalibrationWanted(bool wanted);
+    // File keeping measured calibrations across launches (once per camera).
     void setSensitivityCalibrationStore(const std::string& path);
     // File keeping, across launches, the lenses the start ladder proved need RAW-only (no companion).
     void setStartLadderStore(const std::string& path);
     void setExposureCompensationSteps(int32_t steps);
+    // HDR+ Bracketed highlight headroom (EV <= 0), rounded to compensation
+    // steps and added to the user's EV in Auto exposure. Lock-free: any
+    // thread may call it; the camera lane applies it on its next tick.
+    void setHdrHeadroomEv(float ev);
+    // Headroom EV (<= 0) a delivered frame was exposed with: its applied
+    // compensation minus the user's, bounded by the current/previous headroom
+    // request. 0 for manual exposure or unknown compensation.
+    float hdrHeadroomEvFor(int32_t aeMode, std::optional<int32_t> appliedSteps) const;
     // Rawr 17U fork: the tele's optical zoom position (3.2 to 4.3); <= 0 gives the lens profile's value back.
     void setOpticalZoomCode(double code);
     // rawr auto exposure (opt-in, color/RawrAutoExposure.h). When enabled

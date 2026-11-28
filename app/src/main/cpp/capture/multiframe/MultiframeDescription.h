@@ -15,7 +15,22 @@ namespace rawrcam::capture::multiframe {
 // Shutter-time tuning bank, transported for EXIF reporting.
 struct MultiframeTuningView {
     float outputScale = 1.0f;
-    std::uint32_t mergeAlgorithm = 4;  // 2 = HDR+ Quality (frequency merge), 4 = Rexture
+    std::uint32_t mergeAlgorithm = 4;  // 2 = HDR+ Quality (frequency merge), 3 = HDR+ Bracketed, 4 = Rexture
+    float hdrplusStrength = 13.0f;
+    std::uint32_t hdrplusTileSize = 32;
+    float bracketEv = -2.0f;
+    std::uint32_t bracketFrames = 2;
+    float bracketLiftEv = 0.0f;  // measured: 0 = no dark frames merged / no headroom
+    // 1 = underexposed ZSL burst + long frames (bracketEv = headroom limit, bracketFrames = long frames requested);
+    // 0 = older dark-frame captures.
+    std::uint32_t bracketCapture = 0;
+    float longFrameEv = 0.0f;  // 0 = back to Camera2 AE
+    // What the burst really holds (exposure of every frame against the reference), for the bracket lines.
+    std::string bracketAchieved;
+    // Darker after-shutter frames that arrived (kept as a highlight layer), their lowest exposure against AE is in
+    // bracketAchieved; the merged file is scaled down by underOutputEv to hold the range they add.
+    std::uint32_t underFrames = 0;
+    float underOutputEv = 0.0f;
     MultiframeBaseFrameMode baseFrameMode = MultiframeBaseFrameMode::Sharpest;
 };
 

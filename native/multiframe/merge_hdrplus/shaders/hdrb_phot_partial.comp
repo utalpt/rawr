@@ -1,0 +1,54 @@
+#version 450
+// Rawr 17U fork: HDR+ Bracketed - Steve's v26 patch (rawr-17u16-bracketed-v26), his code.
+// HDR+ Bracketed, photometric matching of a long frame to the reference, step 1: per 16x16 group, the sums for a linear
+// fit  reference = a * frame + b  over the texels where the frame is well exposed. The frame is clean (normalized from a
+// much longer exposure) and the reference is noisy, so regressing the reference on the frame is unbiased; selecting on the
+// frame (not on the reference) keeps it so.
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(set = 0, binding = 0, rgba16f) readonly uniform image2D aligned;
+layout(set = 0, binding = 1, rgba16f) readonly uniform image2D refImg;
+layout(std430, set = 0, binding = 2) writeonly buffer Parts { float v[]; } parts;
+layout(push_constant) uniform Params {
+    ivec2 size;
+    int groupsX;
+    float scale;  // fp16 storage scale of the frames
+    float black;  // raw black level (the reference holds black-included raw units x scale; the aligned frame is black-subtracted)
+    float lo;     // use texels whose frame level above black is within [lo, hi] (reference raw units)
+    float hi;
+} p;
+shared float sh[5][256];
+
+void main() {
+    uint lid = gl_LocalInvocationIndex;
+    ivec2 q = ivec2(gl_GlobalInvocationID.xy);
+    float n = 0.0, sx = 0.0, sy = 0.0, sxx = 0.0, sxy = 0.0;
+    if (q.x < p.size.x && q.y < p.size.y) {
+        vec4 x = imageLoad(aligned, q) / p.scale;  // stored black-subtracted
+        vec4 y = imageLoad(refImg, q) / p.scale - vec4(p.black);
+        for (int k = 0; k < 4; ++k) {
+            if (x[k] >= p.lo && x[k] <= p.hi) {
+                n += 1.0;
+                sx += x[k];
+                sy += y[k];
+                sxx += x[k] * x[k];
+                sxy += x[k] * y[k];
+            }
+        }
+    }
+    sh[0][lid] = n;
+    sh[1][lid] = sx;
+    sh[2][lid] = sy;
+    sh[3][lid] = sxx;
+    sh[4][lid] = sxy;
+    barrier();
+    for (uint s = 128u; s > 0u; s >>= 1) {
+        if (lid < s) {
+            for (int k = 0; k < 5; ++k) sh[k][lid] += sh[k][lid + s];
+        }
+        barrier();
+    }
+    if (lid == 0u) {
+        uint g = gl_WorkGroupID.y * uint(p.groupsX) + gl_WorkGroupID.x;
+        for (int k = 0; k < 5; ++k) parts.v[g * 5u + uint(k)] = sh[k][0];
+    }
+}

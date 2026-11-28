@@ -1,0 +1,101 @@
+#version 450
+// Rawr 17U fork: HDR+ Bracketed - Steve's v26 patch (rawr-17u16-bracketed-v26), his code.
+// HDR+ Bracketed copy of hdrq_warp_rgba.comp: for a companion brighter than the reference, texels near its clip point are
+// replaced by the reference (the underexposed frame keeps the highlights), blended over 90..98% of the white level.
+// Texels whose samples fall outside the companion's real sensor area (the hand moved it, so its padding replicates or reads
+// as 0 where the reference's padding does not) are replaced by the reference too. Left as they were, every tile that overlaps
+// the sensor edge read as a mismatch and rejected all companions, leaving a band one tile wide with the reference's noise.
+// hdr-plus-swift warp_texture_bayer followed by convert_to_rgba, fused: each
+// RGBA texel warps the four raw samples of its 2x2 cell (same blending of the
+// up to four overlapping tile displacements as hdrp_warp.comp). offset maps
+// the pass's padded coordinates into the frame and tile grid the alignment
+// was computed on (align-once mode: pass 0).
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(set = 0, binding = 0, r32f) readonly uniform image2D compPadded;
+layout(set = 0, binding = 1, rgba16f) writeonly uniform image2D rgba;
+layout(std430, set = 0, binding = 2) readonly buffer Align { ivec2 v[]; } align;
+layout(set = 0, binding = 3, rgba16f) readonly uniform image2D substitute;  // the reference RGBA (same fp16 scale)
+layout(push_constant) uniform P {
+    ivec2 size;        // RGBA extent
+    ivec2 crop;        // raw-pixel offset into the padded frame
+    ivec2 paddedSize;
+    ivec2 tiles;       // level-0 tile grid
+    int halfTileSize;  // level-0 tile size == full-res half tile
+    ivec2 offset;
+    // 0: upstream weights ((x % h) + 0.5) / (2h), which jump at every half-tile
+    // boundary (hidden by upstream's four differently gridded passes).
+    // 1: continuous bilinear weights fract(grid), for align-once mode where all
+    // passes share one tile grid.
+    int continuous;
+    float scale;  // fp16 storage scale, see hdrq_to_rgba.comp
+    float exposureFactor;  // companion exposure / reference exposure
+    float whiteLevel;      // raw white level
+    float blackLevelMean;  // raw black level mean
+    int sensorX0, sensorY0, sensorX1, sensorY1;  // the companion's real sensor area inside the padded frame
+} p;
+
+float gOutside = 0.0;  // largest tap-weight share, over this texel's samples, that fell outside the real sensor area
+
+bool outsideSensor(ivec2 s) { return s.x < p.sensorX0 || s.y < p.sensorY0 || s.x >= p.sensorX1 || s.y >= p.sensorY1; }
+
+float sampleComp(ivec2 s) {
+    return (any(lessThan(s, ivec2(0))) || any(greaterThanEqual(s, p.paddedSize))) ? 0.0 : imageLoad(compPadded, s).x;
+}
+
+// The four tile vectors around a sample and the blend of them; the four samples of one RGBA texel almost always sit
+// between the same four tiles, so the vectors are fetched once per texel.
+struct Cell { ivec2 a0, a1, a2, a3; };
+
+Cell cellOf(ivec2 q) {
+    float h = float(p.halfTileSize);
+    vec2 grid = (vec2(q) + 0.5) / h - 1.0;
+    ivec2 lo = ivec2(max(vec2(0.0), floor(grid)) + 0.1);
+    ivec2 hi = ivec2(min(ceil(grid), vec2(p.tiles - 1)) + 0.1);
+    return Cell(2 * align.v[lo.y * p.tiles.x + lo.x], 2 * align.v[lo.y * p.tiles.x + hi.x],
+                2 * align.v[hi.y * p.tiles.x + lo.x], 2 * align.v[hi.y * p.tiles.x + hi.x]);
+}
+
+float warped(ivec2 q, Cell c) {
+    float h = float(p.halfTileSize);
+    vec2 grid = (vec2(q) + 0.5) / h - 1.0;
+    vec2 w = p.continuous != 0 ? clamp(grid - floor(grid), 0.0, 1.0) : (vec2(q % p.halfTileSize) + 0.5) / (2.0 * h);
+    float w0 = (1.0 - w.x) * (1.0 - w.y), w1 = w.x * (1.0 - w.y), w2 = (1.0 - w.x) * w.y, w3 = w.x * w.y;
+    float v = w0 * sampleComp(q + c.a0) + w1 * sampleComp(q + c.a1) + w2 * sampleComp(q + c.a2) + w3 * sampleComp(q + c.a3);
+    float o = w0 * float(outsideSensor(q + c.a0)) + w1 * float(outsideSensor(q + c.a1)) + w2 * float(outsideSensor(q + c.a2)) +
+              w3 * float(outsideSensor(q + c.a3));
+    gOutside = max(gOutside, o / (w0 + w1 + w2 + w3));
+    return v / (w0 + w1 + w2 + w3);
+}
+
+// Tile indices (lo, hi) of a sample, to tell whether a texel's samples share one cell.
+ivec4 tilesOf(ivec2 q) {
+    float h = float(p.halfTileSize);
+    vec2 grid = (vec2(q) + 0.5) / h - 1.0;
+    return ivec4(ivec2(max(vec2(0.0), floor(grid)) + 0.1), ivec2(min(ceil(grid), vec2(p.tiles - 1)) + 0.1));
+}
+
+void main() {
+    ivec2 q = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(q, p.size))) return;
+    ivec2 s = 2 * q + p.crop + p.offset;
+    vec4 v;
+    if (tilesOf(s) == tilesOf(s + ivec2(1, 1))) {
+        Cell c = cellOf(s);
+        v = vec4(warped(s, c), warped(s + ivec2(1, 0), c), warped(s + ivec2(0, 1), c), warped(s + ivec2(1, 1), c));
+    } else {
+        v = vec4(warped(s, cellOf(s)), warped(s + ivec2(1, 0), cellOf(s + ivec2(1, 0))),
+                 warped(s + ivec2(0, 1), cellOf(s + ivec2(0, 1))), warped(s + ivec2(1, 1), cellOf(s + ivec2(1, 1))));
+    }
+    if (gOutside > 0.0) v = mix(v, imageLoad(substitute, q) / p.scale, clamp(2.0 * gOutside, 0.0, 1.0));
+    if (p.exposureFactor > 1.001) {
+        // v is scaled to the reference exposure: undo that to compare with the companion's own clip point.
+        float m = max(max(v.x, v.y), max(v.z, v.w));
+        m = (m - p.blackLevelMean) * p.exposureFactor + p.blackLevelMean;
+        float t = clamp((m / p.whiteLevel - 0.90) / 0.08, 0.0, 1.0);
+        if (t > 0.0) v = mix(v, imageLoad(substitute, q) / p.scale, t);
+    }
+    // The aligned frame is stored black-subtracted: fp16 spends its precision near zero, so a normalized long frame keeps its
+    // sub-level detail (with the black pedestal in, fp16 resolves only one raw level here and truncates, which cost a
+    // per-channel error in flat dark areas). The bracket readers add the black back in fp32.
+    imageStore(rgba, q, p.scale * (v - vec4(p.blackLevelMean)));
+}

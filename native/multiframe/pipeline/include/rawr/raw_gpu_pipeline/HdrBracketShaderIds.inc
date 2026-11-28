@@ -1,0 +1,13 @@
+// Rawr 17U fork: HDR+ Bracketed (Steve's v26 patch). Included only with RAWR_HDRB (app/build.gradle.kts, rawr.hdrb).
+    HdrbAvgPool,
+    HdrbBestTile,
+    HdrbCorrectUpsampling,
+    HdrbWarpRgba,
+    HdrbMismatch,
+    HdrbMerge,
+    HdrbWnorm,
+    HdrbPhotPartial,
+    HdrbPhotReduce,
+    HdrbPhotApply,
+    HdrbFinalize,
+    HdrbUnderStore,

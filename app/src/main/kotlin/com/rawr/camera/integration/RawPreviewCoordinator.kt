@@ -311,8 +311,8 @@ class RawPreviewCoordinator(application: Application) : AutoCloseable {
 
 
     /** Frames frozen; more than maxFrames when native folded the long frames into the burst. */
-    fun prepareExperimentalMultiframe(maxFrames: Int): Int =
-        native.prepareExperimentalMultiframe(nativeHandle, maxFrames.coerceIn(2, 30))
+    fun prepareExperimentalMultiframe(maxFrames: Int, longFrames: Int = 0): Int =
+        native.prepareExperimentalMultiframe(nativeHandle, maxFrames.coerceIn(2, 30), longFrames.coerceIn(0, 28))
 
     fun cancelPreparedMultiframeCapture() = native.cancelPreparedMultiframeCapture(nativeHandle)
 
@@ -375,6 +375,9 @@ class RawPreviewCoordinator(application: Application) : AutoCloseable {
     // the zero-copy reader usage no longer depends on the toggle.
     fun setExperimentalMultiframeEnabled(enabled: Boolean) =
         postNative { native.setExperimentalMultiframeEnabled(nativeHandle, enabled) }
+    /** HDR+ Bracketed ZSL highlight headroom limit in EV (< 0); 0 turns the meter off. */
+    fun setHdrPlusHeadroomMaxEv(maxEv: Float) =
+        postNative { native.setHdrPlusHeadroomMaxEv(nativeHandle, maxEv) }
 
     // No restart needed: the film engine is created lazily with a queue
     // wait-idle and the preview ingress is untouched.
@@ -690,10 +693,11 @@ class RawPreviewCoordinator(application: Application) : AutoCloseable {
             mergedDngDisplayName,
             jpegDisplayName,
             dumpRzslRequested,
-            // Tuning contract + chroma-denoise flag (JNI index 22) + merge values (23-28) + Rexture detail restoration (29).
+            // Tuning contract + chroma-denoise flag (JNI index 22) + merge values (23-28) + Rexture detail restoration (29)
+            // + HDR+ Bracketed under frames and their exposure (30-31).
             multiframeTuning.sanitized().let { tuning ->
                 tuning.nativeValues() + (if (multiframeChromaDenoise) 1f else 0f) + tuning.nativeMergeValues() +
-                    (if (multiframeDetailRestore) 1f else 0f)
+                    (if (multiframeDetailRestore) 1f else 0f) + tuning.nativeUnderValues()
             },
             multiframeBaseFrameMode.nativeId,
             distortionCorrectionEnabled,

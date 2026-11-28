@@ -1,0 +1,29 @@
+#version 450
+// HDR+ Bracketed copy of hdrp_avg_pool.comp (Steve's v26 patch): the bracket merge's under-frame alignment changes live
+// here, so Ed's hdrp_avg_pool.comp, which HDR+ Quality uses, stays as it is. Used only by HdrBracketRecorder.cpp.
+// Port of hdr-plus-swift avg_pool (scale 2, no black/WB normalization: the
+// exposure-control-off path). Output rounded through fp16 like upstream's
+// r16Float pyramid so alignment decisions match..
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(set = 0, binding = 0, r32f) readonly uniform image2D src;
+layout(set = 0, binding = 1, r32f) writeonly uniform image2D dst;
+layout(push_constant) uniform P {
+    ivec2 dstSize;
+    float clip;  // > 0: clip the samples at this value first (alignment of an under frame, see HdrPlusRecorder.cpp kUnderAlignClip)
+} p;
+
+void main() {
+    ivec2 q = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(q, p.dstSize))) return;
+    ivec2 s = q * 2;
+    vec4 x = vec4(imageLoad(src, s).x, imageLoad(src, s + ivec2(0, 1)).x, imageLoad(src, s + ivec2(1, 0)).x,
+                  imageLoad(src, s + ivec2(1, 1)).x);
+    // An under frame scaled up to the reference's exposure holds real values where the reference sits at its sensor clip. Aligned
+    // as is, that region matches whatever offset puts the frame's darkest pixels on the flat reference. Clipped like the reference
+    // it matches at every offset there, so the tiles decide by the unclipped content around it. Only the alignment image is
+    // clipped: the padded frame the warp reads keeps the full range.
+    if (p.clip > 0.0) x = min(x, vec4(p.clip));
+    float v = x.x + x.y + x.z + x.w;
+    v = unpackHalf2x16(packHalf2x16(vec2(v * 0.25, 0.0))).x;
+    imageStore(dst, q, vec4(v));
+}

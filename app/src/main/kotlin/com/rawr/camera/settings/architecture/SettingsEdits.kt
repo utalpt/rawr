@@ -90,6 +90,8 @@ internal fun SettingsValues.capturePreferences(lenses: List<LensProfile> = empty
     waveformMode = waveformMode,
     filmSimEnabled = filmSimEnabled,
     experimentalMultiframeEnabled = experimentalMultiframeEnabled,
+    hdrPlusBracketedSelected =
+        activeMultiframeTuning.mergeAlgorithm == com.rawr.camera.settings.model.MultiframeMergeAlgorithm.HdrPlusBracketed,
     multiframeAlgorithm = activeMultiframeTuning.mergeAlgorithm,
     multiframeFrames = activeMultiframeFrames(lenses),
     captureLayout = captureControlLayout,

@@ -524,6 +524,7 @@ void MultiframeOutputAdapter::prepare(VkImageView mergedView, std::uint32_t lscW
     push.refWidth = useSensorClip ? sensorClip.refWidth : 0u;
     push.refHeight = useSensorClip ? sensorClip.refHeight : 0u;
     push.cfa = useSensorClip ? sensorClip.cfa : 0u;
+    if (sensorClip.cfaWithoutClip && sensorClip.cfa <= 3u) push.cfa = sensorClip.cfa;  // Rawr 17U fork: HDR+ Bracketed
     push.useSensorClip = useSensorClip ? 1u : 0u;
     for (int i = 0; i < 4; ++i) {
         const float black = useSensorClip ? sensorClip.blackByPhase[static_cast<std::size_t>(i)] : 0.0f;
