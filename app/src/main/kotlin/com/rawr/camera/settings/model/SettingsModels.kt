@@ -308,7 +308,8 @@ enum class DynamicRangeMethod(val label: String, val summary: String) {
 }
 
 // Keep the experimental implementation and recipe support, but hide its controls.
-const val LOCAL_TONE_CONTROLS_VISIBLE = false
+// Rawr 17U fork (Steve's v26 patch): shown, for HDR+ Bracketed's local tone mapping (Ed's main hides it).
+const val LOCAL_TONE_CONTROLS_VISIBLE = true
 val visibleDynamicRangeMethods: List<DynamicRangeMethod> = DynamicRangeMethod.entries.filter {
     LOCAL_TONE_CONTROLS_VISIBLE || it != DynamicRangeMethod.Local
 }
@@ -330,12 +331,15 @@ data class LocalToneTuning(
     val highlightsEv: Float = 2f,
     val sigma: Float = 5f,
     val coarsestMip: Int = 6,
-    val boostLocalContrast: Boolean = false
+    val boostLocalContrast: Boolean = false,
+    /** Rawr 17U fork (Steve's v26 patch): fine detail kept in flat, dark areas; 0 = Ed's guided regression, 1 = a plain lift. */
+    val shadowDetail: Float = LocalToneLimits.DEFAULT_SHADOW_DETAIL
 ) {
     fun sanitized() = copy(
-        highlightsEv = if (highlightsEv.isFinite()) (highlightsEv.coerceIn(.5f, 2f) * 10f).roundToInt() / 10f else 2f,
+        highlightsEv = if (highlightsEv.isFinite()) (highlightsEv.coerceIn(LocalToneLimits.MIN_HIGHLIGHTS_EV, LocalToneLimits.MAX_HIGHLIGHTS_EV) * 10f).roundToInt() / 10f else LocalToneLimits.DEFAULT_HIGHLIGHTS_EV,
         sigma = if (sigma.isFinite()) (sigma.coerceIn(3f, 5f) * 10f).roundToInt() / 10f else 5f,
-        coarsestMip = coarsestMip.coerceIn(6, 8)
+        coarsestMip = coarsestMip.coerceIn(6, 8),
+        shadowDetail = if (shadowDetail.isFinite()) (shadowDetail.coerceIn(0f, 1f) * 100f).roundToInt() / 100f else LocalToneLimits.DEFAULT_SHADOW_DETAIL
     )
 }
 
@@ -343,7 +347,12 @@ data class LocalToneTuning(
 object LocalToneLimits {
     const val DEFAULT_SHADOWS_EV = 2.0f
     const val MIN_SHADOWS_EV = 1.0f
-    const val MAX_SHADOWS_EV = 3.0f
+    // Rawr 17U fork (Steve's v26 patch): wider ranges (Ed's: 3 EV of lift, 2 EV of highlight protection).
+    const val MAX_SHADOWS_EV = 5.0f
+    const val DEFAULT_HIGHLIGHTS_EV = 2.0f
+    const val DEFAULT_SHADOW_DETAIL = 0.75f  // shared with native local_tone/ExposureFusion.h FusionParams::shadowDetail
+    const val MIN_HIGHLIGHTS_EV = 0.5f
+    const val MAX_HIGHLIGHTS_EV = 4.0f
     fun shadowsEv(value: Float): Float =
         if (value.isFinite()) (value.coerceIn(MIN_SHADOWS_EV, MAX_SHADOWS_EV) * 10f).roundToInt() / 10f else DEFAULT_SHADOWS_EV
 }

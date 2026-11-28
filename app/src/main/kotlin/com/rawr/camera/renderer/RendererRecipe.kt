@@ -341,7 +341,8 @@ internal object RendererRecipe {
         val local = j.optJSONObject("localToneTuning") ?: j.optJSONObject("localTone") ?: JSONObject()
         val tuning = LocalToneTuning(local.optDouble("highlightsEv", 2.0).toFloat(),
             local.optDouble("sigma", 5.0).toFloat(), local.optInt("coarsestMip", 6),
-            local.optBoolean("boostLocalContrast", false)).sanitized()
+            local.optBoolean("boostLocalContrast", false),
+            local.optDouble("shadowDetail", LocalToneLimits.DEFAULT_SHADOW_DETAIL.toDouble()).toFloat()).sanitized()
         return d.copy(imageTone = tone, localToneTuning = tuning,
             colorRenderProfile = profile,
             srgbTone = if (profile == ColorRenderProfile.SRgb) profileTone else d.srgbTone,

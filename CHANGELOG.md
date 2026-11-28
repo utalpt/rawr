@@ -6,6 +6,14 @@ first and moves to `xiaomi-17u` once verified.
 
 ## Unreleased (on the `debug` build, not in a release yet)
 
+### Dynamic Range: Local (from Steve's v26 patch)
+
+- **Settings > Image > Dynamic Range > Photo > Local** is shown (Ed's main keeps it hidden): region-by-region exposure
+  fusion, the local tone mapping Steve tuned HDR+ Bracketed with. Wider ranges (Strength up to 5 EV, Highlight
+  protection up to 4 EV; Ed's: 3 and 2) and **Shadow detail** (0.75 by default; 0 = Ed's guided regression, which
+  smooths dark flat areas), also in the Renderer. Written by Steve. Off and Global stay as in Ed's main, and Global stays
+  the default, so nothing changes unless Local is chosen.
+
 ### LOFIC on the main camera (Xiaomi 17 Ultra, needs Anton Tretiakov's X17U LOFIC RAW root module)
 
 From Anton Tretiakov's (@designation_zero on Telegram) X17U LOFIC RAW specification and his LOFIC RAW demo app

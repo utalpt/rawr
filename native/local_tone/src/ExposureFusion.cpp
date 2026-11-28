@@ -29,7 +29,8 @@ struct Push {
     std::uint32_t block;
     std::uint32_t boost;
     std::uint32_t targetCount;
-    std::uint32_t pad[2];
+    float detail;  // Rawr 17U fork (Steve's v26 patch): shadow detail
+    std::uint32_t pad;
 };
 static_assert(sizeof(Push) == 112, "exposure fusion push layout");
 
@@ -286,6 +287,7 @@ bool ExposureFusionProcessor::record(const FusionRecordInfo& info) {
     push.block = 1u << kFusionBaseMip;
     push.boost = info.params.boostLocalContrast ? 1u : 0u;
     push.targetCount = info.targetCount;
+    push.detail = info.params.shadowDetail;
 
     const auto memory = [&] {
         VkMemoryBarrier b{};

@@ -158,8 +158,8 @@ internal fun DynamicRangeSettings(state: SettingsUiState, dispatch: SettingsDisp
                     StandaloneNumericSliderRow(
                         identity = "local_tone_highlights", label = "Highlight protection",
                         supportingText = "Uses a darker exposure for bright areas. Higher: stronger highlight reduction.",
-                        minimum = .5f, maximum = 2f, step = .1f, decimals = 1, unit = "EV",
-                        value = tuning.highlightsEv, defaultValue = 2f
+                        minimum = LocalToneLimits.MIN_HIGHLIGHTS_EV, maximum = LocalToneLimits.MAX_HIGHLIGHTS_EV, step = .1f, decimals = 1, unit = "EV",
+                        value = tuning.highlightsEv, defaultValue = LocalToneLimits.DEFAULT_HIGHLIGHTS_EV
                     ) { dispatch.invoke(SetLocalTone(tuning = tuning.copy(highlightsEv = it))) }
                     SettingDivider()
                     StandaloneNumericSliderRow(
@@ -176,10 +176,17 @@ internal fun DynamicRangeSettings(state: SettingsUiState, dispatch: SettingsDisp
                         value = (tuning.coarsestMip - 5).toFloat(), defaultValue = 1f
                     ) { dispatch.invoke(SetLocalTone(tuning = tuning.copy(coarsestMip = it.toInt() + 5))) }
                     SettingDivider()
+                    StandaloneNumericSliderRow(
+                        identity = "local_tone_shadow_detail", label = "Shadow detail",
+                        supportingText = "Detail and grain kept in dark, flat areas that Local would otherwise smooth. Higher: more detail, and more shadow noise.",
+                        minimum = 0f, maximum = 1f, step = .05f, decimals = 2,
+                        value = tuning.shadowDetail, defaultValue = LocalToneLimits.DEFAULT_SHADOW_DETAIL
+                    ) { dispatch.invoke(SetLocalTone(tuning = tuning.copy(shadowDetail = it))) }
+                    SettingDivider()
                     SettingsSwitchRow(title = "Local contrast boost", checked = tuning.boostLocalContrast) {
                         dispatch.invoke(SetLocalTone(tuning = tuning.copy(boostLocalContrast = it)))
                     }
-                    ChoiceSummary("Conservative ranges. Strong combinations can still exaggerate edges; leave contrast boost off for a softer look.")
+                    ChoiceSummary("Wide ranges (up to 5 EV of lift, 4 EV of highlight reduction). Strong combinations exaggerate edges and noise; leave contrast boost off for a softer look.")
                     androidx.compose.material3.TextButton(onClick = {
                         dispatch.invoke(SetLocalTone(shadowsEv = LocalToneLimits.DEFAULT_SHADOWS_EV, tuning = LocalToneTuning()))
                     }) { Text(tr("Reset local tone")) }

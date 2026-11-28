@@ -326,7 +326,7 @@ internal fun RendererControls(stage: RendererStage, v: SettingsValues, dispatch:
                         EditorNumber("Strength", shadows, LocalToneLimits.MIN_SHADOWS_EV, LocalToneLimits.MAX_SHADOWS_EV,
                             .1f, LocalToneLimits.DEFAULT_SHADOWS_EV) { localTone(it) }
                         val tuning = v.localToneTuning
-                        EditorNumber("Highlight protection (EV)", tuning.highlightsEv, .5f, 2f, .1f, 2f) {
+                        EditorNumber("Highlight protection (EV)", tuning.highlightsEv, LocalToneLimits.MIN_HIGHLIGHTS_EV, LocalToneLimits.MAX_HIGHLIGHTS_EV, .1f, LocalToneLimits.DEFAULT_HIGHLIGHTS_EV) {
                             send(SetLocalTone(tuning = tuning.copy(highlightsEv = it)))
                         }
                         EditorNumber("Exposure selectivity", tuning.sigma, 3f, 5f, .1f, 5f) {
@@ -334,6 +334,9 @@ internal fun RendererControls(stage: RendererStage, v: SettingsValues, dispatch:
                         }
                         EditorNumber("Blend scale", (tuning.coarsestMip - 5).toFloat(), 1f, 3f, 1f, 1f) {
                             send(SetLocalTone(tuning = tuning.copy(coarsestMip = it.toInt() + 5)))
+                        }
+                        EditorNumber("Shadow detail", tuning.shadowDetail, 0f, 1f, .05f, LocalToneLimits.DEFAULT_SHADOW_DETAIL) {
+                            send(SetLocalTone(tuning = tuning.copy(shadowDetail = it)))
                         }
                         EditorToggle("Local contrast boost", tuning.boostLocalContrast) {
                             send(SetLocalTone(tuning = tuning.copy(boostLocalContrast = it)))

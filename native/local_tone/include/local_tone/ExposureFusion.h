@@ -32,7 +32,9 @@ struct ImageRef {
 // App defaults: natural shadow lift, with stronger adjustments capped at 3 EV.
 inline constexpr float kDefaultShadowsEv = 2.0f;
 inline constexpr float kDefaultHighlightsEv = 2.0f;
-inline constexpr float kMinShadowsEv = 1.0f, kMaxShadowsEv = 3.0f;
+// Rawr 17U fork (Steve's v26 patch): wider ranges, 5 EV of lift and 4 EV of highlight reduction (Ed's: 3 and 2).
+inline constexpr float kMinShadowsEv = 1.0f, kMaxShadowsEv = 5.0f;
+inline constexpr float kMinHighlightsEv = 0.5f, kMaxHighlightsEv = 4.0f;
 
 // The lift brings dark regions toward mid grey, where their noise shows. It
 // is limited so that the darkest region lifted to mid grey keeps a per-pixel
@@ -76,16 +78,23 @@ struct FusionParams {
     float sigma = 5.0f;         // exposure preference sharpness around lightness 0.5
     std::uint32_t coarsestMip = 6;        // coarsest pyramid level, mips below full resolution (demo "mip")
     bool boostLocalContrast = false;      // weight Laplacians by their magnitude
+    // Rawr 17U fork (Steve's v26 patch): fine detail in flat, dark areas (fus_apply.comp). The guided regression at full
+    // resolution shrinks its slope toward zero where the quarter-resolution guide barely varies, which flattens the
+    // pixel's own detail and noise there. This is the share of the lift ratio it shrinks toward instead: 0 = Ed's (the
+    // demo's) behaviour, 1 = flat areas keep their detail as a plain lift would.
+    float shadowDetail = 0.75f;
 };
 
 inline FusionParams fusionParams(float shadowsEv, float highlightsEv, float sigma = 5.0f,
-                                 std::uint32_t coarsestMip = 6, bool boostLocalContrast = false) noexcept {
+                                 std::uint32_t coarsestMip = 6, bool boostLocalContrast = false,
+                                 float shadowDetail = 0.75f) noexcept {
     FusionParams p{};
     p.shadowsEv = shadowsEv;
     p.highlightsEv = highlightsEv;
     p.sigma = sigma;
     p.coarsestMip = coarsestMip;
     p.boostLocalContrast = boostLocalContrast;
+    p.shadowDetail = shadowDetail;
     return p;
 }
 
@@ -93,7 +102,8 @@ inline bool validParams(const FusionParams& p) noexcept {
     return std::isfinite(p.exposure) && p.exposure > 0.0f && std::isfinite(p.shadowsEv) && p.shadowsEv >= 0.0f &&
            p.shadowsEv <= 6.0f && std::isfinite(p.highlightsEv) && p.highlightsEv >= 0.0f && p.highlightsEv <= 6.0f &&
            std::isfinite(p.sigma) && p.sigma > 0.0f && p.coarsestMip > kFusionBaseMip &&
-           p.coarsestMip <= kFusionBaseMip + kFusionMaxDownLevels;
+           p.coarsestMip <= kFusionBaseMip + kFusionMaxDownLevels && std::isfinite(p.shadowDetail) && p.shadowDetail >= 0.0f &&
+           p.shadowDetail <= 1.0f;
 }
 
 struct FusionRecordInfo {

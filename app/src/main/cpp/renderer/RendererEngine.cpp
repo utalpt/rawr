@@ -925,7 +925,7 @@ std::vector<uint8_t> RendererEngine::render(DngSource& source, const std::string
     if (context.tonemapParams.localTone.shadowsEv > 0.0f)
         linearKey << ",lt:" << context.tonemapParams.localTone.shadowsEv << ',' << context.tonemapParams.localTone.highlightsEv
                   << ',' << context.tonemapParams.localTone.sigma << ',' << context.tonemapParams.localTone.coarsestMip
-                  << ',' << context.tonemapParams.localTone.boostLocalContrast
+                  << ',' << context.tonemapParams.localTone.boostLocalContrast << ',' << context.tonemapParams.localTone.shadowDetail
                   << ',' << context.tonemapParams.aePostGain << ',' << context.tonemapParams.exposureEV;
     context.reuseLinearResult = options.overview && linearResultKey_ == linearKey.str();
     linearResultKey_.clear();

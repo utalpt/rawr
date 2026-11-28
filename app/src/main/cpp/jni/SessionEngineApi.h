@@ -65,7 +65,8 @@ void setMaxAePostGain(EngineHandle handle, float gain) noexcept;
 void setPostGainKneeWidthEv(EngineHandle handle, float widthEv) noexcept;
 void setAutoKeyMode(EngineHandle handle, int mode) noexcept;
 // HDR+ Bracketed local tone mapping (strength 0..1, detail 0.8..1.3).
-void setLocalTone(EngineHandle handle, float shadowsEv, float highlightsEv, float sigma, unsigned coarsestMip, bool boostLocalContrast) noexcept;
+void setLocalTone(EngineHandle handle, float shadowsEv, float highlightsEv, float sigma, unsigned coarsestMip, bool boostLocalContrast,
+                  float shadowDetail) noexcept;
 void setExpectedMergeFrames(EngineHandle handle, uint32_t frames) noexcept;
 void setAutoMinFps(EngineHandle handle, int fps) noexcept;
 void setAePriorityDisabled(EngineHandle handle, bool disabled) noexcept;

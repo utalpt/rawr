@@ -170,8 +170,9 @@ void setMaxAePostGain(EngineHandle h, float gain) noexcept {
 void setPostGainKneeWidthEv(EngineHandle h, float widthEv) noexcept {
     if (h) engine(h)->setPostGainKneeWidthEv(widthEv);
 }
-void setLocalTone(EngineHandle h, float shadowsEv, float highlightsEv, float sigma, unsigned coarsestMip, bool boostLocalContrast) noexcept {
-    if (h) engine(h)->setLocalTone(shadowsEv, highlightsEv, sigma, coarsestMip, boostLocalContrast);
+void setLocalTone(EngineHandle h, float shadowsEv, float highlightsEv, float sigma, unsigned coarsestMip, bool boostLocalContrast,
+                  float shadowDetail) noexcept {
+    if (h) engine(h)->setLocalTone(shadowsEv, highlightsEv, sigma, coarsestMip, boostLocalContrast, shadowDetail);
 }
 void setExpectedMergeFrames(EngineHandle h, uint32_t frames) noexcept {
     if (h) engine(h)->setExpectedMergeFrames(frames);

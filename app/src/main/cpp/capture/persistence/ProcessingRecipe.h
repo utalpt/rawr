@@ -33,7 +33,8 @@ inline std::string resolvedRecipe(const tonemap::TonemapParams& tone, float gain
     out << ",\"localTone\":{\"version\":3,\"method\":\"exposureFusion\",\"shadowsEv\":" << tone.localTone.shadowsEv
         << ",\"highlightsEv\":" << tone.localTone.highlightsEv
         << ",\"sigma\":" << tone.localTone.sigma << ",\"coarsestMip\":" << tone.localTone.coarsestMip
-        << ",\"boostLocalContrast\":" << (tone.localTone.boostLocalContrast ? "true" : "false") << "}";
+        << ",\"boostLocalContrast\":" << (tone.localTone.boostLocalContrast ? "true" : "false")
+        << ",\"shadowDetail\":" << tone.localTone.shadowDetail << "}";
 #undef RAWR_TONE_FIELD
     out << "},\"film\":{\"version\":1";
 #define RAWR_FILM_FIELD(type, name) out << ",\"" #name "\":" << film.name;

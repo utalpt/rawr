@@ -499,7 +499,8 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
             localToneShadowsEv = LocalToneLimits.shadowsEv(p[Keys.localToneShadowsEv] ?: d.localToneShadowsEv),
             localToneTuning = LocalToneTuning(
                 p[Keys.localToneHighlightsEv] ?: 2f, p[Keys.localToneSigma] ?: 5f,
-                p[Keys.localToneMip] ?: 6, p[Keys.localToneBoost] ?: false
+                p[Keys.localToneMip] ?: 6, p[Keys.localToneBoost] ?: false,
+                p[Keys.localToneDetail] ?: LocalToneLimits.DEFAULT_SHADOW_DETAIL
             ).sanitized(),
             maxPostGainId = p[Keys.maxPostGainId] ?: d.maxPostGainId,
             autoMinFpsId = p[Keys.autoMinFpsId] ?: d.autoMinFpsId,
@@ -738,6 +739,7 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         p[Keys.localToneSigma] = v.localToneTuning.sigma
         p[Keys.localToneMip] = v.localToneTuning.coarsestMip
         p[Keys.localToneBoost] = v.localToneTuning.boostLocalContrast
+        p[Keys.localToneDetail] = v.localToneTuning.shadowDetail
         p[Keys.maxPostGainId] = v.maxPostGainId
         p[Keys.autoMinFpsId] = v.autoMinFpsId
         p[Keys.controlSurfaceStyle] = v.controlSurfaceStyle.name
@@ -1138,6 +1140,7 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         val localToneSigma = floatPreferencesKey("local_tone_sigma")
         val localToneMip = intPreferencesKey("local_tone_mip")
         val localToneBoost = booleanPreferencesKey("local_tone_boost")
+        val localToneDetail = floatPreferencesKey("local_tone_detail")  // Rawr 17U fork
         val maxPostGainId = stringPreferencesKey("max_post_gain_id")
         val autoMinFpsId = stringPreferencesKey("auto_min_fps_id")
         val controlSurfaceStyle = stringPreferencesKey("control_surface_style")

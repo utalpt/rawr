@@ -33,7 +33,15 @@ void main() {
     mY /= ws;
     mX2 /= ws;
     mXY /= ws;
-    float a = (mXY - mX * mY) / (max(mX2 - mX * mX, 0.0) + 0.00001);
+    // Rawr 17U fork (Steve's v26 patch): the regression a = cov / (var + eps) shrinks its slope toward zero where the guide
+    // barely varies (dark, smooth areas), so the output becomes the local mean and the pixel's own detail is lost. Ridge
+    // toward the lift ratio instead, by pc.detail (0 = Ed's regression): flat areas scale their detail like a plain lift,
+    // edges keep the regression's slope. The ratio is capped at a plain lift of the shadows exposure (near black the
+    // lightness is zero and the ratio meaningless).
+    float varX = max(mX2 - mX * mX, 0.0);
+    float covXY = mXY - mX * mY;
+    float lift = min(mY / max(mX, 0.0001), sqrt(pc.shadows));
+    float a = (covXY + 0.00001 * pc.detail * lift) / (varX + 0.00001);
     float b = mY - a * mX;
     vec4 pixel = imageLoad(target, q);
     // Evaluate the regression in exactly the same lightness space as its

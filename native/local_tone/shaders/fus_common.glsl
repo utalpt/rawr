@@ -12,7 +12,9 @@ layout(push_constant) uniform FusionPush {
     float sigmaSq;
     uint block;        // full-res pixels per base-level texel (square)
     uint boost;        // weight Laplacians by magnitude
-    uint targetCount, pad1, pad2;
+    uint targetCount;
+    float detail;      // Rawr 17U fork: shadow detail, share of the lift ratio the guided regression shrinks toward
+    uint pad2;
 } pc;
 
 // three.js r138 ACESFilmicToneMapping (toneMappingExposure 1), Rec.709 in.

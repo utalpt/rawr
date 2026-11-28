@@ -33,6 +33,7 @@ struct LocalToneParams {
     float sigma = 5.0f;
     unsigned coarsestMip = 6;
     unsigned boostLocalContrast = 0;
+    float shadowDetail = 0.75f;  // Rawr 17U fork: fine detail kept in flat dark areas (FusionParams::shadowDetail), 0..1
 };
 
 struct TonemapParams {

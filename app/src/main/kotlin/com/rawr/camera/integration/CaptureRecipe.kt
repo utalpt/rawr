@@ -102,6 +102,7 @@ internal object CaptureRecipe {
             put("sigma", v.localToneTuning.sigma)
             put("coarsestMip", v.localToneTuning.coarsestMip)
             put("boostLocalContrast", v.localToneTuning.boostLocalContrast)
+            put("shadowDetail", v.localToneTuning.shadowDetail)
         })
         put("tone", JSONObject().apply {
             val value = v.activeImageTone()

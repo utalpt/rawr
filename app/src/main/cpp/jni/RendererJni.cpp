@@ -164,7 +164,7 @@ rawrcam::renderer::RenderOptions options(JNIEnv* env, jstring recipe, int workin
         t.localTone = {float(localTone.number("shadowsEv", 0)),
                        float(localTone.number("highlightsEv", rawr::local_tone::kDefaultHighlightsEv)),
                        float(localTone.number("sigma", 5)), unsigned(localTone.number("coarsestMip", 6)),
-                       unsigned(localTone.flag("boostLocalContrast", false))};
+                       unsigned(localTone.flag("boostLocalContrast", false)), float(localTone.number("shadowDetail", 0.75))};
     } else {
         t.localTone = localTone.number("strength", 0) > 0
                           ? tonemap::LocalToneParams{rawr::local_tone::kDefaultShadowsEv,
@@ -179,8 +179,9 @@ rawrcam::renderer::RenderOptions options(JNIEnv* env, jstring recipe, int workin
     t.localTone.sigma = float(tuning.number("sigma", t.localTone.sigma));
     t.localTone.coarsestMip = unsigned(tuning.number("coarsestMip", t.localTone.coarsestMip));
     t.localTone.boostLocalContrast = unsigned(tuning.flag("boostLocalContrast", t.localTone.boostLocalContrast != 0));
+    t.localTone.shadowDetail = float(tuning.number("shadowDetail", t.localTone.shadowDetail));
     if (rawr::local_tone::fusionActive(t.localTone.shadowsEv) &&
-        !rawr::local_tone::validParams(rawr::local_tone::fusionParams(t.localTone.shadowsEv, t.localTone.highlightsEv, t.localTone.sigma, t.localTone.coarsestMip, t.localTone.boostLocalContrast != 0)))
+        !rawr::local_tone::validParams(rawr::local_tone::fusionParams(t.localTone.shadowsEv, t.localTone.highlightsEv, t.localTone.sigma, t.localTone.coarsestMip, t.localTone.boostLocalContrast != 0, t.localTone.shadowDetail)))
         throw std::runtime_error("Invalid local tone recipe");
     o.adaptiveToneMode = json.text("adaptiveToneMode");
     if (o.adaptiveToneMode == "null") o.adaptiveToneMode.clear();
