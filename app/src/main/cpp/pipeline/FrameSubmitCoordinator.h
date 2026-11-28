@@ -189,7 +189,10 @@ class FrameSubmitCoordinator final {
     // LOFIC lens (CameraContextMetadata::rawPacked14): the RAW16 buffers hold packed 14-bit samples, so every
     // frame goes through the CPU upload, which unpacks them. Set before the RAW reader is created.
     void setPacked14(bool packed) noexcept {
-        packed14_.store(packed, std::memory_order_relaxed);
+        // Rawr 17U fork: leaving the LOFIC lens, the CPU ingress it used must not count for the next lens (it is
+        // cleared again with the geometry, but the UI could read the flag in between: "CPU copy path" notice).
+        if (packed14_.exchange(packed, std::memory_order_relaxed) != packed)
+            cpuIngressActive_.store(false, std::memory_order_relaxed);
         cpuUpload_.setPacked14(packed);
     }
     [[nodiscard]] bool packed14() const noexcept { return packed14_.load(std::memory_order_relaxed); }

@@ -57,6 +57,7 @@ class NativeCaptureScreenController(
     private val selfTimer = CaptureSelfTimer(scope, state, ::update, ::enqueueStillCapture, foregroundToken)
     // Once per process: the CPU path is a device/stream property, not a per-frame event.
     private var rawCpuIngressNotified = false
+    private var rawCpuIngressSeen = 0
 
     init {
         // Native starts on the first lens of its profile; the snapshot's
@@ -65,7 +66,9 @@ class NativeCaptureScreenController(
             while (isActive) {
                 val snapshot = NativeCameraUiSnapshot.parse(coordinator.cameraControlSnapshot())
                 if (snapshot != null) {
-                    if (snapshot.rawCpuIngress && !rawCpuIngressNotified) {
+                    // Rawr 17U fork: only a lasting CPU ingress (3 snapshots in a row), not a lens switch's moment.
+                    rawCpuIngressSeen = if (snapshot.rawCpuIngress) rawCpuIngressSeen + 1 else 0
+                    if (rawCpuIngressSeen >= 3 && !rawCpuIngressNotified) {
                         rawCpuIngressNotified = true
                         onRawCpuIngress()
                     }
