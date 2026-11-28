@@ -17,7 +17,7 @@ class VoiceKeywordGateTest {
 
     @Test fun onlyTheWholeHypothesisCounts() {
         val gate = VoiceKeywordGate()
-        for (text in listOf("cheese please", "say cheese", "cheers", "chess", "[unk]", "", "picture")) {
+        for (text in listOf("cheese please", "say cheese please", "cheers", "chess", "[unk]", "", "picture")) {
             assertNull(gate.onHypothesis(text, true, 1000L + text.length), text)
         }
     }

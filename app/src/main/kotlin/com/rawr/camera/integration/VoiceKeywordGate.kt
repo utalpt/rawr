@@ -52,7 +52,10 @@ internal class VoiceKeywordGate(
     companion object {
         // "captured": how the small English model hears "capture" from a non-native speaker (a Portuguese speaker on the
         // 17 Ultra: "captured" three times out of three); it is the same word, so it cannot come from a look-alike.
-        val DEFAULT_KEYWORDS = setOf("cheese", "capture", "captured")
+        // "say cheese": the phrase people say anyway, and the one form of "cheese" the model got right from that speaker
+        // ("cheese" alone came out as "cheers", "geez", "she is"). A whole phrase ending in the word cannot be a
+        // look-alike; a sentence that only begins with it still does not fire.
+        val DEFAULT_KEYWORDS = setOf("cheese", "say cheese", "capture", "captured")
         const val DEFAULT_STABLE_MS = 300L
         const val DEFAULT_COOLDOWN_MS = 2500L
     }

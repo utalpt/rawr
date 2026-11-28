@@ -16,17 +16,18 @@ Steve) and the tele opening at 75 mm. Checked on the Xiaomi 17 Ultra. No sync wi
   whatever the switch said. **Settings > Photo > Capture > Follow System Shutter Rule** (on by default, shown
   only on those phones) lets the Shutter Sound switch alone decide when turned off, and the (i) of Shutter
   Sound says what the system asks for. Found and written by Steve.
-- **Voice Shutter** (off by default): "Capture" or "Cheese" takes a photo in Photo mode, with Vosk's small
+- **Voice Shutter** (off by default): "Capture", "Cheese" or "Say cheese" takes a photo in Photo mode, with Vosk's small
   English model (Apache-2.0) running offline on the phone while the viewfinder is open (nothing is recorded or
   sent; the first start unpacks the model). Written by Steve. Only the exact word fires, so look-alikes such as
-  "cheers" do not; the fork also accepts "captured", which is how the model hears "Capture" from some speakers.
+  "cheers" do not. The fork also accepts "captured" (how the model hears "Capture" from some speakers) and the
+  phrase "say cheese" (heard exactly where "cheese" alone came out as "cheers" or "geez").
 - **Watch Remote** (off by default): the viewfinder on a paired Wear OS watch, which takes photos, through
   **Rawr Remote**, the watch app: `rawr17u-remote-wear-0.5.1-17u.17.apk` on this release, installed on the
   watch and signed with the same key as the phone app. Written by Steve.
 - Left out of this release from the same patch: HDR+ Bracketed, the multiframe resolution presets, the local
   tone changes and the UI rotation for both landscape postures. They change the native capture, multiframe
   merge and tonemap paths and need their own test round on the 17 Ultra.
-- Checked on the 17U: Shutter Sound off and on, Voice Shutter ("Capture" three times out of three). Watch Remote
+- Checked on the 17U: Shutter Sound off and on, Voice Shutter ("Capture" three times out of three, "Say cheese"). Watch Remote
   as shown working in Steve's test video (not checked on a watch here).
 
 ### Tele lenses

@@ -133,10 +133,10 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   recording, the start tone played before the microphone opens. Asked for by @iG0Lka_ru. On phones whose system
   asks for the sound (some regions require it), **Follow System Shutter Rule** decides whether that wins over
   the switch (on by default); found and written by Steve.
-- **Voice Shutter** (Settings > Photo > Capture, off by default): say "Capture" or "Cheese" to take a photo in
+- **Voice Shutter** (Settings > Photo > Capture, off by default): say "Capture", "Cheese" or "Say cheese" to take a photo in
   Photo mode. An offline recognizer (Vosk's small English model, Apache-2.0) runs on the phone, only while the
   viewfinder is open; nothing is recorded or sent. Only the exact word fires (look-alikes such as "cheers" do
-  not), so the pronunciation matters: "Capture" is the more reliable one. Written by Steve.
+  not), so the pronunciation matters: "Capture" and "Say cheese" are the more reliable ones. Written by Steve.
 - **Watch Remote** (Settings > Photo > Capture, off by default): the viewfinder on a paired Wear OS watch, which
   takes photos, through **Rawr Remote**, the watch app (`rawr17u-remote-wear-<version>.apk` on the release,
   installed on the watch). Written by Steve.
