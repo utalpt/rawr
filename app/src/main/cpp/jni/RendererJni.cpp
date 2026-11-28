@@ -397,11 +397,12 @@ Java_com_rawr_camera_renderer_RendererNative_render(JNIEnv* e, jobject, jlong id
                 const float keyed = std::exp2(std::log2(rawrcam::color::autoKeyPolicy(
                                                   rawrcam::color::AutoKeyMode::Natural).targetLuma) -
                                               s->measuredKey->key->keyEv);
-                // The brightest part (P99.5, the window) may land at most 1.5 EV over white, inside
-                // the local tone mapping's highlight protection (2 EV): a LOFIC DNG at +3 EV keyed
-                // to the room put the window 3.9 EV over white, 12% of the JPEG at 255 though the
-                // DNG held it (d1). The room is left darker and the shadow lift brings it up.
-                constexpr float kBrightMaxEv = 1.5f;
+                // The brightest part (P99.5, the window) may land at most 2 EV over white, the local
+                // tone mapping's highlight protection (2 EV, the editor's limit): a LOFIC DNG at +3 EV
+                // keyed to the room put the window 3.9 EV over white, 12% of the JPEG at 255 though
+                // the DNG held it (d1). The room is left darker and the shadow lift brings it up;
+                // at 1.5 EV the window held (0.3% at 255) but the room came out at median 44 (d2).
+                constexpr float kBrightMaxEv = 2.0f;
                 const float brightCap = std::exp2(kBrightMaxEv - s->measuredKey->key->brightEv);
                 const float wanted = std::max(1.0f, std::min(keyed, brightCap));
                 tone.aePostGain = std::clamp(wanted, 1.0f, kMaxGain);
