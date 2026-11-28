@@ -116,11 +116,11 @@ internal fun PriorityToggleBadge(
         else -> return
     }
     val haptics = LocalCaptureHaptics.current
-    // A tab standing on the cell's top edge, only 2 dp inside it, so it never covers the value. Its touch area (at least
-    // 26 dp; "S⇄I" stays on one line, so it may be wider) is above the cell, which keeps all its own gestures.
+    // A tab astride the cell's top edge: about half of it (8 dp) inside the cell, clear of the value below. Its touch area
+    // (at least 26 dp; "S⇄I" stays on one line, so it may be wider) reaches 8 dp into the cell; the rest keeps its gestures.
     Box(
         modifier
-            .offset(x = 4.dp, y = (-24).dp)
+            .offset(x = 4.dp, y = (-18).dp)
             .defaultMinSize(minWidth = 26.dp, minHeight = 26.dp)
             .combinedClickableTap {
                 haptics.selection()
