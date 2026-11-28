@@ -4,6 +4,27 @@ Fork of [Rawr](https://github.com/adityawarmanfw/rawr) for the Xiaomi 17 Ultra.
 Releases follow Ed's version: `0.5.1-17u.N`. Test work lands on `yuv-probe`
 first and moves to `xiaomi-17u` once verified.
 
+## Unreleased (on the `debug` build, not in a release yet)
+
+### LOFIC on the main camera (Xiaomi 17 Ultra, needs Anton Tretiakov's X17U LOFIC RAW root module)
+
+From Anton Tretiakov's (@designation_zero on Telegram) X17U LOFIC RAW specification and his LOFIC RAW demo app
+(session keys, the 6 outputs and their order, the setups). Without his module the HAL gives a 16:9 readout with no
+real LOFIC gain: the lens refuses the shot and says so.
+
+- **Settings > Photo > Capture > LOFIC Lens (1x LOFIC)** (off by default): a "1x LOFIC" lens in the lens bar, main
+  camera 4:3 30 (sensor mode 5). The viewfinder shows the Long; a photo takes the Long and Short of the same frame and
+  merges them into one float16 DNG (`RAWR_..._LOFIC.dng`, 4096x3072), then a JPEG (Ultra HDR) through the Renderer.
+- **Settings > Photo > Capture > LOFIC Camera**: a separate screen on Camera2 like Anton's demo, with his three setups
+  (4:3 30, 4:3 59.5, 16:10 60), auto or manual exposure (AE compensation, +3 EV by default), focus, and a status line
+  (sensor mode, fps, exposure count, Long/Short rows).
+- The merge: the Long/Short ratio k is measured on every photo (model as fallback); the DNG carries the white balance
+  (AsShotNeutral), BaselineExposure and a NoiseProfile (Long and k x Short), so the Renderer's profiled denoise runs on it.
+- The Renderer opens float DNGs (float kept exact, no 16-bit rounding): gain metered from the scene (within 64x), local
+  tone mapping, the brightest part kept at most 2 EV over white. LOFIC JPEGs are queued one after the other.
+- Checked on the 17U (daylight window, Long + Short): the lens and the screen give the same results; measured k 94-98% of
+  the model, 4.5 to 5.8 stops above the Long clip, the Long always on the same reader, no crash. Video LOFIC: not yet.
+
 ## 0.5.1-17u.18
 
 Ed's main up to #169, HDR+ Bracketed back (Ed's merge, brought back and reworked by Steve, kept apart from Ed's code)
