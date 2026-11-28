@@ -1,5 +1,7 @@
 #include "imaging/LoficGrab.h"
 
+#include <android/log.h>
+
 #include <condition_variable>
 #include <cstring>
 #include <deque>
@@ -94,6 +96,14 @@ void LoficGrab::offerLong(int64_t timestampNs, const uint8_t* data, uint32_t wid
 void LoficGrab::offerShort(int64_t timestampNs, const uint8_t* data, uint32_t width, uint32_t rows) {
     std::lock_guard<std::mutex> lock(mutex);
     if (!wanting || !data) return;
+    // The Short arrives straight from its reader, the Long only after the CPU upload unpacks it, which can run
+    // several frames behind (the debug build's unoptimised native code: "no Long/Short pair" there, never in the
+    // optimised builds). So the first Shorts after the request are kept for their Long to catch up; they are
+    // replaced only once a newer Long shows that theirs was dropped.
+    if (shorts.size() >= kFrames) {
+        if (longs.empty() || longs.back().timestampNs <= shorts.back().timestampNs) return;
+        shorts.clear();
+    }
     keep(shorts, timestampNs, data, size_t(rows) * width / 4u * 5u, width, rows);
     changed.notify_all();
 }
@@ -117,6 +127,12 @@ std::optional<LoficPair> LoficGrab::wait(std::chrono::milliseconds timeout) {
     std::optional<std::pair<size_t, size_t>> found;
     changed.wait_until(lock, deadline, [&] { return (found = findPair()).has_value(); });
     if (!found) {
+        __android_log_print(ANDROID_LOG_WARN, "RawrLofic",
+                            "LOFIC_NO_PAIR longs=%zu [%lld..%lld] shorts=%zu [%lld..%lld]", longs.size(),
+                            longs.empty() ? 0LL : (long long)longs.front().timestampNs,
+                            longs.empty() ? 0LL : (long long)longs.back().timestampNs, shorts.size(),
+                            shorts.empty() ? 0LL : (long long)shorts.front().timestampNs,
+                            shorts.empty() ? 0LL : (long long)shorts.back().timestampNs);
         wanting = false;
         longs.clear();
         shorts.clear();
