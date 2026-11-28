@@ -94,8 +94,9 @@ internal fun PriorityToggleTopBarButton(state: CaptureUiState, dispatch: Capture
 }
 
 /**
- * Exposure cell: an "S" (shutter cell, in S) or "I" (ISO cell, in I) tab on the cell's top-left corner. Tap switches to the
- * other side; the rest of the cell keeps its own gestures (tap: slider, double tap: auto, long press: lock).
+ * Exposure cell: an "S" (shutter cell, in S) or "I" (ISO cell, in I) tab on the cell's top-left corner, or "S⇄I" on the
+ * shutter cell in Auto or Manual. Tap switches to the other side (from Auto or Manual: to S); the rest of the cell keeps its
+ * own gestures (tap: slider, double tap: auto, long press: lock).
  */
 @Composable
 internal fun PriorityToggleBadge(
@@ -106,38 +107,43 @@ internal fun PriorityToggleBadge(
 ) {
     if (PriorityToggleState.style != PriorityToggleStyle.EXPOSURE_CELL || !state.priorityToggleAvailable()) return
     val mode = state.exposureControl.mode
+    // In S or I the tab sits on the fixed cell; in Auto or Manual an "S⇄I" tab on the shutter cell starts it (to S).
     val letter = when {
         parameter == ExposureParameter.Shutter && mode == ExposureMode.ShutterPriority -> "S"
         parameter == ExposureParameter.Iso && mode == ExposureMode.IsoPriority -> "I"
+        parameter == ExposureParameter.Shutter && (mode == ExposureMode.Auto || mode == ExposureMode.Manual) -> "S⇄I"
         else -> return
     }
     val haptics = LocalCaptureHaptics.current
-    // A 28 dp touch area around the small tab, half over the cell's corner: easy to hit, and the rest of the cell keeps its
-    // own gestures.
+    // A 26 dp touch area in the cell's top-left corner (inside the cell, so nothing clips it); the rest of the cell keeps
+    // its own gestures.
     Box(
         modifier
-            .offset(x = (-8).dp, y = (-10).dp)
-            .size(28.dp)
+            .offset(x = 1.dp, y = 1.dp)
+            .size(26.dp)
             .combinedClickableTap {
                 haptics.selection()
                 dispatch(TogglePriority())
             }
             .testTag(CaptureTestTags.PRIORITY_TOGGLE_BADGE)
             .semantics {
-                contentDescription = if (letter == "S") "Shutter priority. Tap for ISO priority."
-                else "ISO priority. Tap for shutter priority."
+                contentDescription = when (letter) {
+                    "S" -> "Shutter priority. Tap for ISO priority."
+                    "I" -> "ISO priority. Tap for shutter priority."
+                    else -> "Tap for shutter priority."
+                }
             },
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.TopStart
     ) {
         Box(
             Modifier
-                .background(CaptureColors.Accent, RoundedCornerShape(5.dp))
+                .background(if (letter.length == 1) CaptureColors.Accent else Color.Black.copy(alpha = .7f), RoundedCornerShape(5.dp))
                 .border(1.dp, Color.Black.copy(alpha = .6f), RoundedCornerShape(5.dp))
                 .padding(horizontal = 5.dp, vertical = 1.dp)
                 .uprightInLandscape(state.orientation)
         ) {
-            Text(letter, color = Color.White, fontFamily = CaptureMono, fontSize = 11.sp, lineHeight = 12.sp,
-                fontWeight = FontWeight.Bold)
+            Text(letter, color = if (letter.length == 1) Color.White else CaptureColors.Accent, fontFamily = CaptureMono,
+                fontSize = if (letter.length == 1) 11.sp else 9.sp, lineHeight = 12.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

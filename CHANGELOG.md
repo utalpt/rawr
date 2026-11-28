@@ -21,8 +21,8 @@ HDR+ Bracketed (Steve's merge, kept apart from Ed's), the S/I Toggle and Ed's ma
 - **Settings > Photo > Capture > S/I Toggle** (Off by default): one tap switches between ISO priority (static scenes)
   and shutter priority (motion), each entered with its own value: **ISO Priority Value** (ISO 50 by default) and
   **Shutter Priority Value** (1/1000 s by default), the nearest the lens offers. Shown as a button in the top bar (long
-  press: back to Auto) or as an S / I tab on the fixed exposure cell (the cell's own tap, double tap and long press stay
-  as they were). Photo mode only. The mode itself is kept across app restarts, as before.
+  press: back to Auto) or as an S / I tab on the fixed exposure cell (in Auto or Manual an S⇄I tab on the shutter cell;
+  the cell's own tap, double tap and long press stay as they were). Photo mode only. The mode itself is kept across app restarts, as before.
 - Checked on the 17U: the switch enters the saved value of each side; a value set by hand on that side is not kept
   (as asked).
 

@@ -99,7 +99,7 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   ISO, shutter, EV and WB, or **Shared**, one set for every lens (focus stays per lens).
 - **S/I Toggle** (Settings > Photo > Capture, off by default): one tap switches between ISO priority and shutter
   priority, each entered with its saved value (ISO 50 and 1/1000 s by default), from a top-bar button (long press:
-  Auto) or an S / I tab on the fixed exposure cell. Asked for by @iG0Lka_ru.
+  Auto) or an S / I tab on the fixed exposure cell (S⇄I on the shutter cell in Auto). Asked for by @iG0Lka_ru.
 - Each lens can keep its own frame count, look, tone and film.
 - Manual ISO shows the standard numbers on the third stops (80, 160, 320, 640, 1250 instead of 79, 159,
   317, 635, 1270).
