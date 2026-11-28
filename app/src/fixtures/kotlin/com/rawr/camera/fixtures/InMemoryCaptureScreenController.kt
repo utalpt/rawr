@@ -148,6 +148,9 @@ class InMemoryCaptureScreenController(
             // AgX controls live in settings, not capture state.
             is SetAgxControl -> Unit
 
+            // Rawr 17U fork: the S/I priority switch needs the native camera; the fixture keeps its exposure as is.
+            is com.rawr.camera.architecture.TogglePriority -> Unit
+
             is SetRenderExposureTenths -> update {
                 CaptureTransitions.scrubRenderExposure(it, action.tenths - it.renderExposureTenths)
             }

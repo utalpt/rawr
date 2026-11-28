@@ -131,6 +131,10 @@ data class SetWatchRemote(val enabled: Boolean) : SettingsApplicationAction
 data class SetTeleZoomStyle(val id: String) : SettingsApplicationAction
 /** Rawr 17U fork: the TELE control always on screen while a tele lens with the optical zoom is selected. */
 data class SetTeleZoomAlwaysOn(val enabled: Boolean) : SettingsApplicationAction
+/** Rawr 17U fork: the S/I priority switch - where it is drawn (PriorityToggleStyle id) and the value of each side. */
+data class SetPriorityToggleStyle(val id: String) : SettingsApplicationAction
+data class SetPriorityToggleIso(val iso: Int) : SettingsApplicationAction
+data class SetPriorityToggleShutter(val ns: Long) : SettingsApplicationAction
 
 data class SetAePriorityDisabled(val disabled: Boolean) : SettingsApplicationAction
 

@@ -132,6 +132,37 @@ internal fun CaptureSettings(state: SettingsUiState, dispatch: SettingsDispatch)
                 testTag = SettingsTestTags.row("Capture", "tele_zoom_always_on")
             ) { dispatch.invoke(SetTeleZoomAlwaysOn(it)) }
             SettingDivider()
+            // Rawr 17U fork (asked for by iG0Lka): one tap between ISO priority and shutter priority, each with its value.
+            val priorityStyle = com.rawr.camera.model.PriorityToggleStyle.fromId(state.values.priorityToggleStyle)
+            val presets = com.rawr.camera.model.PriorityTogglePresets
+            SettingsRow(
+                title = "S/I Toggle",
+                value = priorityStyle.label,
+                supportingText = "One tap switches between ISO priority (static scenes) and shutter priority (motion), each " +
+                    "with the value below. Top bar: a button next to the timer (long press: back to Auto). Exposure cell: " +
+                    "an S or I tab on the fixed cell. Photo mode only.",
+                testTag = SettingsTestTags.row("Capture", "priority_toggle_style"),
+                onClick = { dispatch.invoke(SetPriorityToggleStyle(priorityStyle.next().id)) }
+            )
+            if (priorityStyle != com.rawr.camera.model.PriorityToggleStyle.OFF) {
+                SettingDivider()
+                SettingsRow(
+                    title = "ISO Priority Value",
+                    value = presets.isoLabel(state.values.priorityToggleIso),
+                    testTag = SettingsTestTags.row("Capture", "priority_toggle_iso"),
+                    onClick = { dispatch.invoke(SetPriorityToggleIso(presets.nextIso(state.values.priorityToggleIso))) }
+                )
+                SettingDivider()
+                SettingsRow(
+                    title = "Shutter Priority Value",
+                    value = presets.shutterLabel(state.values.priorityToggleShutterNs),
+                    testTag = SettingsTestTags.row("Capture", "priority_toggle_shutter"),
+                    onClick = {
+                        dispatch.invoke(SetPriorityToggleShutter(presets.nextShutter(state.values.priorityToggleShutterNs)))
+                    }
+                )
+            }
+            SettingDivider()
             SettingsSwitchRow(
                 title = "Location Tagging",
                 checked = state.values.locationTagging && locationGranted,

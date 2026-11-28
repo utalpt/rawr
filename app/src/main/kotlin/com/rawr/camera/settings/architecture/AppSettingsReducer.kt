@@ -34,6 +34,9 @@ internal fun reduceAppSettings(
     is SetWatchRemote -> state.withValues(state.values.copy(watchRemote = action.enabled))
     is SetTeleZoomStyle -> state.withValues(state.values.copy(teleZoomStyle = action.id))
     is SetTeleZoomAlwaysOn -> state.withValues(state.values.copy(teleZoomAlwaysOn = action.enabled))
+    is SetPriorityToggleStyle -> state.withValues(state.values.copy(priorityToggleStyle = action.id))
+    is SetPriorityToggleIso -> state.withValues(state.values.copy(priorityToggleIso = action.iso))
+    is SetPriorityToggleShutter -> state.withValues(state.values.copy(priorityToggleShutterNs = action.ns))
 
     is SetAePriorityDisabled -> {
         state.withValues(state.values.copy(aePriorityDisabled = action.disabled))

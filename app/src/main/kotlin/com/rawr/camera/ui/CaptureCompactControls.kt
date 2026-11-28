@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -245,8 +246,15 @@ internal fun CompactParamRow(
             .testTag(CaptureTestTags.COMPACT_PARAM_ROW),
         horizontalArrangement = Arrangement.spacedBy(CaptureDimens.ControlGap)
     ) {
-        CompactExposureButton(ExposureParameter.Iso, state, dispatch, Modifier.weight(weights[0]).fillMaxHeight())
-        CompactExposureButton(ExposureParameter.Shutter, state, dispatch, Modifier.weight(weights[1]).fillMaxHeight())
+        // Rawr 17U fork: the S/I priority switch's tab sits on the fixed cell (Settings > Photo > Capture > S/I Toggle).
+        Box(Modifier.weight(weights[0]).fillMaxHeight()) {
+            CompactExposureButton(ExposureParameter.Iso, state, dispatch, Modifier.fillMaxSize())
+            PriorityToggleBadge(ExposureParameter.Iso, state, dispatch, Modifier.align(Alignment.TopStart))
+        }
+        Box(Modifier.weight(weights[1]).fillMaxHeight()) {
+            CompactExposureButton(ExposureParameter.Shutter, state, dispatch, Modifier.fillMaxSize())
+            PriorityToggleBadge(ExposureParameter.Shutter, state, dispatch, Modifier.align(Alignment.TopStart))
+        }
         CompactExposureButton(ExposureParameter.Ev, state, dispatch, Modifier.weight(weights[2]).fillMaxHeight())
         CompactWbButton(state, dispatch, Modifier.weight(weights[3]).fillMaxHeight())
         CompactFocusButton(state, dispatch, Modifier.weight(weights[4]).fillMaxHeight())

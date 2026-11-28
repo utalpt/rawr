@@ -21,6 +21,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.rawr.camera.model.CaptureControlLayout
@@ -516,6 +517,9 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
             watchRemote = p[Keys.watchRemote] ?: d.watchRemote,
             teleZoomStyle = p[Keys.teleZoomStyle] ?: d.teleZoomStyle,
             teleZoomAlwaysOn = p[Keys.teleZoomAlwaysOn] ?: d.teleZoomAlwaysOn,
+            priorityToggleStyle = p[Keys.priorityToggleStyle] ?: d.priorityToggleStyle,
+            priorityToggleIso = p[Keys.priorityToggleIso] ?: d.priorityToggleIso,
+            priorityToggleShutterNs = p[Keys.priorityToggleShutterNs] ?: d.priorityToggleShutterNs,
             gridMode = enumOrDefault(p[Keys.gridMode], d.gridMode),
             lensBarGrouping = enumOrDefault(p[Keys.lensBarGrouping], d.lensBarGrouping),
             lensBarSize = enumOrDefault(p[Keys.lensBarSize], d.lensBarSize),
@@ -748,6 +752,9 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         p[Keys.watchRemote] = v.watchRemote
         p[Keys.teleZoomStyle] = v.teleZoomStyle
         p[Keys.teleZoomAlwaysOn] = v.teleZoomAlwaysOn
+        p[Keys.priorityToggleStyle] = v.priorityToggleStyle
+        p[Keys.priorityToggleIso] = v.priorityToggleIso
+        p[Keys.priorityToggleShutterNs] = v.priorityToggleShutterNs
         p[Keys.gridMode] = v.gridMode.name
         p[Keys.lensBarGrouping] = v.lensBarGrouping.name
         p[Keys.lensBarSize] = v.lensBarSize.name
@@ -1145,6 +1152,9 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         val watchRemote = booleanPreferencesKey("capture_watch_remote")
         val teleZoomStyle = stringPreferencesKey("capture_tele_zoom_style")  // Rawr 17U fork
         val teleZoomAlwaysOn = booleanPreferencesKey("capture_tele_zoom_always_on")  // Rawr 17U fork
+        val priorityToggleStyle = stringPreferencesKey("capture_priority_toggle_style")  // Rawr 17U fork
+        val priorityToggleIso = intPreferencesKey("capture_priority_toggle_iso")  // Rawr 17U fork
+        val priorityToggleShutterNs = longPreferencesKey("capture_priority_toggle_shutter_ns")  // Rawr 17U fork
         val gridMode = stringPreferencesKey("capture_grid_mode")
         val lensBarGrouping = stringPreferencesKey("lens_bar_grouping")
         val lensBarSize = stringPreferencesKey("lens_bar_size")

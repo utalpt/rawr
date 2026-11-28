@@ -6,7 +6,15 @@ first and moves to `xiaomi-17u` once verified.
 
 ## Unreleased
 
-### HDR+ Bracketed (from Steve's v26 patch) - not tested on the 17U yet
+### S/I Toggle (asked for by iG0Lka)
+
+- **Settings > Photo > Capture > S/I Toggle** (Off by default): one tap switches between ISO priority (static scenes)
+  and shutter priority (motion), each entered with its own value: **ISO Priority Value** (ISO 50 by default) and
+  **Shutter Priority Value** (1/1000 s by default), the nearest the lens offers. Shown as a button in the top bar (long
+  press: back to Auto) or as an S / I tab on the fixed exposure cell (the cell's own tap, double tap and long press stay
+  as they were). Photo mode only. The mode itself is kept across app restarts, as before.
+
+### HDR+ Bracketed (from Steve's v26 patch)
 
 - **Settings > Photo > Multiframe > Merge Algorithm > HDR+ Bracketed** (off by default: the default merge stays
   Rexture). HDR+ Quality on a ZSL burst metered darker so bright areas (sky, lamps) do not clip, brightened back, plus

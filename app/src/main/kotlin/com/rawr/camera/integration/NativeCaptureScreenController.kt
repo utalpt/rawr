@@ -146,6 +146,9 @@ class NativeCaptureScreenController(
                 setExposureCandidate(action)
             }
 
+            // Rawr 17U fork: the S/I priority switch.
+            is com.rawr.camera.architecture.TogglePriority -> togglePriority(action)
+
             is SyncToneControls -> {
                 update {
                     it.copy(
@@ -336,6 +339,37 @@ class NativeCaptureScreenController(
         val requestId = whiteBalanceRequestIds.incrementAndGet()
         update { CaptureTransitions.lockWhiteBalance(it, temperatureK, tint) }
         coordinator.setWhiteBalanceLocked(temperatureK, tint, requestId)
+    }
+
+    /**
+     * Rawr 17U fork: the S/I priority switch (model/PriorityToggle.kt). S goes to I, anything else to S, each with the saved
+     * value of that side (Settings > Photo > Capture > S/I Toggle), the nearest this lens offers; toAuto = back to Auto.
+     * The mode request seeds the other axes from the live exposure (native), then the saved value replaces the fixed one.
+     */
+    private fun togglePriority(action: com.rawr.camera.architecture.TogglePriority) {
+        val current = state.value
+        val supported = current.capabilities.supportedExposureModes
+        if (action.toAuto) {
+            if (current.exposureControl.mode != ExposureMode.Auto) setExposureMode(ExposureMode.Auto)
+            return
+        }
+        val target =
+            if (current.exposureControl.mode == ExposureMode.ShutterPriority) ExposureMode.IsoPriority else ExposureMode.ShutterPriority
+        if (target !in supported) return
+        setExposureMode(target)
+        val p = snapshotPresentation.exposureProjectionFor(state.value) ?: return
+        val presets = com.rawr.camera.model.PriorityTogglePresets
+        if (target == ExposureMode.IsoPriority) {
+            presets.nearest(p.isoValues, com.rawr.camera.ui.PriorityToggleState.isoValue.toDouble())?.let { (id, iso) ->
+                coordinator.setManualSensitivity(iso)
+                update { CaptureTransitions.requestExposureCandidate(it, ExposureParameter.Iso, id) }
+            }
+        } else {
+            presets.nearest(p.shutterValuesNs, com.rawr.camera.ui.PriorityToggleState.shutterNs.toDouble())?.let { (id, ns) ->
+                coordinator.setManualExposureTimeNs(ns)
+                update { CaptureTransitions.requestExposureCandidate(it, ExposureParameter.Shutter, id) }
+            }
+        }
     }
 
     private fun setExposureCandidate(action: SetExposureCandidate) {

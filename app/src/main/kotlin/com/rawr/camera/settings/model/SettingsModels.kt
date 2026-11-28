@@ -920,6 +920,11 @@ data class SettingsValues(
     val teleZoomStyle: String = "bar",
     /** Rawr 17U fork: the TELE control stays on screen while the tele (75-100 mm) is selected. Off by default. */
     val teleZoomAlwaysOn: Boolean = false,
+    /** Rawr 17U fork: where the S/I priority switch is drawn (PriorityToggleStyle id: "off", "top_bar", "exposure_cell"). */
+    val priorityToggleStyle: String = "off",
+    /** Rawr 17U fork: the S/I switch's ISO for ISO priority, and shutter (ns) for shutter priority. */
+    val priorityToggleIso: Int = com.rawr.camera.model.PriorityTogglePresets.DEFAULT_ISO,
+    val priorityToggleShutterNs: Long = com.rawr.camera.model.PriorityTogglePresets.DEFAULT_SHUTTER_NS,
     // Ignore Camera2 shutter/ISO priority modes: locking SS or ISO always enters
     // full Manual. Off by default.
     val aePriorityDisabled: Boolean = false,

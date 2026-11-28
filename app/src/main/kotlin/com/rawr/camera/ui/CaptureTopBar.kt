@@ -166,6 +166,10 @@ internal fun CaptureTopBar(
                     orientation = state.orientation
                 )
             }
+            // Rawr 17U fork: the S/I priority switch, when Settings > Photo > Capture > S/I Toggle puts it here.
+            if (PriorityToggleState.style == com.rawr.camera.model.PriorityToggleStyle.TOP_BAR && state.priorityToggleAvailable()) {
+                TopBarSlot { PriorityToggleTopBarButton(state, dispatch) }
+            }
         }
         TopBarSlot {
             IconToggleButton(

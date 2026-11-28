@@ -93,7 +93,7 @@ class PersistentSettingsController(
             is ReportImageToneApplication -> reduceRuntimeSettings(state, action, defaults)
 
             is SetSaveLocationTree, is SetPipelineDiagnosticsEnabled, is SetExperimentalZeroCopyEnabled,
-            is SetSaveBaseDng, is SetExperimentalMultiframeEnabled, is SetUltraHdrEnabled, is SetShutterSound, is SetShutterSoundFollowSystem, is SetVoiceShutter, is SetWatchRemote, is SetTeleZoomStyle, is SetTeleZoomAlwaysOn, is SetAePriorityDisabled,
+            is SetSaveBaseDng, is SetExperimentalMultiframeEnabled, is SetUltraHdrEnabled, is SetShutterSound, is SetShutterSoundFollowSystem, is SetVoiceShutter, is SetWatchRemote, is SetTeleZoomStyle, is SetTeleZoomAlwaysOn, is SetPriorityToggleStyle, is SetPriorityToggleIso, is SetPriorityToggleShutter, is SetAePriorityDisabled,
             is SetRawrAeSettings,
             is SetPersistentEngineEnabled, is SetCustomGpuDriverEnabled, is SetCustomGpuDriverInstalled,
             is SetPersistZslRingEnabled, is SetPersistZslRingOnShutterEnabled -> reduceAppSettings(state, action)

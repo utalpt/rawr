@@ -227,6 +227,15 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                     com.rawr.camera.ui.TeleZoomSheetState.style = com.rawr.camera.model.TeleZoomStyle.fromId(it)
                 }
             }
+            // Rawr 17U fork: the S/I priority switch's settings, for the capture UI and the controller.
+            launch {
+                settingsEditor.values.map { Triple(it.priorityToggleStyle, it.priorityToggleIso, it.priorityToggleShutterNs) }
+                    .distinctUntilChanged().collect { (style, iso, ns) ->
+                        com.rawr.camera.ui.PriorityToggleState.style = com.rawr.camera.model.PriorityToggleStyle.fromId(style)
+                        com.rawr.camera.ui.PriorityToggleState.isoValue = iso
+                        com.rawr.camera.ui.PriorityToggleState.shutterNs = ns
+                    }
+            }
             launch {
                 settingsEditor.values.map { it.teleZoomAlwaysOn }.distinctUntilChanged().collect {
                     com.rawr.camera.ui.TeleZoomSheetState.alwaysOn = it
