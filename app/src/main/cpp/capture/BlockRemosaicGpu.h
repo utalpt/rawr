@@ -37,23 +37,30 @@ class BlockRemosaicGpu final {
     BlockRemosaicGpu& operator=(const BlockRemosaicGpu&) = delete;
     // The shader covers Fast/Standard for any block and High/Detail for quad only.
     static bool supports(uint32_t block, imaging::CfaRemosaicQuality);
-    // `black` is the mean raw black level in sample units. An active `field` (quad only) is divided out of
-    // each sample as the strip is loaded, exactly as imaging::applyQuadGainField does on the CPU.
+    // `black` is the mean raw black level in sample units. `fit` (quad only, may be null): the frame's
+    // QuadGainField; when active it is divided out of each sample as the strip is loaded, exactly as
+    // imaging::applyQuadGainField does on the CPU. `disparity` (quad only) then corrects the phase-detect
+    // disparity as imaging::correctQuadDisparity does, with the fit's noise model (none without a fit).
+    // `convert` (quad Detail, dimensions a multiple of 4) adds the thin-feature stage after Detail
+    // (imaging::quadConvert), which needs wider strip margins.
     void run(std::vector<uint8_t>& pixels, uint32_t block, uint32_t order, imaging::CfaRemosaicQuality quality,
-             float black, const imaging::QuadGainField* field = nullptr);
+             float black, const imaging::QuadGainField* fit = nullptr, bool disparity = false, bool convert = false);
 
    private:
     // Records and submits one window on `slot`; waitSlot blocks until it is done.
     void submitWindow(uint32_t slot, uint32_t block, uint32_t order, imaging::CfaRemosaicQuality, float black,
-                      const imaging::QuadGainField* field, uint32_t firstRow);
+                      const imaging::QuadGainField* field, bool disparity, bool convert, float noiseSlope,
+                      float noiseFloor, uint32_t firstRow);
     void waitSlot(uint32_t slot);
     void waitAll() noexcept;
     void destroy() noexcept;
     static constexpr uint32_t kSlots = 2;
     const vulkan::VulkanContext& vk_;
     uint32_t width_, height_;
-    StripLayout layout_;
-    uint32_t windowHeight_ = 0;
+    StripLayout layout_;         // the layout of the current run
+    StripLayout layoutPlain_, layoutConvert_;
+    uint32_t windowHeight_ = 0;  // buffers and images are sized for the larger window
+    uint32_t windowRows_ = 0;    // rows of the current run's window
     size_t bytes_;           // one strip window
     size_t frameBytes_;
     VkBuffer buffer_[kSlots]{};
@@ -65,5 +72,6 @@ class BlockRemosaicGpu final {
     VkCommandBuffer command_[kSlots]{};
     VkFence fence_[kSlots]{};
     std::unique_ptr<rawr::raw_ingress::RawRemosaicker> remosaic_;
+    std::vector<float> fieldUpload_;  // QuadGainField coef then grid (RawRemosaicker::kGainFieldFloats)
 };
 }  // namespace rawrcam::capture

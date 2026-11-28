@@ -6,8 +6,15 @@ first and moves to `xiaomi-17u` once verified.
 
 ## 0.5.1-17u.18
 
-HDR+ Bracketed (Steve's merge, kept apart from Ed's) and the S/I Toggle. Checked on the Xiaomi 17 Ultra. No sync with
-Ed's main (still up to #165).
+HDR+ Bracketed (Steve's merge, kept apart from Ed's), the S/I Toggle and Ed's main up to #169. Checked on the Xiaomi
+17 Ultra.
+
+### From Ed's main (#166, #168, #169)
+
+- **#168:** Rexturation no longer draws dotted lines along clipped and very steep edges.
+- **#166, #169:** the quad remosaic of 2x2 on-chip-lens sensors (lenses with a 2x2 photo stream and "Correct
+  per-position response") loses its blocky soft edges, lattice, patches and thin-line artifacts. The 17U's 200 MP
+  tele (4x4 blocks) keeps the fork's fast remosaic, so this does not change its photos.
 
 ### S/I Toggle (asked for by @iG0Lka_ru)
 

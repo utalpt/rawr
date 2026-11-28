@@ -46,7 +46,7 @@
 
 Everything the fork adds, kept here also once Ed has taken it into Rawr: those items say *(Already in
 Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each was checked:
-[CHANGELOG.md](CHANGELOG.md). Synced with Ed's main up to #165 (26 Nov 2026).
+[CHANGELOG.md](CHANGELOG.md). Synced with Ed's main up to #169 (27 Nov 2026).
 
 **Photo: 50 and 200 MP**
 - **50 MP RAW** on the main, tele and ultra-wide cameras: the viewfinder streams the binned 4:3 RAW at 30 fps

@@ -1,7 +1,6 @@
 #include "capture/BlockRemosaicGpu.h"
 
-static_assert(rawr::raw_ingress::RawRemosaicker::kGainFieldFloats ==
-              rawrcam::imaging::QuadGainField::kSurfaces * rawrcam::imaging::QuadGainField::kTerms);
+static_assert(rawr::raw_ingress::RawRemosaicker::kGainFieldFloats == rawrcam::imaging::QuadGainField::kFloats);
 
 #include <algorithm>
 #include <cstring>
@@ -19,8 +18,11 @@ BlockRemosaicGpu::BlockRemosaicGpu(const vulkan::VulkanContext& vk, uint32_t w, 
     : vk_(vk), width_(w), height_(h), frameBytes_(size_t(w) * h * 2) {
     try {
         if (!w || !h || w % 2 || h % 2) throw std::runtime_error("block_remosaic_geometry");
-        layout_ = StripLayout::make(h, strips);
-        windowHeight_ = layout_.window;
+        layoutPlain_ = StripLayout::make(h, strips);
+        layoutConvert_ = StripLayout::make(h, strips, StripLayout::kConvertMargin);
+        layout_ = layoutPlain_;
+        windowHeight_ = std::max(layoutPlain_.window, layoutConvert_.window);
+        windowRows_ = layoutPlain_.window;
         bytes_ = size_t(w) * windowHeight_ * 2;
         VkPhysicalDeviceProperties props{};
         vkGetPhysicalDeviceProperties(vk_.physicalDevice(), &props);
@@ -86,9 +88,21 @@ bool BlockRemosaicGpu::supports(uint32_t block, imaging::CfaRemosaicQuality qual
     return block == 4u && (quality == Q::Fast || quality == Q::Standard);
 }
 void BlockRemosaicGpu::run(std::vector<uint8_t>& pixels, uint32_t block, uint32_t order,
-                           imaging::CfaRemosaicQuality quality, float black, const imaging::QuadGainField* field) {
+                           imaging::CfaRemosaicQuality quality, float black, const imaging::QuadGainField* fit,
+                           bool disparity, bool convert) {
     if (pixels.size() != frameBytes_ || !supports(block, quality)) throw std::runtime_error("block_remosaic_invalid");
-    if (field && (!field->active || block != 2)) field = nullptr;
+    const imaging::QuadGainField* field = fit && fit->active && block == 2 ? fit : nullptr;
+    if (block != 2) disparity = false;
+    // The thin-feature stage: quad Detail, 4-aligned frame (a window starts on a multiple of 8 rows, or is the frame).
+    convert = convert && block == 2 && quality == imaging::CfaRemosaicQuality::Detail && width_ % 4 == 0 &&
+              height_ % 4 == 0 && width_ >= 32 && height_ >= 32;
+    layout_ = convert ? layoutConvert_ : layoutPlain_;
+    windowRows_ = layout_.window;
+    const float noiseSlope = fit ? fit->noiseSlope : 0.0f, noiseFloor = fit ? fit->noiseFloor : 0.0f;
+    if (field) {
+        fieldUpload_.assign(field->coef.begin(), field->coef.end());
+        fieldUpload_.insert(fieldUpload_.end(), field->grid.begin(), field->grid.end());
+    }
     // Strips are written back only after their wait: until the first wait succeeds, `pixels` is untouched.
     bool written = false;
     uint8_t* const windows[kSlots] = {static_cast<uint8_t*>(mapped_[0]), static_cast<uint8_t*>(mapped_[1])};
@@ -96,7 +110,7 @@ void BlockRemosaicGpu::run(std::vector<uint8_t>& pixels, uint32_t block, uint32_
         remosaicInStripsOverlapped(
             pixels, width_, height_, layout_, windows,
             [&](uint8_t*, uint32_t slot, uint32_t, uint32_t firstRow) {
-                submitWindow(slot, block, order, quality, black, field, firstRow);
+                submitWindow(slot, block, order, quality, black, field, disparity, convert, noiseSlope, noiseFloor, firstRow);
             },
             [&](uint32_t slot) {
                 waitSlot(slot);
@@ -109,7 +123,8 @@ void BlockRemosaicGpu::run(std::vector<uint8_t>& pixels, uint32_t block, uint32_
     }
 }
 void BlockRemosaicGpu::submitWindow(uint32_t slot, uint32_t block, uint32_t order, imaging::CfaRemosaicQuality quality,
-                                    float black, const imaging::QuadGainField* field, uint32_t firstRow) {
+                                    float black, const imaging::QuadGainField* field, bool disparity,
+                                    bool convert, float noiseSlope, float noiseFloor, uint32_t firstRow) {
     using Q = imaging::CfaRemosaicQuality;
     VkCommandBuffer command = command_[slot];
     check(vkResetCommandBuffer(command, 0));
@@ -131,7 +146,7 @@ void BlockRemosaicGpu::submitWindow(uint32_t slot, uint32_t block, uint32_t orde
     f.source = buffer_[slot];
     f.destination = output_[slot].view;
     f.width = width_;
-    f.height = windowHeight_;
+    f.height = windowRows_;
     f.rowStrideBytes = width_ * 2;
     f.block = block;
     f.order = order;
@@ -141,10 +156,15 @@ void BlockRemosaicGpu::submitWindow(uint32_t slot, uint32_t block, uint32_t orde
                                          : rawr::raw_ingress::RawRemosaicker::Quality::Standard;
     f.blackLevel = black;
     if (field) {
-        f.gainField = field->coef.data();
+        f.gainField = fieldUpload_.data();
         f.fieldRow0 = firstRow;
         f.fieldHeight = height_;
     }
+    f.disparity = disparity;
+    f.convert = convert;
+    f.convertClip = std::max(black + 1.0f, 1020.0f);
+    f.noiseSlope = noiseSlope;
+    f.noiseFloor = noiseFloor;
     // The remosaicker's scratch is shared by both slots; its recorded barriers order them on the queue.
     remosaic_->record(command, slot, f);
     // The shader reads the source buffer only in its first (copy) pass, so the
@@ -156,7 +176,7 @@ void BlockRemosaicGpu::submitWindow(uint32_t slot, uint32_t block, uint32_t orde
                          0, nullptr, 1, &b);
     VkBufferImageCopy region{};
     region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    region.imageExtent = {width_, windowHeight_, 1};
+    region.imageExtent = {width_, windowRows_, 1};
     vkCmdCopyImageToBuffer(command, output_[slot].image, VK_IMAGE_LAYOUT_GENERAL, buffer_[slot], 1, &region);
     VkMemoryBarrier host{};
     host.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
