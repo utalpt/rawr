@@ -95,7 +95,7 @@ internal fun PriorityToggleTopBarButton(state: CaptureUiState, dispatch: Capture
 }
 
 /**
- * Exposure cell: an "S" (shutter cell, in S) or "I" (ISO cell, in I) tab on the cell's top-left corner, or "S⇄I" on the
+ * Exposure cell: an "S" (shutter cell, in S) or "I" (ISO cell, in I) tab standing on the cell's top-left edge, or "S⇄I" on the
  * shutter cell in Auto or Manual. Tap switches to the other side (from Auto or Manual: to S); the rest of the cell keeps its
  * own gestures (tap: slider, double tap: auto, long press: lock).
  */
@@ -116,11 +116,11 @@ internal fun PriorityToggleBadge(
         else -> return
     }
     val haptics = LocalCaptureHaptics.current
-    // A touch area of at least 26 dp in the cell's top-left corner ("S⇄I" on one line, so it may be wider) (inside the cell, so nothing clips it); the rest of the cell keeps
-    // its own gestures.
+    // A tab standing on the cell's top edge, only 2 dp inside it, so it never covers the value. Its touch area (at least
+    // 26 dp; "S⇄I" stays on one line, so it may be wider) is above the cell, which keeps all its own gestures.
     Box(
         modifier
-            .offset(x = 1.dp, y = 1.dp)
+            .offset(x = 4.dp, y = (-24).dp)
             .defaultMinSize(minWidth = 26.dp, minHeight = 26.dp)
             .combinedClickableTap {
                 haptics.selection()
@@ -134,7 +134,7 @@ internal fun PriorityToggleBadge(
                     else -> "Tap for shutter priority."
                 }
             },
-        contentAlignment = Alignment.TopStart
+        contentAlignment = Alignment.BottomStart
     ) {
         Box(
             Modifier
