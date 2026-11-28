@@ -42,7 +42,9 @@ internal fun RawPreviewSurface(coordinator: RawPreviewCoordinator, modifier: Mod
                 override fun surfaceDestroyed(holder: SurfaceHolder) = coordinator.onSurfaceDestroyed()
             }
         view.holder.addCallback(callback)
+        PreviewSurfaceRegistry.set(view) // Rawr 17U fork: the watch remote copies frames from it
         onDispose {
+            PreviewSurfaceRegistry.clear(view)
             view.holder.removeCallback(callback)
             coordinator.onSurfaceDestroyed()
         }

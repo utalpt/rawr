@@ -106,3 +106,4 @@ RAWR_internal_trace_*.txt
 
 # Film assets are generated from native/spektrafilm/assets by Gradle
 /app/src/main/assets/spektrafilm/
+wear/build/

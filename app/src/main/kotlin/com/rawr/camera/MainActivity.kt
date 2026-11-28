@@ -67,9 +67,93 @@ class MainActivity : ComponentActivity() {
             if (granted && started) startPreviewAndMaybeDiagnosticCapture()
         }
 
+    // Rawr 17U fork: Voice Shutter. The listener runs only while this viewfinder is in front, in Photo mode, with the
+    // microphone permission and no recording in progress (video needs the microphone for itself; Settings is another Activity,
+    // so opening it stops this one).
+    private var voiceShutter: com.rawr.camera.integration.VoiceShutter? = null
+    private var voiceShutterOn = false
+    private var voicePermissionRefused = false
+    private val voicePermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!granted) {
+                voicePermissionRefused = true
+                captureViewModel.turnVoiceShutterOff()
+                android.widget.Toast.makeText(
+                    this, "Voice Shutter needs the microphone permission, so it was turned off.", android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+            refreshVoiceShutter()
+        }
+
+    // Rawr 17U fork: Watch Remote. Listens for the watch while this viewfinder is in front with the setting on; while it is
+    // not ready to shoot, it tells the watch why (readiness), so a press on the watch never silently does nothing.
+    private var watchRemote: com.rawr.camera.integration.WatchRemote? = null
+    private var watchRemoteOn = false
+
+    private fun watchRemoteReadiness(): String? = when {
+        !started -> "Open Rawr's viewfinder on the phone"
+        com.rawr.camera.ui.PreviewSurfaceRegistry.current()?.holder?.surface?.isValid != true -> "Waiting for the viewfinder"
+        else -> null
+    }
+
+    private fun refreshWatchRemote() {
+        if (!(started && watchRemoteOn)) {
+            watchRemote?.stop()
+            return
+        }
+        val remote = watchRemote ?: com.rawr.camera.integration.WatchRemote(
+            applicationContext,
+            lifecycleScope,
+            captureViewModel.controller.state,
+            captureViewModel.recording.state,
+            readiness = ::watchRemoteReadiness,
+            rotationDegrees = { captureViewModel.previewCoordinator.captureDeviceRotationDegrees },
+            primaryAction = ::triggerShutter,
+            setMode = { captureViewModel.controller.dispatch(com.rawr.camera.architecture.SetCaptureMode(it)) },
+            selectLens = { captureViewModel.controller.dispatch(com.rawr.camera.architecture.SelectLens(it)) }
+        ).also { watchRemote = it }
+        remote.start()
+    }
+
+    private fun refreshVoiceShutter() {
+        val photo = captureViewModel.controller.state.value.captureMode == CaptureMode.Photo
+        val idle = captureViewModel.recording.state.value.phase == com.rawr.camera.video.RecordingPhase.Idle
+        if (!(started && voiceShutterOn && photo && idle)) {
+            voiceShutter?.stop()
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            if (!voicePermissionRefused) voicePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+        val listener = voiceShutter ?: com.rawr.camera.integration.VoiceShutter(applicationContext) {
+            runOnUiThread { if (started) captureViewModel.controller.dispatch(TriggerCapture) }
+        }.also { voiceShutter = it }
+        listener.start()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         com.rawr.camera.i18n.I18n.init(this) // Rawr 17U fork: UI language
+        lifecycleScope.launch {
+            captureViewModel.voiceShutterEnabled.collect {
+                voiceShutterOn = it
+                if (it) voicePermissionRefused = false
+                refreshVoiceShutter()
+            }
+        }
+        lifecycleScope.launch {
+            captureViewModel.controller.state.map { it.captureMode }.distinctUntilChanged().collect { refreshVoiceShutter() }
+        }
+        lifecycleScope.launch {
+            captureViewModel.watchRemoteEnabled.collect {
+                watchRemoteOn = it
+                refreshWatchRemote()
+            }
+        }
+        lifecycleScope.launch {
+            captureViewModel.recording.state.map { it.phase }.distinctUntilChanged().collect { refreshVoiceShutter() }
+        }
         // Dev/test hooks: win over persisted settings via the startup override
         // (applied when the settings stream emits, so there is no race).
         captureViewModel.applyStartupVideoOverrides(
@@ -270,6 +354,9 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         started = true
+        voicePermissionRefused = false
+        refreshVoiceShutter()
+        refreshWatchRemote()
         // A viewfinder you are only looking at must not time out; onStop clears this.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val generation = ++startGeneration
@@ -390,6 +477,8 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         captureViewModel.foreground.pause(this)
         started = false
+        voiceShutter?.stop()
+        watchRemote?.stop()
         startGeneration++
         captureViewModel.stopPreviewAfterRecording()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)

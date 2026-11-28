@@ -93,6 +93,19 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         .distinctUntilChanged()
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly,
             com.rawr.camera.video.VideoAudioInput.of(latestSettings.videoEncoder.sanitized()))
+    /** Settings > Photo > Capture > Voice Shutter: MainActivity starts and stops its listener from this. */
+    val voiceShutterEnabled: kotlinx.coroutines.flow.Flow<Boolean> =
+        settingsEditor.values.map { it.voiceShutter }.distinctUntilChanged()
+
+    /** Settings > Photo > Capture > Watch Remote: MainActivity starts and stops the watch remote from this. */
+    val watchRemoteEnabled: kotlinx.coroutines.flow.Flow<Boolean> =
+        settingsEditor.values.map { it.watchRemote }.distinctUntilChanged()
+
+    /** The microphone permission was refused: the switch goes back off. */
+    fun turnVoiceShutterOff() {
+        settingsEditor.update { it.copy(voiceShutter = false) }
+    }
+
     /** Startup diagnostics use the same optimistic owner, including when preferences are still loading. */
     fun applyStartupVideoOverrides(resolution: VideoResolutionMode?, fps: Int?) {
         if (resolution == null && fps == null) return
@@ -217,6 +230,11 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             launch {
                 settingsEditor.values.map { it.teleZoomAlwaysOn }.distinctUntilChanged().collect {
                     com.rawr.camera.ui.TeleZoomSheetState.alwaysOn = it
+                }
+            }
+            launch {
+                settingsEditor.values.map { it.shutterSoundFollowSystem }.distinctUntilChanged().collect {
+                    com.rawr.camera.integration.CameraSounds.followSystem = it
                 }
             }
             settingsEditor.values.map { it.shutterSound }.distinctUntilChanged().collect {

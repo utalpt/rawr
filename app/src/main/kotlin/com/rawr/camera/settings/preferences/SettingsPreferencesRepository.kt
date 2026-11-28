@@ -511,6 +511,9 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
                     ?: d.dngCompressionId,
             saveBaseDng = p[Keys.saveBaseDng] ?: true,
             shutterSound = p[Keys.shutterSound] ?: d.shutterSound,
+            shutterSoundFollowSystem = p[Keys.shutterSoundFollowSystem] ?: d.shutterSoundFollowSystem,
+            voiceShutter = p[Keys.voiceShutter] ?: d.voiceShutter,
+            watchRemote = p[Keys.watchRemote] ?: d.watchRemote,
             teleZoomStyle = p[Keys.teleZoomStyle] ?: d.teleZoomStyle,
             teleZoomAlwaysOn = p[Keys.teleZoomAlwaysOn] ?: d.teleZoomAlwaysOn,
             gridMode = enumOrDefault(p[Keys.gridMode], d.gridMode),
@@ -734,6 +737,9 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         p[Keys.dngCompressionId] = v.dngCompressionId
         p[Keys.saveBaseDng] = v.saveBaseDng
         p[Keys.shutterSound] = v.shutterSound
+        p[Keys.shutterSoundFollowSystem] = v.shutterSoundFollowSystem
+        p[Keys.voiceShutter] = v.voiceShutter
+        p[Keys.watchRemote] = v.watchRemote
         p[Keys.teleZoomStyle] = v.teleZoomStyle
         p[Keys.teleZoomAlwaysOn] = v.teleZoomAlwaysOn
         p[Keys.gridMode] = v.gridMode.name
@@ -1112,6 +1118,9 @@ class SettingsPreferencesRepository(context: Context, private val defaults: Sett
         val dngCompressionId = stringPreferencesKey("capture_dng_compression_id")
         val saveBaseDng = booleanPreferencesKey("capture_save_base_dng")
         val shutterSound = booleanPreferencesKey("capture_shutter_sound")
+        val shutterSoundFollowSystem = booleanPreferencesKey("capture_shutter_sound_follow_system")
+        val voiceShutter = booleanPreferencesKey("capture_voice_shutter")
+        val watchRemote = booleanPreferencesKey("capture_watch_remote")
         val teleZoomStyle = stringPreferencesKey("capture_tele_zoom_style")  // Rawr 17U fork
         val teleZoomAlwaysOn = booleanPreferencesKey("capture_tele_zoom_always_on")  // Rawr 17U fork
         val gridMode = stringPreferencesKey("capture_grid_mode")

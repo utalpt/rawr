@@ -73,11 +73,48 @@ internal fun CaptureSettings(state: SettingsUiState, dispatch: SettingsDispatch)
             ) { dispatch.invoke(SetOisPreference(it)) }
             SettingDivider()
             // Rawr 17U fork: the system's camera sounds (asked for by @iG0Lka_ru in the Telegram group).
+            // The system's word on the sound, shown so it is clear why the click can play with the switch off.
+            val systemAsksForSound = androidx.compose.runtime.remember { com.rawr.camera.integration.CameraSounds.requiredBySystem() }
             SettingsSwitchRow(
                 title = "Shutter Sound",
                 checked = state.values.shutterSound,
+                supportingText = when {
+                    !systemAsksForSound -> "This phone's system does not ask for the shutter sound: this switch decides."
+                    state.values.shutterSoundFollowSystem ->
+                        "This phone's system asks for the shutter sound, so it plays even with this off. Turn off Follow System Shutter Rule to let this switch decide."
+                    else -> "This phone's system asks for the shutter sound, but Follow System Shutter Rule is off: this switch decides."
+                },
                 testTag = SettingsTestTags.row("Capture", "shutter_sound")
             ) { dispatch.invoke(SetShutterSound(it)) }
+            if (systemAsksForSound) {
+                SettingDivider()
+                SettingsSwitchRow(
+                    title = "Follow System Shutter Rule",
+                    checked = state.values.shutterSoundFollowSystem,
+                    supportingText = "On: where the system asks for it (some regions require the sound), the click plays even when Shutter Sound is off. Off: Shutter Sound alone decides.",
+                    testTag = SettingsTestTags.row("Capture", "shutter_sound_follow_system")
+                ) { dispatch.invoke(SetShutterSoundFollowSystem(it)) }
+            }
+            SettingDivider()
+            // Rawr 17U fork: take a photo by voice (offline recognizer; the viewfinder does the listening).
+            SettingsSwitchRow(
+                title = "Voice Shutter",
+                checked = state.values.voiceShutter,
+                supportingText = "Say \"Cheese\" or \"Capture\" to take a photo. It listens through the microphone only while the " +
+                    "viewfinder is open in Photo mode (Android shows its microphone indicator), and the speech model runs on this " +
+                    "phone: nothing is recorded or sent. English only. The first start unpacks a 68 MB speech model.",
+                testTag = SettingsTestTags.row("Capture", "voice_shutter")
+            ) { dispatch.invoke(SetVoiceShutter(it)) }
+            SettingDivider()
+            // Rawr 17U fork: the Wear OS companion (the watch app is installed separately).
+            SettingsSwitchRow(
+                title = "Watch Remote",
+                checked = state.values.watchRemote,
+                supportingText = "Lets the Rawr Remote app on your paired Wear OS watch show this viewfinder and take photos. " +
+                    "Open Rawr here first, in Photo mode, then open Rawr Remote on the watch. It streams over Bluetooth only " +
+                    "while both are open.",
+                testTag = SettingsTestTags.row("Capture", "watch_remote")
+            ) { dispatch.invoke(SetWatchRemote(it)) }
             SettingDivider()
             // Rawr 17U fork: the tele optical zoom control's look (bar above the exposure row, or a vertical
             // wheel / dial / rocker on the viewfinder's edge, ported from the Telezoom module).

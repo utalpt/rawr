@@ -29,6 +29,9 @@ internal fun reduceAppSettings(
     }
 
     is SetShutterSound -> state.withValues(state.values.copy(shutterSound = action.enabled))
+    is SetShutterSoundFollowSystem -> state.withValues(state.values.copy(shutterSoundFollowSystem = action.enabled))
+    is SetVoiceShutter -> state.withValues(state.values.copy(voiceShutter = action.enabled))
+    is SetWatchRemote -> state.withValues(state.values.copy(watchRemote = action.enabled))
     is SetTeleZoomStyle -> state.withValues(state.values.copy(teleZoomStyle = action.id))
     is SetTeleZoomAlwaysOn -> state.withValues(state.values.copy(teleZoomAlwaysOn = action.enabled))
 

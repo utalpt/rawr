@@ -81,7 +81,7 @@ jobs:
           RAWR_SIGNING_STORE_PASSWORD: ${{ secrets.RAWR_SIGNING_STORE_PASSWORD }}
           RAWR_SIGNING_KEY_ALIAS: ${{ secrets.RAWR_SIGNING_KEY_ALIAS }}
           RAWR_SIGNING_KEY_PASSWORD: ${{ secrets.RAWR_SIGNING_KEY_PASSWORD }}
-        run: ./gradlew :app:assembleRelease -Prawr17uRelease=${{ steps.version.outputs.n }}
+        run: ./gradlew :app:assembleRelease :wear:assembleRelease -Prawr17uRelease=${{ steps.version.outputs.n }}
 
       # The annotated tag's message is the "What's new"; a fixed footer follows.
       - name: Publish release
@@ -92,6 +92,9 @@ jobs:
           git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
           APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
           cp "$APK" "rawr17u-$NAME.apk"
+          # Rawr Remote, the Wear OS companion (Watch Remote): installed on the watch, signed with the same key.
+          WEAR=$(ls wear/build/outputs/apk/release/*.apk | head -1)
+          cp "$WEAR" "rawr17u-remote-wear-$NAME.apk"
           {
             if [ "$(git cat-file -t "$GITHUB_REF_NAME")" = "tag" ]; then
               git for-each-ref --format='%(contents)' "refs/tags/$GITHUB_REF_NAME" | sed '/-----BEGIN PGP SIGNATURE-----/,$d'
@@ -99,5 +102,5 @@ jobs:
             fi
             cat .github/release-footer.md
           } > notes.md
-          gh release create "$GITHUB_REF_NAME" "rawr17u-$NAME.apk" --latest \
+          gh release create "$GITHUB_REF_NAME" "rawr17u-$NAME.apk" "rawr17u-remote-wear-$NAME.apk" --latest \
             --title "Rawr 17U $NAME" --notes-file notes.md

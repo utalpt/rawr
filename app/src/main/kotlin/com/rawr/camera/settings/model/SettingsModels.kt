@@ -789,6 +789,12 @@ data class SettingsValues(
     // Rawr 17U fork: the system's camera sounds (shutter, video start / stop). Off by default; where the law asks
     // for the shutter sound (MediaActionSound.mustPlayShutterSound) it plays regardless.
     val shutterSound: Boolean = false,
+    // Where the system asks for the shutter sound, play it even when Shutter Sound is off (the default). Off: the switch decides.
+    val shutterSoundFollowSystem: Boolean = true,
+    // Take a photo by saying "Cheese" or "Capture" (offline speech recognizer, integration/VoiceShutter.kt). Off by default.
+    val voiceShutter: Boolean = false,
+    // Stream the viewfinder to the Rawr app on a paired Wear OS watch and take photos from it (integration/WatchRemote.kt).
+    val watchRemote: Boolean = false,
     /** Rawr 17U fork: how the TELE cell's optical zoom control looks - "bar", "wheel", "dial" or "rocker". */
     val teleZoomStyle: String = "bar",
     /** Rawr 17U fork: the TELE control stays on screen while the tele (75-100 mm) is selected. Off by default. */

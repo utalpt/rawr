@@ -1,3 +1,6 @@
+import java.io.File
+import java.net.URI
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins {
@@ -33,6 +36,47 @@ abstract class FilmAssetsTask : DefaultTask() {
         sourceFile.get().asFile.copyTo(target, overwrite = true)
     }
 }
+// Rawr 17U fork: Voice Shutter's offline speech model (Vosk small English, Apache-2.0). It is fetched at build time and its
+// checksum verified, so the 41 MB zip is not tracked in the source; -Prawr.voiceModelZip=<path> uses a local copy (an offline
+// build). The app unpacks it on first use (integration/VoiceModelStore.kt).
+abstract class VoiceModelAssetsTask : DefaultTask() {
+    @get:Input abstract val url: Property<String>
+    @get:Input abstract val sha256: Property<String>
+    @get:Input @get:org.gradle.api.tasks.Optional abstract val localZip: Property<String>
+    @get:OutputDirectory abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction fun fetch() {
+        val dir = outputDirectory.get().asFile.resolve("voice")
+        dir.deleteRecursively()
+        dir.mkdirs()
+        val out = dir.resolve("vosk-model.zip")
+        val local = localZip.orNull
+        if (local != null) {
+            File(local).copyTo(out, overwrite = true)
+        } else {
+            URI(url.get()).toURL().openStream().use { input -> out.outputStream().use { input.copyTo(it) } }
+        }
+        val digest = MessageDigest.getInstance("SHA-256")
+        out.inputStream().use { s ->
+            val buffer = ByteArray(1 shl 16)
+            while (true) {
+                val n = s.read(buffer)
+                if (n < 0) break
+                digest.update(buffer, 0, n)
+            }
+        }
+        val hex = digest.digest().joinToString("") { "%02x".format(it) }
+        check(hex == sha256.get()) { "Voice Shutter speech model checksum mismatch: $hex" }
+    }
+}
+
+val voiceModelAssets = tasks.register<VoiceModelAssetsTask>("generateVoiceModelAssets") {
+    url.set("https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip")
+    sha256.set("30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498")
+    providers.gradleProperty("rawr.voiceModelZip").orNull?.let { localZip.set(it) }
+    outputDirectory.set(layout.buildDirectory.dir("generated/voiceModelAssets"))
+}
+
 val filmAssets = tasks.register<FilmAssetsTask>("generateFilmAssets") {
     sourceFile.set(rootProject.layout.projectDirectory.file("native/spektrafilm/assets/SpektraHanatos2025Spectra.f32"))
     outputDirectory.set(layout.buildDirectory.dir("generated/filmAssets"))
@@ -443,6 +487,7 @@ androidComponents {
     }
     onVariants { variant ->
         variant.sources.assets?.addGeneratedSourceDirectory(filmAssets, FilmAssetsTask::outputDirectory)
+        variant.sources.assets?.addGeneratedSourceDirectory(voiceModelAssets, VoiceModelAssetsTask::outputDirectory)
         variant.sources.java?.addGeneratedSourceDirectory(settingsSearchIndex, SettingsSearchIndexTask::outputDirectory)
         variant.sources.assets?.addGeneratedSourceDirectory(i18nTemplate, I18nTemplateTask::outputDirectory)
     }
@@ -593,7 +638,8 @@ android {
         jniLibs.useLegacyPackaging = true
     }
     // Film lookup tables are opened with AAssetManager.openFd and must remain uncompressed.
-    androidResources { noCompress += "f32" }
+    // The Voice Shutter speech model is already a zip: keep it as it is (the app unpacks it itself).
+    androidResources { noCompress += listOf("f32", "zip") }
 
     lint {
         abortOnError = true
@@ -624,6 +670,11 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.2.1")
     implementation("androidx.media3:media3-muxer:1.10.0")
     implementation("sh.calvin.reorderable:reorderable:3.0.0")
+    // Rawr 17U fork: Voice Shutter's offline speech recognizer (Apache-2.0; brings its JNA bridge, arm64 only here).
+    implementation("com.alphacephei:vosk-android:0.3.75")
+    // Rawr 17U fork: Watch Remote (Wear OS Data Layer).
+    implementation("com.google.android.gms:play-services-wearable:19.0.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation(kotlin("test"))
