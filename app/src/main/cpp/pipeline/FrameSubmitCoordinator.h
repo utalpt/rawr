@@ -202,6 +202,8 @@ class FrameSubmitCoordinator final {
                (raw16ImageImportLatched_.load(std::memory_order_relaxed) || config_.cfaBlock > 1u);
     }
     [[nodiscard]] bool cpuIngressActive() const noexcept { return cpuIngressActive_.load(std::memory_order_relaxed); }
+    // Rawr 17U fork: the LOFIC lens (packed RAW14) goes through the CPU upload by design.
+    [[nodiscard]] bool packed14Active() const noexcept { return packed14_.load(std::memory_order_relaxed); }
     // True while the GLES bridge (GlesRawBridge.h) may still take a RAW10 frame. The reader setup asks
     // this too: the bridge imports the packed plane as a storage buffer, so the camera AHB needs GPU
     // buffer usage even after the RAW16 latch already sent this process to the CPU.

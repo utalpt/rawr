@@ -104,7 +104,10 @@ class SessionEngine {
     // Face detections in display-normalized coordinates for the viewfinder
     // overlay, as a JSON array [[x,y,w,h,score],...]. Empty array when none.
     std::string faceDetectionsDisplaySnapshot();
-    [[nodiscard]] bool rawCpuIngressActive() const noexcept { return realtime_.coordinator().cpuIngressActive(); }
+    // Rawr 17U fork: not on the LOFIC lens, whose packed RAW14 Long is always read on the CPU (by design, not a fallback).
+    [[nodiscard]] bool rawCpuIngressActive() const noexcept {
+        return realtime_.coordinator().cpuIngressActive() && !realtime_.coordinator().packed14Active();
+    }
     [[nodiscard]] capture::multiframe::MultiframeCaptureCoordinator::BracketHold bracketHold() const noexcept {
         return capture_.multiframe().bracketHold();
     }
