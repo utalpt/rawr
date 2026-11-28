@@ -59,8 +59,9 @@ std::optional<SceneKey> measureSceneKey(DngSource& source, bool shading, const s
     }
     const auto key = sceneKeyEv(bins.data());
     const auto high = scenePercentileEv(bins.data(), 0.95f);
+    const auto bright = scenePercentileEv(bins.data(), 0.995f);
     if (!key || !high) return std::nullopt;
-    return SceneKey{*key, *high};
+    return SceneKey{*key, *high, bright.value_or(*high)};
 }
 
 }  // namespace rawrcam::renderer

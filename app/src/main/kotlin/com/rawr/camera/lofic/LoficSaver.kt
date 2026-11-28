@@ -17,7 +17,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 import kotlin.math.log2
-import kotlinx.coroutines.flow.first
 
 /**
  * Photos of the "1x LOFIC" lens (L2): takes the next Long/Short pair from the running viewfinder session, merges it
@@ -149,19 +148,9 @@ internal object LoficSaver {
         return "LOFIC: saved $name (%.1f stops above the Long clip)".format(Locale.ROOT, headroom)
     }
 
-    /** Hands the DNG to the Renderer's bulk render (import, current look, JPEG export), as the LOFIC screen does. */
+    /** Queues the DNG's JPEG (Renderer: import, current look, JPEG export), as the LOFIC screen does. */
     private fun queueJpeg(context: Context, uri: android.net.Uri, name: String): String = try {
-        val store = com.rawr.camera.renderer.RendererStore.get(context)
-        if (store.bulk.value.running) {
-            "skipped (Renderer busy)"
-        } else {
-            val settings = com.rawr.camera.settings.preferences.SettingsPreferencesStore.editor(
-                context.applicationContext,
-                com.rawr.camera.settings.model.SettingsCatalog.initialState().values
-            )
-            store.renderAll(listOf(uri to name)) { settings.values.first() }
-            "queued"
-        }
+        LoficJpegQueue.add(context, uri, name)
     } catch (e: Exception) {
         Log.w(TAG, "jpeg", e)
         "failed (${e.message?.replace("%", " pct")})"

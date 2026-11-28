@@ -60,7 +60,6 @@ import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.log2
 import kotlin.math.roundToInt
-import kotlinx.coroutines.flow.first
 
 /**
  * Rawr 17U fork: LOFIC camera of the Xiaomi 17 Ultra main camera, a screen of its own (Camera2 on the Java API, like
@@ -603,18 +602,9 @@ class LoficActivity : Activity() {
         )
     }
 
-    /** Hands the DNG to the Renderer's bulk render (import, current look, JPEG export). */
+    /** Queues the DNG's JPEG (Renderer: import, current look, JPEG export). */
     private fun queueJpeg(uri: android.net.Uri, name: String): String = try {
-        val store = com.rawr.camera.renderer.RendererStore.get(this)
-        if (store.bulk.value.running) {
-            "skipped (Renderer busy)"
-        } else {
-            val settings = com.rawr.camera.settings.preferences.SettingsPreferencesStore.editor(
-                application, com.rawr.camera.settings.model.SettingsCatalog.initialState().values
-            )
-            store.renderAll(listOf(uri to name)) { settings.values.first() }
-            "queued"
-        }
+        LoficJpegQueue.add(this, uri, name)
     } catch (e: Exception) {
         Log.w(TAG, "jpeg", e)
         // No '%': this goes into a format string.

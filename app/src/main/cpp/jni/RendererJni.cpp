@@ -394,9 +394,16 @@ Java_com_rawr_camera_renderer_RendererNative_render(JNIEnv* e, jobject, jlong id
             if (s->measuredKey->key && std::isfinite(s->measuredKey->key->keyEv)) {
                 constexpr float kMaxGain = 64.0f;
                 const float base = std::clamp(float(tone.aePostGain), 1.0e-6f, kMaxGain);
-                const float wanted = std::exp2(std::log2(rawrcam::color::autoKeyPolicy(
-                                                   rawrcam::color::AutoKeyMode::Natural).targetLuma) -
-                                               s->measuredKey->key->keyEv);
+                const float keyed = std::exp2(std::log2(rawrcam::color::autoKeyPolicy(
+                                                  rawrcam::color::AutoKeyMode::Natural).targetLuma) -
+                                              s->measuredKey->key->keyEv);
+                // The brightest part (P99.5, the window) may land at most 1.5 EV over white, inside
+                // the local tone mapping's highlight protection (2 EV): a LOFIC DNG at +3 EV keyed
+                // to the room put the window 3.9 EV over white, 12% of the JPEG at 255 though the
+                // DNG held it (d1). The room is left darker and the shadow lift brings it up.
+                constexpr float kBrightMaxEv = 1.5f;
+                const float brightCap = std::exp2(kBrightMaxEv - s->measuredKey->key->brightEv);
+                const float wanted = std::max(1.0f, std::min(keyed, brightCap));
                 tone.aePostGain = std::clamp(wanted, 1.0f, kMaxGain);
                 // Past the gain limit the rest goes to the render exposure (after
                 // the shadow lift in tonemap.comp), at most 3 EV; with local tone
@@ -412,8 +419,10 @@ Java_com_rawr_camera_renderer_RendererNative_render(JNIEnv* e, jobject, jlong id
                                                     o.context.filmLook, float(tone.aePostGain), float(tone.exposureEV)))
                                               : float(tone.aePostGain) * std::exp2(float(tone.exposureEV));
                 __android_log_print(ANDROID_LOG_INFO, "RawrRenderer",
-                                    "FLOAT_DNG_GAIN keyEv=%.2f base=%.2f gain=%.2f extraEv=%.2f",
-                                    double(s->measuredKey->key->keyEv), double(base), double(tone.aePostGain),
+                                    "FLOAT_DNG_GAIN keyEv=%.2f brightEv=%.2f keyed=%.2f brightCap=%.2f base=%.2f gain=%.2f "
+                                    "extraEv=%.2f",
+                                    double(s->measuredKey->key->keyEv), double(s->measuredKey->key->brightEv),
+                                    double(keyed), double(brightCap), double(base), double(tone.aePostGain),
                                     double(extraEv));
             }
         }

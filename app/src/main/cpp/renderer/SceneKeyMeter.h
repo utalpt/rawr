@@ -9,6 +9,7 @@ namespace rawrcam::renderer {
 struct SceneKey {
     float keyEv = 0.0f;        // trimmed weighted median of log2 luma, before any render gain
     float highlightEv = 0.0f;  // weighted P95
+    float brightEv = 0.0f;     // weighted P99.5 (Rawr 17U fork: the window of a LOFIC float DNG)
 };
 
 // The camera's scene-key meter (color/AutoKeyExposure.h over image_scopes'
