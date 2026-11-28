@@ -168,8 +168,13 @@ class LoficActivity : Activity() {
         super.onResume()
         startThreads()
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.CAMERA), 1)
+            // The camera first (the result reads index 0); the notifications for the "JPEG saved" notice.
+            requestPermissions(arrayOf(Manifest.permission.CAMERA) + notificationPermissionIfMissing(), 1)
             return
+        }
+        if (!notificationsAsked && notificationPermissionIfMissing().isNotEmpty()) {
+            notificationsAsked = true
+            requestPermissions(notificationPermissionIfMissing(), 2)
         }
         if (texture.isAvailable) openCamera()
     }
@@ -180,8 +185,18 @@ class LoficActivity : Activity() {
         super.onPause()
     }
 
+    /** Android 13+: the "JPEG saved" notification needs this; asked once per screen opening. */
+    private var notificationsAsked = false
+
+    private fun notificationPermissionIfMissing(): Array<String> =
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) arrayOf(Manifest.permission.POST_NOTIFICATIONS) else emptyArray()
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 2) return  // notifications only
+        notificationsAsked = true
         if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED && texture.isAvailable) openCamera()
         else message("Camera permission needed")
     }
@@ -867,7 +882,8 @@ class LoficActivity : Activity() {
                 .format(Locale.ROOT, ratio.k, model, headroom))
             message("Saved DCIM/Camera/$name\nk=%.0f (%s, model %.0f) · up to %.1f stops above the Long clip · module %s"
                 .format(Locale.ROOT, ratio.k, if (ratio.measured) "measured" else "model", model, headroom,
-                    if (module) "detected" else "not detected (k far from the model)") + "\nJPEG: $jpeg")
+                    if (module) "detected" else "not detected (k far from the model)") +
+                "\n" + if (jpeg.startsWith("queued")) LoficJpegQueue.userHint(this) else "JPEG: $jpeg")
         } catch (e: Exception) {
             Log.w(TAG, "save", e)
             message("Save failed: ${e.message}")

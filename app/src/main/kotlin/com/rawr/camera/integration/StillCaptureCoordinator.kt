@@ -160,7 +160,7 @@ class StillCaptureCoordinator(
                 com.rawr.camera.lofic.LoficSaver.capture(application) { message ->
                     Log.i(TAG, message)
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
-                        android.widget.Toast.makeText(application, message, android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(application, message, android.widget.Toast.LENGTH_LONG).show()
                     }
                 }
                 return 0L

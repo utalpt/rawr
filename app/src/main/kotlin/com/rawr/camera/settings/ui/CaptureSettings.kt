@@ -34,6 +34,8 @@ internal fun CaptureSettings(state: SettingsUiState, dispatch: SettingsDispatch)
         locationGranted = granted.values.any { it }
         if (locationGranted) dispatch.invoke(SetLocationTagging(true))
     }
+    // Rawr 17U fork: the LOFIC lens's "JPEG saved" notification.
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     val lenses = state.values.effectiveLensProfiles(LocalLensHardware.current.deviceDefaults)
     val enabledLenses = lenses.filter { it.enabled }
     SettingsPageContainer {
@@ -143,7 +145,13 @@ internal fun CaptureSettings(state: SettingsUiState, dispatch: SettingsDispatch)
                     title = "LOFIC Lens (1x LOFIC)",
                     checked = com.rawr.camera.lofic.LoficLensSwitch.enabled,
                     testTag = SettingsTestTags.row("Capture", "lofic_lens")
-                ) { com.rawr.camera.lofic.LoficLensSwitch.set(context, it) }
+                ) {
+                    com.rawr.camera.lofic.LoficLensSwitch.set(context, it)
+                    // Its JPEGs arrive later with a "JPEG saved" notification: ask for notifications now (Android 13+).
+                    if (it && android.os.Build.VERSION.SDK_INT >= 33 &&
+                        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                    ) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
                 SettingDivider()
             }
             SettingsSwitchRow(

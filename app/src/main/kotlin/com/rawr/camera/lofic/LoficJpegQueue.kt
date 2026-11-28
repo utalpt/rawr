@@ -26,6 +26,19 @@ internal object LoficJpegQueue {
     @Volatile private var started = false
     private val pending = AtomicInteger(0)
 
+    /**
+     * What to tell the user after a LOFIC shot: the JPEG comes later, from the Renderer (about 10-15 s each), and its
+     * "JPEG saved" notification only shows with the app's notifications allowed (off by default on Android 13+).
+     */
+    fun userHint(context: Context): String {
+        val ahead = pending.get()
+        val wait = if (ahead > 1) "JPEG after $ahead in the queue, about 10-15 s each" else "JPEG in about 10-15 s"
+        val notifications = context.getSystemService(android.app.NotificationManager::class.java)
+            ?.areNotificationsEnabled() == true
+        return if (notifications) "$wait (notification when saved)"
+        else "$wait. Allow Rawr's notifications (app info > Notifications) to see when it is saved"
+    }
+
     /** Queues the DNG's JPEG; returns what the log shows ("queued", or "queued (N ahead)"). */
     fun add(context: Context, uri: Uri, name: String): String {
         start(context.applicationContext)

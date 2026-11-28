@@ -22,6 +22,8 @@ real LOFIC gain: the lens refuses the shot and says so.
   (AsShotNeutral), BaselineExposure and a NoiseProfile (Long and k x Short), so the Renderer's profiled denoise runs on it.
 - The Renderer opens float DNGs (float kept exact, no 16-bit rounding): gain metered from the scene (within 64x), local
   tone mapping, the brightest part kept at most 2 EV over white. LOFIC JPEGs are queued one after the other.
+- After a LOFIC shot the message says the JPEG follows in about 10-15 s; turning the lens on (or opening the LOFIC
+  screen) asks for notifications on Android 13+, for the "JPEG saved" notice.
 - Checked on the 17U (daylight window, Long + Short): the lens and the screen give the same results; measured k 94-98% of
   the model, 4.5 to 5.8 stops above the Long clip, the Long always on the same reader, no crash. Video LOFIC: not yet.
 

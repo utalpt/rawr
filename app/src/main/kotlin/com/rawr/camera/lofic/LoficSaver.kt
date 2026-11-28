@@ -145,7 +145,8 @@ internal object LoficSaver {
             "model=%.1f iso=$iso exposureNs=$exposureNs headroom=%.2f module=$module result=${if (matched) "matched" else "nearest"} " +
             "jpeg=$jpeg neutral=${neutralValues.joinToString(",") { "%.3f".format(Locale.ROOT, it) }}")
             .format(Locale.ROOT, ratio.k, model, headroom))
-        return "LOFIC: saved $name (%.1f stops above the Long clip)".format(Locale.ROOT, headroom)
+        return "LOFIC: saved $name (%.1f stops above the Long clip). ".format(Locale.ROOT, headroom) +
+            if (jpeg.startsWith("queued")) LoficJpegQueue.userHint(context) else "JPEG $jpeg"
     }
 
     /** Queues the DNG's JPEG (Renderer: import, current look, JPEG export), as the LOFIC screen does. */
