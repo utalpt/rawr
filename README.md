@@ -29,6 +29,8 @@
 - Release (recommended): [latest release](https://github.com/utalpt/rawr/releases/latest), file
   `rawr17u-<version>.apk`. Installs as `x17u.rawr.camera` ("Rawr 17U"); versions are named after the Rawr
   version they build on, e.g. `0.5.1-17u.1`, and each one installs over the previous.
+- Watch Remote: the watch app is `rawr17u-remote-wear-<version>.apk` on the same release, installed on a Wear
+  OS watch paired with the phone (same version as the phone app).
 - Test build: [rawr-debug.apk](https://github.com/utalpt/rawr/releases/download/debug/rawr-debug.apk)
   ([release page](https://github.com/utalpt/rawr/releases/tag/debug)). Every push to `xiaomi-17u` rebuilds it;
   install it over the previous one.
@@ -128,7 +130,16 @@ Rawr: Ed's #N)*, with the pull request it came in. Entry by entry, with how each
   0/50/100% and clipping in red, and an **RGB PARADE** waveform mode; they hide while a film card is held.
 - **Scrub readout:** a slim capsule near the top of the viewfinder while a control is scrubbed.
 - **Shutter Sound** (off by default): the system's camera sounds for photos and for the start and end of a
-  recording, the start tone played before the microphone opens. Asked for by @iG0Lka_ru.
+  recording, the start tone played before the microphone opens. Asked for by @iG0Lka_ru. On phones whose system
+  asks for the sound (some regions require it), **Follow System Shutter Rule** decides whether that wins over
+  the switch (on by default); found and written by Steve.
+- **Voice Shutter** (Settings > Photo > Capture, off by default): say "Capture" or "Cheese" to take a photo in
+  Photo mode. An offline recognizer (Vosk's small English model, Apache-2.0) runs on the phone, only while the
+  viewfinder is open; nothing is recorded or sent. Only the exact word fires (look-alikes such as "cheers" do
+  not), so the pronunciation matters: "Capture" is the more reliable one. Written by Steve.
+- **Watch Remote** (Settings > Photo > Capture, off by default): the viewfinder on a paired Wear OS watch, which
+  takes photos, through **Rawr Remote**, the watch app (`rawr17u-remote-wear-<version>.apk` on the release,
+  installed on the watch). Written by Steve.
 - **Settings by intent:** Photo, Look, RAW development, Video, Viewfinder & controls, Lenses, System, with a
   **search** whose index is generated at build time from the settings pages (a result opens its page with
   the setting highlighted). The lens editor keeps the basics on the lens page and the sensor tuning under

@@ -4,7 +4,30 @@ Fork of [Rawr](https://github.com/adityawarmanfw/rawr) for the Xiaomi 17 Ultra.
 Releases follow Ed's version: `0.5.1-17u.N`. Test work lands on `yuv-probe`
 first and moves to `xiaomi-17u` once verified.
 
-## Unreleased (on the `debug` build, not in a release yet)
+## 0.5.1-17u.17
+
+A fix for the Shutter Sound switch, two new ways to take a photo (Voice Shutter and Watch Remote, both by
+Steve) and the tele opening at 75 mm. Checked on the Xiaomi 17 Ultra. No sync with Ed's main (still up to #165).
+
+### Shutter sound and remote shutters (from Steve's v26 patch)
+
+- **Shutter Sound fix:** on some phones the system reports the shutter sound as required
+  (`MediaActionSound.mustPlayShutterSound`) outside the regions it is meant for, and the sound then played
+  whatever the switch said. **Settings > Photo > Capture > Follow System Shutter Rule** (on by default, shown
+  only on those phones) lets the Shutter Sound switch alone decide when turned off, and the (i) of Shutter
+  Sound says what the system asks for. Found and written by Steve.
+- **Voice Shutter** (off by default): "Capture" or "Cheese" takes a photo in Photo mode, with Vosk's small
+  English model (Apache-2.0) running offline on the phone while the viewfinder is open (nothing is recorded or
+  sent; the first start unpacks the model). Written by Steve. Only the exact word fires, so look-alikes such as
+  "cheers" do not; the fork also accepts "captured", which is how the model hears "Capture" from some speakers.
+- **Watch Remote** (off by default): the viewfinder on a paired Wear OS watch, which takes photos, through
+  **Rawr Remote**, the watch app: `rawr17u-remote-wear-0.5.1-17u.17.apk` on this release, installed on the
+  watch and signed with the same key as the phone app. Written by Steve.
+- Left out of this release from the same patch: HDR+ Bracketed, the multiframe resolution presets, the local
+  tone changes and the UI rotation for both landscape postures. They change the native capture, multiframe
+  merge and tonemap paths and need their own test round on the 17 Ultra.
+- Checked on the 17U: Shutter Sound off and on, Voice Shutter ("Capture" three times out of three). Watch Remote
+  as shown working in Steve's test video (not checked on a watch here).
 
 ### Tele lenses
 
