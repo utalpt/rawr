@@ -674,6 +674,9 @@ dependencies {
     implementation("com.alphacephei:vosk-android:0.3.75")
     // Rawr 17U fork: Watch Remote (Wear OS Data Layer).
     implementation("com.google.android.gms:play-services-wearable:19.0.0")
+    // play-services-wearable brings androidx.fragment 1.0 along, which lint refuses with the Activity Result APIs
+    // (InvalidFragmentVersionForActivityResult, release lint): pin a current one.
+    implementation("androidx.fragment:fragment-ktx:1.8.5")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
