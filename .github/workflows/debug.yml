@@ -160,6 +160,14 @@ jobs:
             ./gradlew :app:testDebugUnitTest :app:assembleDebug
           fi
 
+      # A failed unit test: its report (which test, which assertion, the values) as an artifact.
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() && !github.event.repository.private }}
+        with:
+          name: unit-test-report-${{ github.sha }}
+          path: app/build/reports/tests/testDebugUnitTest/
+          retention-days: 7
+
       # (a private repository – the test builds', utalpt/rawr-dev – has a small artifact quota shared by the
       # account: its APK goes to the test-build prerelease instead; release files don't count against it)
       # Publishes the APK even when the unit tests fail: a test failure leaves the assembled APK usable for
